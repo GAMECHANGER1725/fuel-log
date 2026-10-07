@@ -8,7 +8,7 @@ import { DEFAULT_DATA, exportText, normalize, parseBackup } from '../src/lib/bac
 import { parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/gemini';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
-import { checkPasscode } from '../src/lib/auth';
+import { checkPasscode, hashCode } from '../src/lib/auth';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -207,9 +207,10 @@ describe('gemini', () => {
 });
 
 describe('passcode', () => {
-  it('accepts only the right code', async () => {
-    expect(await checkPasscode('0172')).toBe(true);
-    expect(await checkPasscode('1720')).toBe(false);
-    expect(await checkPasscode('')).toBe(false);
+  // The real code is deliberately not written here (public repo).
+  it('hashes with the salt and rejects wrong codes', async () => {
+    expect(await hashCode('1234')).toBe('07b299323add332a50a3e99105ac849ad118666ebf4f30b037185375ddaef0a6'); // matches `shasum -a 256`
+    expect(await hashCode('1234')).not.toBe(await hashCode('1235'));
+    for (const c of ['0000', '1234', '9999', '']) expect(await checkPasscode(c)).toBe(false);
   });
 });

@@ -8,11 +8,12 @@ const HASH = '355cc6f9a4c55dac49b483d943adf5baba22beb448deb5b455e5a25308610671';
 const KEY = 'fuel-log-unlocked';
 export const CODE_LENGTH = 4;
 
-export async function checkPasscode(code: string): Promise<boolean> {
+export async function hashCode(code: string): Promise<string> {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`fuel-log:${code}`));
-  const hex = [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
-  return hex === HASH;
+  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
+
+export const checkPasscode = async (code: string) => (await hashCode(code)) === HASH;
 
 const read = () => {
   try {
