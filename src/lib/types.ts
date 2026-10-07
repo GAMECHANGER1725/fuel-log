@@ -33,6 +33,8 @@ export interface Entry {
   source: Source;
   /** Epoch ms when it was logged. */
   at: number;
+  /** Epoch ms of the last edit, for syncing. */
+  upd?: number;
   foodId?: string;
 }
 
@@ -41,6 +43,8 @@ export interface DayLog {
   /** 250 ml glasses. */
   water: number;
   checks: Record<string, boolean>;
+  /** Epoch ms of the last water/checks change, for syncing. */
+  m?: number;
 }
 
 export interface WeighIn {
@@ -96,4 +100,8 @@ export interface AppData {
   nudgeDismissed: string | null;
   lastExport: string | null;
   seen: GameSeen;
+  /** Entry ids deleted on any device (id → epoch ms), so a sync doesn't bring them back. */
+  tomb: Record<string, number>;
+  /** Epoch ms of the last change to profile, targets, weigh-ins or favourites (newest wins on sync). */
+  mod: number;
 }

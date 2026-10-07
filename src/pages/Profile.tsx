@@ -9,6 +9,7 @@ import { todayKey, fmtDate } from '../lib/dates';
 import type { AppData, Macros } from '../lib/types';
 import { Bar, toast, useGame, useRoute } from '../components/ui';
 import { useAuth } from '../lib/auth';
+import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
 
 const TONE = { fuel: 'var(--fuel)', protein: 'var(--pro)', sand: 'var(--carb)', ink: 'var(--ink)' };
 
@@ -18,6 +19,8 @@ export default function ProfilePage() {
   const { params } = useRoute();
   const open = params.get('open');
   const earned = g.badges.filter((b) => b.earned).length;
+  const sync = useSync();
+  const syncHint = !sync.conn ? 'Not connected' : sync.status === 'syncing' ? 'Syncing…' : sync.status === 'error' ? 'Problem' : sync.last ? `Synced ${ago(sync.last)}` : 'Connected';
 
   return (
     <>
@@ -84,6 +87,9 @@ export default function ProfilePage() {
         <Section title="AI food scanner" hint={s.settings.geminiKey ? 'Gemini key added' : 'Not set up'} hintColor={s.settings.geminiKey ? 'var(--pro)' : undefined} open={open === 'ai'}>
           <AiForm />
         </Section>
+        <Section title="Sync between devices" hint={syncHint} hintColor={sync.status === 'error' && sync.kind !== 'offline' ? 'var(--danger)' : sync.conn ? 'var(--pro)' : undefined} open={open === 'sync'}>
+          <SyncForm />
+        </Section>
         <Section title="Display and food" hint={`${s.settings.unit} · ${s.settings.theme === 'auto' ? 'match device' : s.settings.theme}`}>
           <DisplayForm />
         </Section>
@@ -98,6 +104,12 @@ export default function ProfilePage() {
       </div>
     </>
   );
+}
+
+/** "just now", "5 min ago", "2 h ago". */
+function ago(t: number) {
+  const m = Math.round((Date.now() - t) / 60_000);
+  return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`;
 }
 
 function Tile({ v, l, color }: { v: number; l: string; color?: string }) {
@@ -258,8 +270,70 @@ function DisplayForm() {
   );
 }
 
+function SyncForm() {
+  const { conn, status, error, last } = useSync();
+  const [token, setToken] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  if (!conn)
+    return (
+      <>
+        <p className="small mut">
+          Keeps your log the same on your phone and laptop. It saves a private copy of your data in a secret GitHub Gist on your own account. Do this once on each device:
+        </p>
+        <ol className="small mut" style={{ paddingLeft: 18, margin: 0, display: 'grid', gap: 6 }}>
+          <li><a href={TOKEN_URL} target="_blank" rel="noreferrer">Open GitHub’s token page</a> (the “gist” permission is already ticked; leave everything else off).</li>
+          <li>Set Expiration to <b>No expiration</b>, tap <b>Generate token</b> and copy it (starts with <code>ghp_</code>).</li>
+          <li>Paste it here and tap Connect. On your other device, paste the same token.</li>
+        </ol>
+        <input className="input" type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" spellCheck={false} placeholder="Paste GitHub token" aria-label="GitHub token" />
+        <button
+          className="btn primary"
+          disabled={busy || !token.trim()}
+          onClick={async () => {
+            setBusy(true);
+            setMsg('');
+            try {
+              await connect(token);
+              setToken('');
+              toast('Sync connected');
+            } catch (e) {
+              setMsg((e as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? 'Connecting…' : 'Connect'}
+        </button>
+        {msg && <p className="small" style={{ color: 'var(--danger)' }} role="alert">{msg}</p>}
+      </>
+    );
+
+  return (
+    <>
+      <p className="small" role="status">
+        {status === 'syncing' ? 'Syncing…' : status === 'error' ? <span style={{ color: 'var(--danger)' }}>{error}</span> : last ? `Up to date. Last synced ${ago(last)}.` : 'Connected.'}
+      </p>
+      <p className="small mut">It syncs when you open the app, a few seconds after each change, and every minute while it’s open. Your Gemini key, theme and recents stay on each device.</p>
+      <div className="row">
+        <button className="btn primary grow" disabled={status === 'syncing'} onClick={() => void syncNow()}>Sync now</button>
+        <button className="btn danger" onClick={() => { disconnect(); toast('Disconnected. Your data stays on this device.'); }}>Disconnect</button>
+      </div>
+    </>
+  );
+}
+
 function BackupForm() {
   const s = useStore();
+  const connected = !!useSync((x) => x.conn);
+  // With sync on, bring in the other device's data first so everything gets cleared/replaced everywhere.
+  const withSync = async (fn: () => void) => {
+    if (connected) await syncNow();
+    fn();
+    if (connected) void syncNow();
+  };
   const [text, setText] = useState('');
   const [pending, setPending] = useState<AppData | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -303,13 +377,13 @@ function BackupForm() {
       <button className="btn" disabled={!text.trim()} onClick={() => check(text)}>Check pasted backup</button>
       {pending && (
         <div className="card outline stack">
-          <p>This backup has {Object.keys(pending.days).length} logged days and {pending.weighIns.length} weigh-ins. Importing replaces everything here.</p>
+          <p>This backup has {Object.keys(pending.days).length} logged days and {pending.weighIns.length} weigh-ins. Importing replaces everything{connected ? ', on your synced devices too' : ' here'}.</p>
           <div className="row">
             <button
               className="btn primary grow"
               onClick={() => {
                 const g = computeGame(pending, todayKey());
-                s.replaceAll({ ...pending, seen: { level: g.level, badges: g.badges.filter((b) => b.earned).map((b) => b.id) } });
+                void withSync(() => s.replaceAll({ ...pending, seen: { level: g.level, badges: g.badges.filter((b) => b.earned).map((b) => b.id) } }));
                 setPending(null);
                 setText('');
                 toast('Backup imported');
@@ -324,7 +398,7 @@ function BackupForm() {
       <span className="mono mut" style={{ marginTop: 8 }}>Start over</span>
       {confirmReset ? (
         <div className="row">
-          <button className="btn danger grow" onClick={() => { s.reset(); toast('All data cleared'); }}>Delete everything</button>
+          <button className="btn danger grow" onClick={() => { void withSync(() => s.reset()); setConfirmReset(false); toast('All data cleared'); }}>Delete everything</button>
           <button className="btn" onClick={() => setConfirmReset(false)}>Keep my data</button>
         </div>
       ) : (

@@ -29,6 +29,8 @@ export const DEFAULT_DATA: AppData = {
   nudgeDismissed: null,
   lastExport: null,
   seen: { level: 1, badges: [] },
+  tomb: {},
+  mod: 0,
 };
 
 const SOURCES: Source[] = ['db', 'off', 'scan', 'ai-photo', 'ai-label', 'ai-text', 'custom', 'imported'];
@@ -73,6 +75,7 @@ function entry(v: unknown): Entry {
     qty: num(e.qty, 1, 0.05, 50),
     source: SOURCES.includes(e.source as Source) ? (e.source as Source) : 'custom',
     at: num(e.at, Date.now(), 0, 4e12),
+    upd: e.upd == null ? undefined : num(e.upd, 0, 0, 4e12),
     foodId: str(e.foodId, 80) || undefined,
   };
 }
@@ -81,7 +84,7 @@ function day(v: unknown): DayLog {
   const d = obj(v);
   const checks: Record<string, boolean> = {};
   for (const [k, val] of Object.entries(obj(d.checks))) if (/^[a-z]{1,20}$/.test(k)) checks[k] = !!val;
-  return { entries: arr(d.entries).slice(0, 200).map(entry), water: num(d.water, 0, 0, 60), checks };
+  return { entries: arr(d.entries).slice(0, 200).map(entry), water: num(d.water, 0, 0, 60), checks, m: d.m == null ? undefined : num(d.m, 0, 0, 4e12) };
 }
 
 /** Validate a v3 data object, filling anything missing from the defaults. */
@@ -137,6 +140,13 @@ export function normalize(raw: unknown): AppData {
       level: Math.round(num(obj(r.seen).level, 1, 1, 1000)),
       badges: arr(obj(r.seen).badges).filter((b): b is string => typeof b === 'string').slice(0, 100),
     },
+    tomb: Object.fromEntries(
+      Object.entries(obj(r.tomb))
+        .filter(([k, v]) => k.length <= 40 && typeof v === 'number')
+        .slice(0, 5000)
+        .map(([k, v]) => [k, num(v, 0, 0, 4e12)]),
+    ),
+    mod: num(r.mod, 0, 0, 4e12),
   };
 }
 

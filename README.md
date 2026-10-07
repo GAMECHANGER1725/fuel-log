@@ -26,6 +26,15 @@ A personal, gamified calorie and protein tracker for a vegetarian (eggs and dair
   XP is worked out from your log, so deleting food takes its XP back.
 - **Profile:** targets (with "suggest from my stats"), Gemini key and model, kcal or kJ, dark, light or auto theme, a whey toggle, backup export and import (including backups from the original Fuel Log artifact), and reset.
 
+## Sync between devices
+
+Optional. **Profile → Sync between devices** keeps your phone and laptop on the same log using one **secret GitHub Gist** (`fuel-log-sync.json`) in your own GitHub account.
+
+1. Create a token with only the **gist** permission: https://github.com/settings/tokens/new?scopes=gist&description=Fuel%20Log%20sync (set Expiration to *No expiration*).
+2. Paste it into the app and tap **Connect**. Repeat on each device with the same token. The second device finds the gist by itself.
+
+It syncs when you open the app, a few seconds after each change, when you switch back to the app, and every minute while it's open. Merging is per item, so food logged on both devices at once is kept, and a deleted item stays deleted. The token, Gemini key, theme and recents never go into the gist; they stay on each device. To stop syncing, tap Disconnect (your data stays) and delete the gist on GitHub if you want.
+
 ## Passcode
 
 The app opens on a passcode screen. You stay signed in until **Profile → Log out**. Only a salted hash of the code is in the repo (`src/lib/auth.ts`). It's a lock screen against casual snooping, not real security.

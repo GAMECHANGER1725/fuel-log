@@ -8,6 +8,7 @@ import ProfilePage from './pages/Profile';
 import LevelUp from './components/LevelUp';
 import Lock from './pages/Lock';
 import { useAuth } from './lib/auth';
+import { startSync, useSync } from './lib/sync';
 
 export default function App() {
   const theme = useStore((s) => s.settings.theme);
@@ -31,6 +32,10 @@ export default function App() {
     window.scrollTo(0, 0);
   }, [path]);
 
+  // Background sync runs only while signed in.
+  useEffect(() => (unlocked ? startSync() : undefined), [unlocked]);
+  const sync = useSync();
+
   if (!unlocked) return <Lock />;
 
   const page =
@@ -38,6 +43,12 @@ export default function App() {
 
   return (
     <div className="app">
+      {sync.status === 'error' && sync.kind !== 'offline' && sync.kind !== 'rate' && path !== 'profile' && (
+        <a href="#/profile?open=sync" className="card tight" style={{ display: 'block', margin: '12px 16px 0', borderColor: 'var(--danger)', color: 'var(--ink)', textDecoration: 'none' }}>
+          <span className="mono" style={{ color: 'var(--danger)' }}>Sync problem</span>
+          <span className="small" style={{ display: 'block' }}>{sync.error} Tap to fix.</span>
+        </a>
+      )}
       {page}
       <Nav path={path} />
       <Celebrations />
