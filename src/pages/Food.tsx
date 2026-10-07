@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useStore } from '../lib/store';
 import { FOODS, foodMacros, searchFoods } from '../lib/foods';
 import { searchProducts } from '../lib/off';
-import { SLOTS, energy, forGrams, slotForHour, slotLabel, scale, KJ } from '../lib/nutrition';
+import { energy, forGrams, scale, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
-import type { Food, Slot, Source } from '../lib/types';
+import type { Food, Source } from '../lib/types';
 import { Icon, MacroGrid, Sheet, Stepper, go, toast, useRoute, useToday } from '../components/ui';
 import Scanner from '../components/Scanner';
 import AiSheet from '../components/AiSheet';
@@ -16,18 +16,12 @@ export default function FoodPage() {
   const today = useToday();
   const { params } = useRoute();
   const date = params.get('d') ?? today;
-  const [slot, setSlot] = useState<Slot>((params.get('slot') as Slot) || slotForHour(new Date().getHours()));
   const [q, setQ] = useState('');
   const [picked, setPicked] = useState<Picked | null>(null);
   const [sheet, setSheet] = useState<'scan' | 'manual' | AiMode | null>(null);
   const [off, setOff] = useState<{ q: string; foods: Food[]; loading: boolean; failed: boolean }>({ q: '', foods: [], loading: false, failed: false });
   const s = useStore();
   const unit = s.settings.unit;
-
-  useEffect(() => {
-    const p = params.get('slot') as Slot | null;
-    if (p) setSlot(p);
-  }, [params.get("slot")]);
 
   const local = useMemo(() => searchFoods([...s.favourites, ...FOODS], q), [q, s.favourites]);
 
@@ -74,19 +68,13 @@ export default function FoodPage() {
     <>
       <header className="head">
         <div className="stack" style={{ gap: 2 }}>
-          <span className="mono mut">Adding to{date !== today ? ` · ${date}` : ''}</span>
-          <h1 className="title">{slotLabel(slot)}</h1>
+          <span className="mono mut">{date === today ? 'Logging now' : `Adding to ${date}`}</span>
+          <h1 className="title">Add food</h1>
         </div>
         <button className="btn" onClick={back}>Done</button>
       </header>
 
       <div className="page">
-        <div className="scroller" role="group" aria-label="Meal">
-          {SLOTS.filter((x) => x.id !== 'other').map((x) => (
-            <button key={x.id} className="chip" aria-pressed={slot === x.id} onClick={() => setSlot(x.id)}>{x.label}</button>
-          ))}
-        </div>
-
         <label className="search">
           <span className="mut"><Icon name="search" size={20} /></span>
           <input aria-label="Search foods" placeholder="Search foods or products" value={q} onChange={(e) => setQ(e.target.value)} enterKeyHint="search" />
@@ -134,8 +122,8 @@ export default function FoodPage() {
         )}
       </div>
 
-      {picked && <AddSheet date={date} slot={slot} picked={picked} onClose={() => setPicked(null)} />}
-      {sheet === 'manual' && <ManualSheet date={date} slot={slot} onClose={() => setSheet(null)} />}
+      {picked && <AddSheet date={date} picked={picked} onClose={() => setPicked(null)} />}
+      {sheet === 'manual' && <ManualSheet date={date} onClose={() => setSheet(null)} />}
       {sheet === 'scan' && (
         <Scanner
           onClose={() => setSheet(null)}
@@ -146,12 +134,12 @@ export default function FoodPage() {
           onReadLabel={() => setSheet('label')}
         />
       )}
-      {(sheet === 'photo' || sheet === 'label' || sheet === 'text') && <AiSheet mode={sheet} date={date} slot={slot} initialText={sheet === 'text' ? q : ''} onClose={() => setSheet(null)} />}
+      {(sheet === 'photo' || sheet === 'label' || sheet === 'text') && <AiSheet mode={sheet} date={date} initialText={sheet === 'text' ? q : ''} onClose={() => setSheet(null)} />}
     </>
   );
 }
 
-function AddSheet({ date, slot, picked, onClose }: { date: string; slot: Slot; picked: Picked; onClose: () => void }) {
+function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onClose: () => void }) {
   const { food, source } = picked;
   const s = useStore();
   const byGrams = !!food.per100;
@@ -167,7 +155,7 @@ function AddSheet({ date, slot, picked, onClose }: { date: string; slot: Slot; p
       useGrams && food.per100
         ? { name: food.name, serving: `${grams} g`, base: m, qty: 1 }
         : { name: food.name, serving: food.serving, base: foodMacros(food), qty };
-    s.addEntries(date, [{ ...entry, slot, source, foodId: food.id }], [food]);
+    s.addEntries(date, [{ ...entry, source, foodId: food.id }], [food]);
     toast(`Added ${food.name}`, xp);
     onClose();
   };
@@ -200,13 +188,13 @@ function AddSheet({ date, slot, picked, onClose }: { date: string; slot: Slot; p
         >
           <Icon name="star" size={18} />
         </button>
-        <button className="btn primary grow" style={{ minHeight: 52 }} onClick={add}>Add to {slotLabel(slot).toLowerCase()} · +{xp} XP</button>
+        <button className="btn primary grow" style={{ minHeight: 52 }} onClick={add}>Add · +{xp} XP</button>
       </div>
     </Sheet>
   );
 }
 
-function ManualSheet({ date, slot, onClose }: { date: string; slot: Slot; onClose: () => void }) {
+function ManualSheet({ date, onClose }: { date: string; onClose: () => void }) {
   const s = useStore();
   const unit = s.settings.unit;
   const [f, setF] = useState({ name: '', serving: '', energy: '', protein: '', carbs: '', fat: '', fav: false });
@@ -218,7 +206,7 @@ function ManualSheet({ date, slot, onClose }: { date: string; slot: Slot; onClos
   const save = () => {
     const base = { kcal: Math.round(kcal), protein: n(f.protein), carbs: n(f.carbs), fat: n(f.fat) };
     const food: Food = { id: `fav-${Date.now().toString(36)}`, name: f.name.trim().slice(0, 60), serving: f.serving.trim() || '1 serve', ...base };
-    s.addEntries(date, [{ name: food.name, serving: food.serving, base, qty: 1, slot, source: 'custom' }], [food]);
+    s.addEntries(date, [{ name: food.name, serving: food.serving, base, qty: 1, source: 'custom' }], [food]);
     if (f.fav) s.toggleFavourite(food);
     toast(`Added ${food.name}`, XP.meal);
     onClose();
@@ -236,7 +224,7 @@ function ManualSheet({ date, slot, onClose }: { date: string; slot: Slot; onClos
         <label className="field"><span>Fat (g)</span><input className="input" inputMode="decimal" type="number" min="0" value={f.fat} onChange={set('fat')} /></label>
       </div>
       <label className="row small"><input type="checkbox" checked={f.fav} onChange={set('fav')} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} /> Save as a favourite for one-tap adding</label>
-      <button className="btn primary block" disabled={!ok} onClick={save}>Add to {slotLabel(slot).toLowerCase()} · +{XP.meal} XP</button>
+      <button className="btn primary block" disabled={!ok} onClick={save}>Add · +{XP.meal} XP</button>
     </Sheet>
   );
 }

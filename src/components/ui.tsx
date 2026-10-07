@@ -163,7 +163,7 @@ export function useGame() {
   return useMemo(() => computeGame(dataOf({ ...useStore.getState(), days, weighIns, settings }), today), [days, weighIns, settings, today]);
 }
 
-/** Minimal hash router: #/today, #/food?slot=dinner, ... */
+/** Minimal hash router: #/today, #/food?d=2026-10-06, ... */
 export function useRoute(): { path: string; params: URLSearchParams } {
   const hash = useSyncExternalStore(
     (cb) => {

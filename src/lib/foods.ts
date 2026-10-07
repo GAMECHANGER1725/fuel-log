@@ -75,7 +75,7 @@ const ROWS: Row[] = [
   ['Croissant', '1 croissant', 230, 4.7, 26, 12],
   ['Rice, cooked', '1 cup', 205, 4.3, 45, 0.4],
   ['Pasta, cooked', '1 cup (140 g)', 220, 8, 43, 1.3],
-  ['Spaghetti bolognese', '1 bowl', 550, 28, 65, 18, 'g'],
+  ['Lentil bolognese', '1 bowl', 520, 24, 75, 14, 'g'],
   ['Mac and cheese', '1 bowl (250 g)', 450, 17, 50, 20],
   ['Instant noodles', '1 pack', 345, 7.5, 47, 14],
   ['Potato, baked', '1 medium (200 g)', 190, 5, 42, 0.3],

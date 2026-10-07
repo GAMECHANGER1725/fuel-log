@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayTotals, energy, forGrams, slotForHour } from '../src/lib/nutrition';
+import { dayTotals, energy, forGrams } from '../src/lib/nutrition';
 import { FOODS, gapSuggestions, searchFoods } from '../src/lib/foods';
 import { addDays, weekStart } from '../src/lib/dates';
 import { suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
@@ -15,7 +15,6 @@ const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry
   serving: '',
   base: { kcal, protein, carbs: 0, fat: 0 },
   qty: 1,
-  slot: 'lunch',
   source: 'db',
   at: new Date('2026-10-07T12:00:00').getTime(),
   ...extra,
@@ -33,14 +32,6 @@ describe('nutrition', () => {
   });
   it('scales per-100 g', () => {
     expect(forGrams({ kcal: 200, protein: 10, carbs: 20, fat: 5 }, 150)).toEqual({ kcal: 300, protein: 15, carbs: 30, fat: 7.5 });
-  });
-  it('picks slot by hour', () => {
-    expect(slotForHour(7)).toBe('breakfast');
-    expect(slotForHour(11)).toBe('recess');
-    expect(slotForHour(13)).toBe('lunch');
-    expect(slotForHour(16)).toBe('arvo');
-    expect(slotForHour(19)).toBe('dinner');
-    expect(slotForHour(22)).toBe('supper');
   });
 });
 
@@ -66,8 +57,8 @@ describe('foods', () => {
     expect(gapSuggestions({ kcal: 50, protein: 2 }, FOODS, { wheyOk: false, atSchool: false })).toEqual([]);
   });
   it('is vegetarian (eggs and dairy OK)', () => {
-    const meat = /chicken|beef|lamb|pork|ham\b|bacon|steak|mince|salmon|tuna|fish|prawn|meat pie|sausage roll'/i;
-    expect(FOODS.filter((f) => meat.test(f.name) && !/veg|vegetarian/i.test(f.name)).map((f) => f.name)).toEqual([]);
+    const meat = /chicken|beef|lamb|pork|ham\b|bacon|steak|mince|salmon|tuna|fish|prawn|meat pie|sausage roll'|bolognese|pepperoni|kebab/i;
+    expect(FOODS.filter((f) => meat.test(f.name) && !/veg|vegetarian|lentil/i.test(f.name)).map((f) => f.name)).toEqual([]);
   });
   it('close the gap: at school prefers packable food', () => {
     const picks = gapSuggestions({ kcal: 600, protein: 30 }, FOODS, { wheyOk: false, atSchool: true });
@@ -137,7 +128,7 @@ describe('game', () => {
   });
   it('computes XP, hits and badges from the log, and XP goes away when food is deleted', () => {
     const today = '2026-10-07';
-    const big = day([entry(1500, 60, { slot: 'breakfast', source: 'scan' }), entry(1600, 60, { slot: 'dinner', source: 'ai-photo' })], 8);
+    const big = day([entry(1500, 60, { source: 'scan' }), entry(1600, 60, { source: 'ai-photo' })], 8);
     const g = computeGame(data({ days: { [today]: big } }), today);
     expect(g.today.hitKcal && g.today.hitProtein && g.today.water).toBe(true);
     expect(g.xp).toBeGreaterThanOrEqual(20 + 10 + 50 + 50 + 25 + 15);
@@ -169,7 +160,7 @@ describe('backup', () => {
     const d = parseBackup(JSON.stringify(v2));
     expect(d.settings.unit).toBe('kJ');
     expect(d.settings.targets.protein).toBe(100);
-    expect(d.days['2026-10-01'].entries[0]).toMatchObject({ name: 'Oats', slot: 'other', source: 'imported', base: { kcal: 300, protein: 10 } });
+    expect(d.days['2026-10-01'].entries[0]).toMatchObject({ name: 'Oats', source: 'imported', base: { kcal: 300, protein: 10 } });
     expect(d.days['2026-10-01'].water).toBe(4);
     expect(d.weighIns).toEqual([{ date: '2026-10-01', kg: 58.3 }]);
     expect(d.favourites[0].name).toBe('Milk, 300 ml glass');

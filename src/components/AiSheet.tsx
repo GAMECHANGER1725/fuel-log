@@ -1,9 +1,8 @@
 import { useRef, useState } from 'react';
 import { useStore } from '../lib/store';
 import { analyse, fileToJpeg, friendlyError, type AiItem, type AiMode, type AiResult } from '../lib/gemini';
-import { slotLabel, sumEntries, energy } from '../lib/nutrition';
+import { sumEntries, energy } from '../lib/nutrition';
 import { XP } from '../lib/game';
-import type { Slot } from '../lib/types';
 import { go, Icon, MacroGrid, Sheet, toast } from './ui';
 
 type Row = AiItem & { qty: number; removed: boolean };
@@ -14,7 +13,7 @@ const COPY: Record<AiMode, { title: string; take: string; hint: string; source: 
   text: { title: 'Describe it', take: '', hint: 'e.g. 3 rotli with ghee, a bowl of toor dal and a glass of milk', source: 'ai-text' },
 };
 
-export default function AiSheet({ mode, date, slot, initialText = '', onClose }: { mode: AiMode; date: string; slot: Slot; initialText?: string; onClose: () => void }) {
+export default function AiSheet({ mode, date, initialText = '', onClose }: { mode: AiMode; date: string; initialText?: string; onClose: () => void }) {
   const s = useStore();
   const c = COPY[mode];
   const fileRef = useRef<HTMLInputElement>(null);
@@ -50,7 +49,6 @@ export default function AiSheet({ mode, date, slot, initialText = '', onClose }:
     serving: r.portion,
     base: { kcal: r.kcal, protein: r.protein, carbs: r.carbs, fat: r.fat },
     qty: r.qty,
-    slot,
     source: c.source,
   }));
   const total = sumEntries(entries.map((e) => ({ ...e, id: '', at: 0 })));
@@ -171,7 +169,7 @@ export default function AiSheet({ mode, date, slot, initialText = '', onClose }:
                 onClose();
               }}
             >
-              Log to {slotLabel(slot).toLowerCase()} · +{xp} XP
+              Log {entries.length} item{entries.length === 1 ? '' : 's'} · +{xp} XP
             </button>
           </div>
           <span className="mono dim" style={{ textAlign: 'center' }}>Estimate only · {result.model}</span>

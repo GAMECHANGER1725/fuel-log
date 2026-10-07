@@ -59,20 +59,22 @@ export interface QuestDef {
 }
 
 const hourOf = (ms: number) => new Date(ms).getHours();
-const slotSum = (day: DayLog, slots: string[]) => sumEntries(day.entries.filter((e) => slots.includes(e.slot)));
-const slotsWith = (day: DayLog, pred: (m: Macros) => boolean) =>
-  [...new Set(day.entries.map((e) => e.slot))].filter((s) => pred(slotSum(day, [s]))).length;
+/** Totals of what was logged in hours [from, to). */
+const between = (day: DayLog, from: number, to: number) => sumEntries(day.entries.filter((e) => hourOf(e.at) >= from && hourOf(e.at) < to));
+/** Number of distinct clock hours whose logged food passes `pred`. */
+const hoursWith = (day: DayLog, pred: (m: Macros) => boolean) =>
+  [...new Set(day.entries.map((e) => hourOf(e.at)))].filter((h) => pred(between(day, h, h + 1))).length;
 
 export const QUESTS: QuestDef[] = [
-  { id: 'early', title: 'Log breakfast before 9 am', xp: 20, done: (d) => d.entries.some((e) => e.slot === 'breakfast' && hourOf(e.at) < 9) },
-  { id: 'p-lunch', title: 'Hit 40 g protein by lunch', xp: 30, done: (d) => slotSum(d, ['breakfast', 'recess', 'lunch']).protein >= 40 },
+  { id: 'early', title: 'Log food before 9 am', xp: 20, done: (d) => d.entries.some((e) => hourOf(e.at) < 9) },
+  { id: 'p-2pm', title: 'Hit 40 g protein before 2 pm', xp: 30, done: (d) => between(d, 0, 14).protein >= 40 },
   { id: 'scan', title: 'Scan a packet with the barcode scanner', xp: 25, done: (d) => d.entries.some((e) => e.source === 'scan') },
   { id: 'water', title: 'Drink your water goal', xp: 20, done: (d, c) => d.water >= c.waterGlasses },
-  { id: 'five', title: 'Eat in 5 different meal slots', xp: 30, done: (d) => new Set(d.entries.map((e) => e.slot)).size >= 5 },
-  { id: 'snacks', title: 'Log a recess and an after-school snack', xp: 20, done: (d) => d.entries.some((e) => e.slot === 'recess') && d.entries.some((e) => e.slot === 'arvo') },
-  { id: 'bed', title: 'Have a 300+ kcal snack before bed', xp: 20, done: (d) => slotSum(d, ['supper']).kcal >= 300 },
-  { id: 'p3', title: 'Get 20 g+ protein in 3 different meals', xp: 30, done: (d) => slotsWith(d, (m) => m.protein >= 20) >= 3 },
-  { id: 'big-bf', title: 'Eat a 600+ kcal breakfast', xp: 25, done: (d) => slotSum(d, ['breakfast']).kcal >= 600 },
+  { id: 'five', title: 'Log 5 or more foods today', xp: 25, done: (d) => d.entries.length >= 5 },
+  { id: 'spread', title: 'Eat in the morning, afternoon and evening', xp: 25, done: (d) => [between(d, 0, 12), between(d, 12, 17), between(d, 17, 24)].every((m) => m.kcal > 0) },
+  { id: 'late', title: 'Have a 300+ kcal snack after 8 pm', xp: 20, done: (d) => between(d, 20, 24).kcal >= 300 },
+  { id: 'p3', title: 'Get 20 g+ protein at 3 different times', xp: 30, done: (d) => hoursWith(d, (m) => m.protein >= 20) >= 3 },
+  { id: 'big-am', title: 'Eat 600+ kcal before 10 am', xp: 25, done: (d) => between(d, 0, 10).kcal >= 600 },
   { id: 'ai', title: 'Log a meal with the AI scanner', xp: 20, done: (d) => d.entries.some((e) => e.source.startsWith('ai-')) },
   { id: 'quality', title: 'Tick all 4 food-quality checks', xp: 20, done: (d) => Object.values(d.checks).filter(Boolean).length >= 4 },
   { id: 'both', title: 'Hit your kcal and protein today', xp: 40, done: (d, c) => hits(dayTotals(d), c.targets).both },
@@ -248,7 +250,7 @@ export function computeGame(d: AppData, today: string) {
   const ai = allEntries.filter((e) => e.source.startsWith('ai-')).length;
   const maxKcal = Math.max(0, ...stats.map((s) => s.totals.kcal));
   const waterDays = stats.filter((s) => s.water).length;
-  const breakfasts = Object.values(d.days).filter((x) => x.entries.some((e) => e.slot === 'breakfast')).length;
+  const earlyDays = Object.values(d.days).filter((x) => x.entries.some((e) => hourOf(e.at) < 9)).length;
   const proteinRun = longestRun(stats, (s) => s.hitProtein);
   const w = [...d.weighIns].sort((a, b) => (a.date < b.date ? -1 : 1));
   const gained = w.length >= 2 ? Math.max(0, w[w.length - 1].kg - w[0].kg) : 0;
@@ -274,7 +276,7 @@ export function computeGame(d: AppData, today: string) {
     B('protein-7', 'Protein 7-streak', 'Hit protein 7 days in a row', 'P7', 'protein', proteinRun, 7),
     B('kcal-3000', '3,000 Club', 'Eat 3,000 kcal in a day', '3K', 'sand', maxKcal, 3000),
     B('hydrated-7', 'Hydrated x7', 'Hit your water goal on 7 days', 'H2O', 'protein', waterDays, 7),
-    B('breakfast-14', 'Early fuel', 'Log breakfast on 14 days', 'AM', 'ink', breakfasts, 14),
+    B('early-14', 'Early fuel', 'Log food before 9 am on 14 days', 'AM', 'ink', earlyDays, 14),
     B('boss-1', 'Boss slayer', 'Beat a weekly boss', 'B', 'sand', bossWins, 1),
     B('boss-5', 'Boss hunter', 'Beat 5 weekly bosses', 'B5', 'sand', bossWins, 5),
     B('level-5', 'Level 5', 'Reach level 5', 'L5', 'sand', lvl.level, 5),

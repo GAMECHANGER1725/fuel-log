@@ -7,8 +7,6 @@ export interface Macros {
   fat: number;
 }
 
-export type Slot = 'breakfast' | 'recess' | 'lunch' | 'arvo' | 'dinner' | 'supper' | 'other';
-
 export type Source = 'db' | 'off' | 'scan' | 'ai-photo' | 'ai-label' | 'ai-text' | 'custom' | 'imported';
 
 /** A food you can add: macros are for one serving. */
@@ -25,16 +23,15 @@ export interface Food extends Macros {
   barcode?: string;
 }
 
-/** One logged item. `base` is one serving; totals are base × qty. */
+/** One logged item. `base` is one serving; totals are base × qty. `at` is when it was logged (kept for insights). */
 export interface Entry {
   id: string;
   name: string;
   serving: string;
   base: Macros;
   qty: number;
-  slot: Slot;
   source: Source;
-  /** Epoch ms when logged. */
+  /** Epoch ms when it was logged. */
   at: number;
   foodId?: string;
 }

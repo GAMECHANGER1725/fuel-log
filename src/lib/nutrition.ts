@@ -1,4 +1,4 @@
-import type { DayLog, Entry, Macros, Slot } from './types';
+import type { DayLog, Entry, Macros } from './types';
 
 export const KJ = 4.184;
 export const ZERO: Macros = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
@@ -43,20 +43,5 @@ export function energy(kcal: number, unit: 'kcal' | 'kJ'): string {
 
 export const fmt = (n: number) => Math.round(n).toLocaleString('en-AU');
 
-export const SLOTS: { id: Slot; label: string; time: string; from: number }[] = [
-  { id: 'breakfast', label: 'Breakfast', time: '7:00', from: 0 },
-  { id: 'recess', label: 'Recess', time: '10:50', from: 10 },
-  { id: 'lunch', label: 'Lunch', time: '1:15', from: 12 },
-  { id: 'arvo', label: 'After school', time: '3:40', from: 15 },
-  { id: 'dinner', label: 'Dinner', time: '6:30', from: 18 },
-  { id: 'supper', label: 'Before bed', time: '9:00', from: 21 },
-];
-
-export const slotLabel = (s: Slot) => SLOTS.find((x) => x.id === s)?.label ?? 'Imported';
-
-/** The slot that fits the current time of day. */
-export function slotForHour(h: number): Slot {
-  let cur: Slot = 'breakfast';
-  for (const s of SLOTS) if (h >= s.from) cur = s.id;
-  return cur;
-}
+/** Time an entry was logged, e.g. "7:20 am". */
+export const timeOf = (ms: number) => new Date(ms).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });

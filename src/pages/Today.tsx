@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store';
 import { addDays, fmtDate } from '../lib/dates';
-import { SLOTS, dayTotals, energy, entryMacros, fmt, slotForHour, slotLabel, sumEntries } from '../lib/nutrition';
+import { dayTotals, energy, entryMacros, fmt, timeOf } from '../lib/nutrition';
 import { FOODS, gapSuggestions } from '../lib/foods';
 import { XP } from '../lib/game';
-import type { Entry, Food, Slot } from '../lib/types';
+import type { Entry, Food } from '../lib/types';
 import { Bar, Icon, MacroGrid, Rings, Sheet, Stepper, toast, useGame, useRoute, useToday } from '../components/ui';
 
 const CHECKS: [string, string][] = [
@@ -34,18 +34,17 @@ export default function Today() {
 
   const setDate = (k: string) => (window.location.hash = k === today ? '/today' : `/today?d=${k}`);
   const now = new Date();
-  const slotNow = isToday ? slotForHour(now.getHours()) : 'dinner';
   const weekday = now.getDay() >= 1 && now.getDay() <= 5;
   const atSchool = isToday && weekday && now.getHours() >= 8 && now.getHours() < 15;
   const gap = isToday ? gapSuggestions({ kcal: kLeft, protein: pLeft }, [...s.favourites, ...FOODS.filter((f) => f.tags)], { wheyOk: s.settings.wheyOk, atSchool }) : [];
 
   const addFood = (f: Food) => {
-    s.addEntries(date, [{ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty: 1, slot: slotNow, source: 'db', foodId: f.id }], [f]);
-    toast(`Added ${f.name} to ${slotLabel(slotNow).toLowerCase()}`, XP.meal);
+    s.addEntries(date, [{ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty: 1, source: 'db', foodId: f.id }], [f]);
+    toast(`Added ${f.name}`, XP.meal);
   };
 
-  const slots = SLOTS.filter((x) => x.id !== 'other');
-  const imported = day.entries.filter((e) => e.slot === 'other');
+  const log = [...day.entries].sort((a, b) => a.at - b.at);
+  const addHref = `#/food${isToday ? '' : `?d=${date}`}`;
 
   return (
     <>
@@ -153,7 +152,7 @@ export default function Today() {
 
         <section className="stack" style={{ marginTop: 8 }}>
           <div className="between" style={{ alignItems: 'center' }}>
-            <h2 className="h2">Meals</h2>
+            <h2 className="h2">Log</h2>
             {(s.days[addDays(date, -1)]?.entries.length ?? 0) > 0 && (
               <button
                 className="btn sm"
@@ -166,32 +165,20 @@ export default function Today() {
               </button>
             )}
           </div>
-          {[...slots, ...(imported.length ? [{ id: 'other' as Slot, label: 'Imported', time: '', from: 0 }] : [])].map((slot) => {
-            const items = day.entries.filter((e) => e.slot === slot.id);
-            if (!items.length)
-              return (
-                <a key={slot.id} href={`#/food?slot=${slot.id}${isToday ? '' : `&d=${date}`}`} className="between" style={{ alignItems: 'center', minHeight: 52, padding: '0 14px', border: '2px dashed var(--line2)', borderRadius: 6, color: 'var(--ink)', textDecoration: 'none' }}>
-                  <span className="mono mut">{slot.label}</span>
-                  <span className="mono fuel">+ Add</span>
-                </a>
-              );
-            const m = sumEntries(items);
-            return (
-              <div key={slot.id} className="card tight stack" style={{ gap: 4 }}>
-                <div className="between">
-                  <span className="mono mut">{slot.label}</span>
-                  <span className="mono">{energy(m.kcal, unit)} · {fmt(m.protein)} g</span>
-                </div>
-                {items.map((e) => (
-                  <button key={e.id} className="item-btn" style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, minHeight: 32, alignItems: 'center' }} onClick={() => setEditing(e)}>
-                    <span>{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
-                    <span className="mono dim" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)}</span>
-                  </button>
-                ))}
-                <a href={`#/food?slot=${slot.id}${isToday ? '' : `&d=${date}`}`} className="mono fuel" style={{ textDecoration: 'none', paddingTop: 4 }}>+ Add more</a>
-              </div>
-            );
-          })}
+          {log.length > 0 ? (
+            <div className="card tight">
+              {log.map((e, i) => (
+                <button key={e.id} className="item-btn" style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, borderTop: i ? '2px solid var(--line)' : 0 }} onClick={() => setEditing(e)}>
+                  <span className="mono dim" style={{ width: 64, flex: 'none' }}>{timeOf(e.at)}</span>
+                  <span className="grow">{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
+                  <span className="mono mut" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)} · {fmt(entryMacros(e).protein)} g</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="empty">Nothing logged {isToday ? 'yet today' : 'this day'}.</p>
+          )}
+          <a href={addHref} className="btn primary block"><Icon name="plus" size={18} stroke={3} /> Add food</a>
         </section>
 
         <section className="card">
@@ -241,22 +228,16 @@ export default function Today() {
 function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClose: () => void }) {
   const s = useStore();
   const [qty, setQty] = useState(entry.qty);
-  const [slot, setSlot] = useState<Slot>(entry.slot);
   const m = entryMacros({ ...entry, qty });
   const fav = s.favourites.some((f) => f.name.toLowerCase() === entry.name.toLowerCase());
   return (
     <Sheet onClose={onClose} label={`Edit ${entry.name}`}>
       <div className="stack" style={{ gap: 2 }}>
-        <span className="mono mut">{entry.serving || 'Logged item'}</span>
+        <span className="mono mut">Logged {timeOf(entry.at)}{entry.serving ? ` · ${entry.serving}` : ''}</span>
         <h2 className="h2" style={{ fontSize: 26 }}>{entry.name}</h2>
       </div>
       <Stepper value={qty} onChange={setQty} label="servings" />
       <MacroGrid {...m} unit={s.settings.unit} />
-      <div className="scroller">
-        {SLOTS.filter((x) => x.id !== 'other').map((x) => (
-          <button key={x.id} className="chip" aria-pressed={slot === x.id} onClick={() => setSlot(x.id)}>{x.label}</button>
-        ))}
-      </div>
       <div className="row">
         <button className="btn danger" onClick={() => { s.removeEntry(date, entry.id); toast(`Removed ${entry.name}`); onClose(); }} aria-label="Delete"><Icon name="trash" size={18} /></button>
         <button
@@ -271,7 +252,7 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
         >
           <Icon name="star" size={18} />
         </button>
-        <button className="btn primary grow" onClick={() => { s.updateEntry(date, entry.id, { qty, slot }); onClose(); }}>Save</button>
+        <button className="btn primary grow" onClick={() => { s.updateEntry(date, entry.id, { qty }); onClose(); }}>Save</button>
       </div>
     </Sheet>
   );

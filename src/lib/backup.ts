@@ -1,7 +1,7 @@
 // Defaults, backup export, and import (this app's v3 backups and the original Fuel Log artifact's v2).
 // Imported files are untrusted, so everything is re-validated field by field.
 
-import type { AppData, DayLog, Entry, Food, Macros, Slot, Source } from './types';
+import type { AppData, DayLog, Entry, Food, Macros, Source } from './types';
 import { isKey } from './dates';
 import { r1 } from './nutrition';
 import { DEFAULT_MODEL } from './gemini';
@@ -31,7 +31,6 @@ export const DEFAULT_DATA: AppData = {
   seen: { level: 1, badges: [] },
 };
 
-const SLOTS: Slot[] = ['breakfast', 'recess', 'lunch', 'arvo', 'dinner', 'supper', 'other'];
 const SOURCES: Source[] = ['db', 'off', 'scan', 'ai-photo', 'ai-label', 'ai-text', 'custom', 'imported'];
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
@@ -72,7 +71,6 @@ function entry(v: unknown): Entry {
     serving: str(e.serving, 60),
     base: macros(e.base),
     qty: num(e.qty, 1, 0.05, 50),
-    slot: SLOTS.includes(e.slot as Slot) ? (e.slot as Slot) : 'other',
     source: SOURCES.includes(e.source as Source) ? (e.source as Source) : 'custom',
     at: num(e.at, Date.now(), 0, 4e12),
     foodId: str(e.foodId, 80) || undefined,
@@ -159,7 +157,6 @@ export function fromFuelLogV2(raw: unknown): AppData {
           serving: '',
           base: { kcal: num(x.kcal, 0, 0, 10000), protein: num(x.protein, 0, 0, 600), carbs: 0, fat: 0 },
           qty: 1,
-          slot: 'other',
           source: 'imported',
           at: new Date(`${k}T12:00:00`).getTime() + i,
         };
