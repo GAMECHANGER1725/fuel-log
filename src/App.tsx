@@ -5,11 +5,9 @@ import Today from './pages/Today';
 import FoodPage from './pages/Food';
 import Progress from './pages/Progress';
 import ProfilePage from './pages/Profile';
-import Onboarding from './pages/Onboarding';
 import LevelUp from './components/LevelUp';
 
 export default function App() {
-  const onboarded = useStore((s) => s.onboarded);
   const theme = useStore((s) => s.settings.theme);
   const { path } = useRoute();
 
@@ -26,9 +24,9 @@ export default function App() {
     navigator.storage?.persist?.().catch(() => {});
   }, []);
 
-  useEffect(() => window.scrollTo(0, 0), [path]);
-
-  if (!onboarded) return <Onboarding />;
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [path]);
 
   const page =
     path === 'food' ? <FoodPage /> : path === 'progress' ? <Progress /> : path === 'profile' ? <ProfilePage /> : <Today />;

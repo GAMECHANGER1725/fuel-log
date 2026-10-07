@@ -6,12 +6,12 @@ import { isKey } from './dates';
 import { r1 } from './nutrition';
 import { DEFAULT_MODEL } from './gemini';
 
+// Personal app: starts set up for its one user. Targets = suggestTargets(profile).
 export const DEFAULT_DATA: AppData = {
   v: 3,
-  onboarded: false,
-  profile: { name: '', heightCm: 175, weightKg: 60, age: 15, sex: 'male', activity: 'moderate', goalKg: null },
+  profile: { name: 'Vaidik', heightCm: 182, weightKg: 58.3, age: 15, sex: 'male', activity: 'moderate', goalKg: null },
   settings: {
-    targets: { kcal: 3000, protein: 115, carbs: 405, fat: 83 },
+    targets: { kcal: 3050, protein: 115, carbs: 456, fat: 85 },
     waterL: 2,
     gainLow: 0.25,
     gainHigh: 0.5,
@@ -102,7 +102,6 @@ export function normalize(raw: unknown): AppData {
   const gainLow = num(s.gainLow, D.settings.gainLow, 0, 2);
   return {
     v: 3,
-    onboarded: !!r.onboarded,
     profile: {
       name: str(p.name, 40),
       heightCm: num(p.heightCm, D.profile.heightCm, 100, 250),
@@ -173,7 +172,6 @@ export function fromFuelLogV2(raw: unknown): AppData {
   const protein = num(s.protein, 115, 20, 300);
   const fat = Math.round((kcal * 0.25) / 9);
   return normalize({
-    onboarded: true,
     settings: {
       targets: { kcal, protein, fat, carbs: Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4)) },
       waterL: s.waterL,
@@ -197,7 +195,7 @@ export function parseBackup(text: string): AppData {
   const p = obj(JSON.parse(String(text).trim()));
   const isWrapped = (p.app === 'fuel-log' || p.app === 'lift-log') && p.data;
   const data = obj(isWrapped ? p.data : p);
-  if (data.v === 3 || p.v === 3) return { ...normalize(data), onboarded: true };
+  if (data.v === 3 || p.v === 3) return normalize(data);
   if (data.days && typeof data.days === 'object') return fromFuelLogV2(data);
   throw new Error('Not a Fuel Log backup');
 }

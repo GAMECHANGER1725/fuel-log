@@ -21,7 +21,7 @@ const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry
   ...extra,
 });
 const day = (entries: Entry[], water = 0): DayLog => ({ entries, water, checks: {} });
-const data = (patch: Partial<AppData> = {}): AppData => ({ ...structuredClone(DEFAULT_DATA), onboarded: true, ...patch });
+const data = (patch: Partial<AppData> = {}): AppData => ({ ...structuredClone(DEFAULT_DATA), ...patch });
 
 describe('nutrition', () => {
   it('totals multiply by qty', () => {
@@ -65,6 +65,10 @@ describe('foods', () => {
     expect(picks.every((f) => f.kcal >= 300)).toBe(true);
     expect(gapSuggestions({ kcal: 50, protein: 2 }, FOODS, { wheyOk: false, atSchool: false })).toEqual([]);
   });
+  it('is vegetarian (eggs and dairy OK)', () => {
+    const meat = /chicken|beef|lamb|pork|ham\b|bacon|steak|mince|salmon|tuna|fish|prawn|meat pie|sausage roll'/i;
+    expect(FOODS.filter((f) => meat.test(f.name) && !/veg|vegetarian/i.test(f.name)).map((f) => f.name)).toEqual([]);
+  });
   it('close the gap: at school prefers packable food', () => {
     const picks = gapSuggestions({ kcal: 600, protein: 30 }, FOODS, { wheyOk: false, atSchool: true });
     expect(picks.every((f) => f.tags?.includes('p'))).toBe(true);
@@ -72,8 +76,9 @@ describe('foods', () => {
 });
 
 describe('targets', () => {
-  it('suggests a sensible bulk for a 182 cm / 58.3 kg 15-year-old', () => {
-    const t = suggestTargets({ name: '', heightCm: 182, weightKg: 58.3, age: 15, sex: 'male', activity: 'moderate', goalKg: null });
+  it('suggests a sensible bulk for a 182 cm / 58.3 kg 15-year-old, matching the built-in defaults', () => {
+    const t = suggestTargets(DEFAULT_DATA.profile);
+    expect(DEFAULT_DATA.settings.targets).toEqual(t);
     expect(t.kcal).toBeGreaterThanOrEqual(2900);
     expect(t.kcal).toBeLessThanOrEqual(3200);
     expect(t.protein).toBe(115);
@@ -93,12 +98,13 @@ describe('targets', () => {
   it('nudges up when gaining slowly and eating to target, asks to eat more otherwise', () => {
     const today = '2026-10-07';
     const weighIns = [0, 7, 14, 21].map((i) => ({ date: addDays('2026-09-16', i), kg: 58 + 0.05 * (i / 7) }));
+    const T = DEFAULT_DATA.settings.targets.kcal;
     const ate = (kcal: number) => Object.fromEntries(Array.from({ length: 7 }, (_, i) => [addDays(today, -i - 1), day([entry(kcal, 100)])]));
-    expect(weeklyNudge(data({ weighIns, days: ate(3000) }), today)).toMatchObject({ kind: 'raise', to: 3200 });
+    expect(weeklyNudge(data({ weighIns, days: ate(T) }), today)).toMatchObject({ kind: 'raise', to: DEFAULT_DATA.settings.targets.kcal + 200 });
     expect(weeklyNudge(data({ weighIns, days: ate(2000) }), today)).toMatchObject({ kind: 'eat-more' });
-    expect(weeklyNudge(data({ weighIns, days: ate(3000), nudgeDismissed: weekStart(today) }), today)).toBeNull();
+    expect(weeklyNudge(data({ weighIns, days: ate(T), nudgeDismissed: weekStart(today) }), today)).toBeNull();
     const fast = weighIns.map((w, i) => ({ ...w, kg: 58 + i }));
-    expect(weeklyNudge(data({ weighIns: fast }), today)).toMatchObject({ kind: 'lower', to: 2850 });
+    expect(weeklyNudge(data({ weighIns: fast }), today)).toMatchObject({ kind: 'lower', to: DEFAULT_DATA.settings.targets.kcal - 150 });
   });
   it('projects a goal date', () => {
     expect(projectedDate(60, 62, 0.5, '2026-10-07')).toBe('2026-11-04');
@@ -161,7 +167,6 @@ describe('backup', () => {
       },
     };
     const d = parseBackup(JSON.stringify(v2));
-    expect(d.onboarded).toBe(true);
     expect(d.settings.unit).toBe('kJ');
     expect(d.settings.targets.protein).toBe(100);
     expect(d.days['2026-10-01'].entries[0]).toMatchObject({ name: 'Oats', slot: 'other', source: 'imported', base: { kcal: 300, protein: 10 } });
@@ -174,7 +179,7 @@ describe('backup', () => {
     expect(() => parseBackup('{"a":1}')).toThrow();
     const n = normalize({ settings: { waterL: 99, targets: { kcal: -5 } }, days: { bad: {}, '2026-10-07': { water: 'x' } } });
     expect(n.settings.waterL).toBe(6);
-    expect(n.settings.targets.kcal).toBe(3000);
+    expect(n.settings.targets.kcal).toBe(DEFAULT_DATA.settings.targets.kcal);
     expect(Object.keys(n.days)).toEqual(['2026-10-07']);
   });
 });

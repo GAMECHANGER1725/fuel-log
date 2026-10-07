@@ -1,6 +1,6 @@
 # Fuel Log
 
-A gamified calorie and protein tracker for bulking. Mobile-first, installs to your home screen, works offline. There's no account and no server: your log stays on your phone.
+A personal, gamified calorie and protein tracker for a vegetarian (eggs and dairy OK) bulk. Mobile-first, installs to your home screen, works offline. There's no account, no setup and no server: it opens straight onto Today with my stats built in (`src/lib/backup.ts` → `DEFAULT_DATA`), and the log stays on the phone.
 
 **Live app:** https://gamechanger1725.github.io/fuel-log/
 
@@ -9,7 +9,7 @@ A gamified calorie and protein tracker for bulking. Mobile-first, installs to yo
 - **Today:** energy and protein rings, carb and fat bars, meals by slot (breakfast, recess, lunch, after school, dinner, before bed), water, food-quality checks, copy yesterday, and past days.
 - **Close the gap:** suggests foods that cover the kcal and protein you still need. During school hours it only suggests food you can pack.
 - **Five ways to log food:**
-  - search a built-in list (about 140 Australian and Gujarati/Indian foods) plus Australian products from [Open Food Facts](https://world.openfoodfacts.org)
+  - search a built-in vegetarian list (about 150 Australian and Gujarati/Indian foods, eggs and dairy included) plus Australian products from [Open Food Facts](https://world.openfoodfacts.org)
   - **barcode scanner** (camera or typed, free, no key needed)
   - **AI meal photo:** Gemini estimates each food on the plate
   - **AI label reader:** for packets that aren't in Open Food Facts

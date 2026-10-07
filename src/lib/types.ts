@@ -88,7 +88,6 @@ export interface GameSeen {
 
 export interface AppData {
   v: 3;
-  onboarded: boolean;
   profile: Profile;
   settings: Settings;
   days: Record<string, DayLog>;

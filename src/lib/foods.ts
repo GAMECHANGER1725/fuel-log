@@ -1,4 +1,5 @@
-// Built-in food list: Australian staples plus Gujarati/Indian home cooking.
+// Built-in food list: vegetarian (eggs and dairy, no meat or fish).
+// Australian staples plus Gujarati/Indian home cooking.
 // Values are typical estimates per serving; labels and recipes vary.
 // Tags: p = easy to pack for school, g = good for closing a gap, w = whey.
 
@@ -32,18 +33,24 @@ const ROWS: Row[] = [
   ['Soft drink', '375 ml can', 160, 0, 40, 0],
   ['Sports drink', '600 ml', 150, 0, 36, 0],
 
-  // Eggs, meat, fish, legumes
+  // Eggs, legumes, soy
   ['Egg, boiled', '1 large', 75, 6.3, 0.5, 5, 'p'],
   ['Scrambled eggs with butter', '2 eggs', 200, 13, 1.5, 15.5],
   ['Cheese omelette', '3 eggs', 340, 23, 2, 26, 'g'],
-  ['Chicken breast, cooked', '100 g', 165, 31, 0, 3.6],
-  ['Chicken thigh, cooked', '100 g', 210, 26, 0, 11],
-  ['Butter chicken', '1 bowl (~250 g)', 440, 30, 12, 30],
-  ['Beef mince, cooked', '100 g', 250, 26, 0, 16],
-  ['Steak, cooked', '150 g', 330, 42, 0, 18],
-  ['Salmon, cooked', '120 g', 250, 25, 0, 16],
-  ['Tuna, tinned', '95 g tin', 110, 22, 0, 2, 'p'],
-  ['Ham', '2 slices (40 g)', 45, 7.5, 0.6, 1.4],
+  ['Boiled eggs', '2 eggs', 150, 12.6, 1, 10, 'pg'],
+  ['Masala omelette', '2 eggs', 210, 13, 3, 16],
+  ['Egg bhurji', '2 eggs', 220, 13, 4, 17],
+  ['Egg sandwich', '1 sandwich', 370, 18, 32, 18, 'pg'],
+  ['Egg and cheese wrap', '1 wrap', 440, 22, 33, 24, 'pg'],
+  ['Cottage cheese', '100 g', 100, 11, 3.5, 4.5],
+  ['Soy milk', '250 ml', 100, 8, 7, 4.5],
+  ['Soya chunks, dry', '50 g', 175, 26, 16, 0.3],
+  ['Soya chunk curry', '1 bowl (~250 g)', 260, 22, 20, 10, 'g'],
+  ['Edamame', '1 cup', 190, 17, 14, 8, 'pg'],
+  ['Tempeh', '100 g', 195, 20, 8, 11],
+  ['Veggie sausages', '2 sausages', 220, 16, 8, 14],
+  ['Hummus', '50 g', 120, 4, 7, 9, 'p'],
+  ['Paneer tikka', '150 g paneer', 380, 24, 8, 28, 'g'],
   ['Lentils or beans, cooked', '1 cup', 230, 16, 40, 0.8],
   ['Chickpeas, cooked', '1 cup', 270, 14.5, 45, 4],
   ['Baked beans', '210 g (half can)', 165, 9.5, 27, 0.6],
@@ -63,9 +70,6 @@ const ROWS: Row[] = [
   ['Glass of milk + PB toast', '300 ml + 1 slice', 410, 18.5, 33, 22, 'g'],
   ['Peanut butter sandwich', '2 slices + 1 tbsp', 310, 13, 35, 12.5, 'pg'],
   ['Cheese sandwich', '1 sandwich', 330, 15, 33, 15, 'p'],
-  ['Ham and cheese sandwich', '1 sandwich', 360, 22, 33, 15, 'pg'],
-  ['Chicken sandwich', '1 sandwich', 380, 26, 36, 13, 'pg'],
-  ['Tuna sandwich', '1 sandwich', 340, 22, 35, 11, 'p'],
   ['Tortilla wrap', '1 wrap', 180, 5, 30, 4.5],
   ['Bagel, plain', '1 bagel', 250, 10, 49, 1.5],
   ['Croissant', '1 croissant', 230, 4.7, 26, 12],
@@ -143,15 +147,13 @@ const ROWS: Row[] = [
   ['Banana bread', '1 slice', 330, 5, 50, 12, 'p'],
 
   // Takeaway
-  ['Cheeseburger', '1 burger', 550, 30, 40, 30],
-  ['Pizza', '1 large slice', 280, 12, 33, 11],
-  ['Sushi hand roll', '1 roll', 200, 6, 35, 4, 'p'],
-  ['Fried rice', '1 plate', 520, 14, 75, 18],
-  ['Chicken wrap', '1 wrap', 480, 30, 45, 18, 'pg'],
-  ['Meat pie', '1 pie', 450, 15, 35, 27],
-  ['Sausage roll', '1 roll', 350, 9, 25, 24],
-  ['Burrito bowl', '1 bowl', 650, 35, 75, 22],
-  ['Chicken kebab', '1 kebab', 650, 40, 60, 26],
+  ['Veggie burger', '1 burger', 480, 18, 52, 22],
+  ['Falafel wrap', '1 wrap', 520, 17, 62, 22, 'p'],
+  ['Bean and cheese burrito bowl', '1 bowl', 620, 24, 85, 20],
+  ['Egg fried rice', '1 plate', 520, 14, 75, 18],
+  ['Vegetable pie', '1 pie', 400, 9, 38, 23],
+  ['Vegetarian sausage roll', '1 roll', 330, 10, 28, 19],
+  ['Vegetarian sushi hand roll', '1 roll', 190, 4, 36, 3.5, 'p'],  ['Pizza', '1 large slice', 280, 12, 33, 11],
 ];
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');

@@ -24,7 +24,6 @@ interface Actions {
   setSettings: (patch: Partial<Settings>) => void;
   setProfile: (patch: Partial<Profile>) => void;
   setTargets: (t: Macros) => void;
-  finishOnboarding: (p: Profile, t: Macros) => void;
   dismissNudge: (week: string) => void;
   markSeen: (level: number, badges: string[]) => void;
   markExported: () => void;
@@ -84,13 +83,6 @@ export const useStore = create<AppData & Actions>()(
             targetChanges:
               t.kcal === s.settings.targets.kcal ? s.targetChanges : [...s.targetChanges, { date: todayKey(), from: s.settings.targets.kcal, to: t.kcal }],
           })),
-        finishOnboarding: (p, t) =>
-          set((s) => ({
-            onboarded: true,
-            profile: p,
-            settings: { ...s.settings, targets: t },
-            weighIns: s.weighIns.length ? s.weighIns : [{ date: todayKey(), kg: p.weightKg }],
-          })),
         dismissNudge: (week) => set({ nudgeDismissed: week }),
         markSeen: (level, badges) => set({ seen: { level, badges } }),
         markExported: () => set({ lastExport: todayKey() }),
@@ -102,13 +94,15 @@ export const useStore = create<AppData & Actions>()(
       name: 'fuel-log-v3',
       version: 3,
       partialize: (s) => dataOf(s),
-      merge: (persisted, current) => ({ ...current, ...(persisted ? normalize(persisted) : {}) }),
+      // A save from the old version where setup was never finished holds placeholder stats: drop it.
+      merge: (persisted, current) =>
+        persisted && (persisted as { onboarded?: boolean }).onboarded !== false ? { ...current, ...normalize(persisted) } : current,
     },
   ),
 );
 
 /** Plain data snapshot (no actions), e.g. for export and the game engine. */
 export const dataOf = (s: AppData & Partial<Actions>): AppData => {
-  const { v, onboarded, profile, settings, days, weighIns, favourites, recents, targetChanges, nudgeDismissed, lastExport, seen } = s;
-  return { v, onboarded, profile, settings, days, weighIns, favourites, recents, targetChanges, nudgeDismissed, lastExport, seen };
+  const { v, profile, settings, days, weighIns, favourites, recents, targetChanges, nudgeDismissed, lastExport, seen } = s;
+  return { v, profile, settings, days, weighIns, favourites, recents, targetChanges, nudgeDismissed, lastExport, seen };
 };

@@ -58,7 +58,8 @@ export const SCHEMA = {
 
 const BASE = [
   'You estimate nutrition for a teenager in Australia who is trying to gain weight healthily.',
-  'They eat all kinds of food, often Gujarati/Indian home cooking (rotli, dal, shaak, thepla, rice, kadhi) as well as Australian food.',
+  'They are vegetarian but eat eggs and dairy: no meat, fish or seafood. If a dish could contain meat, assume the vegetarian version (e.g. veggie burger, paneer instead of chicken).',
+  'They often eat Gujarati/Indian home cooking (rotli, dal, shaak, thepla, rice, kadhi) as well as Australian food.',
   'Always give energy in kcal, never kJ. Be realistic, not optimistic, and include typical cooking oil or ghee.',
 ];
 
