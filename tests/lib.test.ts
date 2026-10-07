@@ -8,6 +8,7 @@ import { DEFAULT_DATA, exportText, normalize, parseBackup } from '../src/lib/bac
 import { parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/gemini';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
+import { checkPasscode } from '../src/lib/auth';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -202,5 +203,13 @@ describe('gemini', () => {
     expect(errorFromResponse(429, {}).kind).toBe('rate-limit');
     expect(errorFromResponse(400, { error: { message: 'API key not valid' } }).kind).toBe('bad-key');
     expect(errorFromResponse(503, {}).kind).toBe('busy');
+  });
+});
+
+describe('passcode', () => {
+  it('accepts only the right code', async () => {
+    expect(await checkPasscode('0172')).toBe(true);
+    expect(await checkPasscode('1720')).toBe(false);
+    expect(await checkPasscode('')).toBe(false);
   });
 });

@@ -26,6 +26,10 @@ A personal, gamified calorie and protein tracker for a vegetarian (eggs and dair
   XP is worked out from your log, so deleting food takes its XP back.
 - **Profile:** targets (with "suggest from my stats"), Gemini key and model, kcal or kJ, dark, light or auto theme, a whey toggle, backup export and import (including backups from the original Fuel Log artifact), and reset.
 
+## Passcode
+
+The app opens on a passcode screen. You stay signed in until **Profile → Log out**. Only a salted hash of the code is in the repo (`src/lib/auth.ts`). It's a lock screen against casual snooping, not real security.
+
 ## AI setup (optional)
 
 1. A parent creates a free key at https://aistudio.google.com/apikey (Google requires an adult to make it).

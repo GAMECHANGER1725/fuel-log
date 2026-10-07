@@ -8,6 +8,7 @@ import { fmt, KJ } from '../lib/nutrition';
 import { todayKey, fmtDate } from '../lib/dates';
 import type { AppData, Macros } from '../lib/types';
 import { Bar, toast, useGame, useRoute } from '../components/ui';
+import { useAuth } from '../lib/auth';
 
 const TONE = { fuel: 'var(--fuel)', protein: 'var(--pro)', sand: 'var(--carb)', ink: 'var(--ink)' };
 
@@ -92,6 +93,7 @@ export default function ProfilePage() {
         <p className="small mut rule" style={{ paddingTop: 12 }}>
           Talk to a parent and your GP before big target changes, before starting any supplement, or if your weight is dropping despite eating more. These numbers are starting points, not rules.
         </p>
+        <button className="btn block" onClick={() => useAuth.getState().lock()}>Log out</button>
         <p className="mono dim" style={{ paddingBottom: 12 }}>Fuel Log · your data stays on this phone</p>
       </div>
     </>

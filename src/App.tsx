@@ -6,9 +6,12 @@ import FoodPage from './pages/Food';
 import Progress from './pages/Progress';
 import ProfilePage from './pages/Profile';
 import LevelUp from './components/LevelUp';
+import Lock from './pages/Lock';
+import { useAuth } from './lib/auth';
 
 export default function App() {
   const theme = useStore((s) => s.settings.theme);
+  const unlocked = useAuth((s) => s.unlocked);
   const { path } = useRoute();
 
   useEffect(() => {
@@ -27,6 +30,8 @@ export default function App() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [path]);
+
+  if (!unlocked) return <Lock />;
 
   const page =
     path === 'food' ? <FoodPage /> : path === 'progress' ? <Progress /> : path === 'profile' ? <ProfilePage /> : <Today />;

@@ -136,6 +136,8 @@ textarea.input { padding: 12px; min-height: 96px; resize: vertical; line-height:
 .levelup .ghost { position: absolute; right: -30px; top: 40px; font-size: 520px; line-height: 0.8; opacity: 0.08; pointer-events: none; }
 .levelup .big { font-size: 240px; line-height: 0.82; font-stretch: 62%; font-weight: 900; }
 .levelup .rows > div { display: flex; justify-content: space-between; align-items: center; min-height: 48px; border-bottom: 2px solid #0e0f0c; }
+@keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+.shake { animation: shake 0.35s ease-in-out; }
 @keyframes slam { from { transform: scale(1.15); opacity: 0; } }
 
 /* Badges */
