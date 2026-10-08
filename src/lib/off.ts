@@ -75,10 +75,17 @@ export async function lookupBarcode(barcode: string, signal?: AbortSignal): Prom
   }
 }
 
-/** Text search of Australian products. OFF rate-limits search, so one failure gets one retry. */
+const cache = new Map<string, Food[]>();
+
+/** Text search of Australian products. OFF allows only about 10 searches a minute, so repeats are cached and one failure gets one retry. */
 export async function searchProducts(query: string, signal?: AbortSignal): Promise<Food[]> {
+  const key = query.trim().toLowerCase();
+  const hit = cache.get(key);
+  if (hit) return hit;
   const url =
-    `https://au.openfoodfacts.org/cgi/search.pl?search_simple=1&json=1&page_size=15` +
+    // The main server filtered to Australia: the au. subdomain often answers 503 without the CORS headers Safari needs.
+    `https://world.openfoodfacts.org/cgi/search.pl?search_simple=1&json=1&page_size=15` +
+    `&tagtype_0=countries&tag_contains_0=contains&tag_0=australia` +
     `&search_terms=${encodeURIComponent(query)}&fields=${FIELDS}`;
   let res: Response;
   try {
@@ -90,5 +97,7 @@ export async function searchProducts(query: string, signal?: AbortSignal): Promi
   }
   if (!res.ok) throw new Error(`OFF ${res.status}`);
   const body = (await res.json()) as { products?: Record<string, unknown>[] };
-  return (body.products ?? []).map((p) => productToFood(p)).filter((f): f is Food => !!f);
+  const foods = (body.products ?? []).map((p) => productToFood(p)).filter((f): f is Food => !!f);
+  cache.set(key, foods);
+  return foods;
 }

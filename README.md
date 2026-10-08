@@ -7,7 +7,7 @@ A personal, gamified calorie and protein tracker for a vegetarian (eggs and dair
 ## What it does
 
 - **Today:** energy and protein rings, carb and fat bars, one running food log with the time each item was logged (every entry stores its exact timestamp for later insights), water, food-quality checks, copy yesterday, and past days.
-- **Close the gap:** suggests foods that cover the kcal and protein you still need. During school hours it only suggests food you can pack.
+- **Close the gap:** suggests foods that cover the kcal and protein you still need. During school hours it only suggests food you can pack. Tap an idea to see its recipe (exact ingredient amounts and method), `+` to log it, or **Refresh** for different ideas. There are 26 vegetarian recipes (`src/lib/recipes.ts`); each dish's calories and macros are worked out from its ingredient amounts, and the recipe also shows in the add-food sheet.
 - **Five ways to log food:**
   - search a built-in vegetarian list (about 150 Australian and Gujarati/Indian foods, eggs and dairy included) plus Australian products from [Open Food Facts](https://world.openfoodfacts.org)
   - **barcode scanner** (camera or typed, free, no key needed)

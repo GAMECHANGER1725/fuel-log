@@ -23,6 +23,7 @@ const paths: Record<string, ReactNode> = {
   right: <path d="M9 5l7 7-7 7" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,
   trash: <><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></>,
+  refresh: <><path d="M20 11a8 8 0 00-14-4M4 4v4h4" /><path d="M4 13a8 8 0 0014 4M20 20v-4h-4" /></>,
   copy: <><rect x="8" y="8" width="12" height="12" rx="1" /><path d="M16 8V4H4v12h4" /></>,
 };
 

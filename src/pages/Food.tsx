@@ -9,6 +9,8 @@ import { Icon, MacroGrid, Sheet, Stepper, go, toast, useRoute, useToday } from '
 import Scanner from '../components/Scanner';
 import AiSheet from '../components/AiSheet';
 import type { AiMode } from '../lib/gemini';
+import RecipeView from '../components/RecipeView';
+import { recipeFor } from '../lib/recipes';
 
 type Picked = { food: Food; source: Source };
 
@@ -38,7 +40,7 @@ export default function FoodPage() {
       searchProducts(query, ctl.signal)
         .then((foods) => setOff({ q: query, foods, loading: false, failed: false }))
         .catch((e) => (e as Error).name !== 'AbortError' && setOff({ q: query, foods: [], loading: false, failed: true }));
-    }, 700);
+    }, 900);
     return () => {
       clearTimeout(t);
       ctl.abort();
@@ -50,7 +52,7 @@ export default function FoodPage() {
     <div key={`${source}-${f.id}`} className="item">
       <button className="item-btn" onClick={() => setPicked({ food: f, source })}>
         <span>{f.name}</span>
-        <span className="mono mut">{f.serving} · {energy(f.kcal, unit)} {unit} · {f.protein} g P</span>
+        <span className="mono mut">{f.serving} · {energy(f.kcal, unit)} {unit} · {f.protein} g P{recipeFor(f) ? ' · recipe' : ''}</span>
       </button>
       <button className="btn icon" aria-label={`Add ${f.name}`} onClick={() => setPicked({ food: f, source })}>+</button>
     </div>
@@ -149,6 +151,7 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
   const m = useGrams && food.per100 ? forGrams(food.per100, grams) : scale(foodMacros(food), qty);
   const fav = s.favourites.some((f) => f.name.toLowerCase() === food.name.toLowerCase());
   const xp = XP.meal + (source === 'scan' ? XP.scan : 0);
+  const recipe = recipeFor(food);
 
   const add = () => {
     const entry =
@@ -178,6 +181,12 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
         <Stepper value={qty} onChange={setQty} label="servings" format={(v) => `${v}×`} />
       )}
       <MacroGrid {...m} unit={s.settings.unit} />
+      {recipe && (
+        <details className="rule">
+          <summary style={{ minHeight: 48, display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 600 }}>Recipe and method</summary>
+          <div style={{ paddingBottom: 8 }}><RecipeView recipe={recipe} /></div>
+        </details>
+      )}
       <div className="row">
         <button
           className="btn"

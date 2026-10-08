@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { dayTotals, energy, forGrams } from '../src/lib/nutrition';
 import { FOODS, gapSuggestions, searchFoods } from '../src/lib/foods';
+import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
 import { addDays, weekStart } from '../src/lib/dates';
 import { suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
 import { computeGame, levelFromXp, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
@@ -61,9 +62,60 @@ describe('foods', () => {
     const meat = /chicken|beef|lamb|pork|ham\b|bacon|steak|mince|salmon|tuna|fish|prawn|meat pie|sausage roll'|bolognese|pepperoni|kebab/i;
     expect(FOODS.filter((f) => meat.test(f.name) && !/veg|vegetarian|lentil/i.test(f.name)).map((f) => f.name)).toEqual([]);
   });
+  it('close the gap: refresh shows different ideas, wraps around, and never repeats within a round', () => {
+    const need = { kcal: 1100, protein: 45 };
+    const opts = { wheyOk: false, atSchool: false };
+    const round = (n: number) => gapSuggestions(need, FOODS, opts, 3, n).map((f) => f.name);
+    const r0 = round(0);
+    expect(round(0)).toEqual(r0); // same round, same answer
+    expect(r0).toEqual(gapSuggestions(need, FOODS, opts).map((f) => f.name)); // default = round 0
+    const seen = new Set<string>();
+    for (let n = 0; n < 4; n++) {
+      const r = round(n);
+      expect(new Set(r).size).toBe(3);
+      expect(r.some((x) => seen.has(x)), `round ${n}`).toBe(false);
+      r.forEach((x) => seen.add(x));
+    }
+    expect(seen.size).toBe(12); // 4 rounds cover the top 12 before it cycles
+    expect(round(4)).toEqual(r0);
+  });
   it('close the gap: at school prefers packable food', () => {
     const picks = gapSuggestions({ kcal: 600, protein: 30 }, FOODS, { wheyOk: false, atSchool: true });
     expect(picks.every((f) => f.tags?.includes('p'))).toBe(true);
+  });
+});
+
+describe('recipes', () => {
+  it('every recipe is a food, with real quantities and steps', () => {
+    for (const r of RECIPES) {
+      const food = FOODS.find((f) => f.name === r.name);
+      expect(food, r.name).toBeDefined();
+      expect(food).toMatchObject(recipeMacros(r)); // the logged numbers ARE the recipe's numbers
+      expect(r.lines.length, r.name).toBeGreaterThanOrEqual(2);
+      expect(r.lines.filter(([k]) => k).length, r.name).toBeGreaterThanOrEqual(1);
+      for (const [k, g, amount, item] of r.lines) {
+        expect(amount.length && item.length, r.name).toBeTruthy();
+        if (k) expect(g, `${r.name}: ${item}`).toBeGreaterThan(0);
+      }
+      expect(r.steps.length, r.name).toBeGreaterThanOrEqual(1);
+      expect(r.time, r.name).toBeTruthy();
+    }
+  });
+  it('energy matches macros and the serving is sensible', () => {
+    for (const r of RECIPES) {
+      const m = recipeMacros(r);
+      expect(Math.abs(m.protein * 4 + m.carbs * 4 + m.fat * 9 - m.kcal) / m.kcal, r.name).toBeLessThan(0.1);
+      expect(m.kcal, r.name).toBeGreaterThan(100);
+      expect(m.kcal, r.name).toBeLessThan(900);
+    }
+  });
+  it('is vegetarian: no meat or fish in any ingredient or step', () => {
+    const meat = /chicken|beef|lamb|pork|bacon|\bham\b|steak|mince|salmon|tuna|fish|prawn|sausage|gelatin/i;
+    for (const r of RECIPES) expect(meat.test(JSON.stringify([r.lines, r.steps])), r.name).toBe(false);
+  });
+  it('finds a recipe by name, including a favourite saved under another id', () => {
+    expect(recipeFor({ name: 'cheese omelette' })?.lines[0][2]).toBe('3');
+    expect(recipeFor({ name: 'Banana' })).toBeUndefined();
   });
 });
 

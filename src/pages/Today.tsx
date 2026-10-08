@@ -6,6 +6,8 @@ import { FOODS, gapSuggestions } from '../lib/foods';
 import { XP } from '../lib/game';
 import type { Entry, Food } from '../lib/types';
 import { Bar, Icon, MacroGrid, Rings, Sheet, Stepper, toast, useGame, useRoute, useToday } from '../components/ui';
+import RecipeView from '../components/RecipeView';
+import { recipeFor } from '../lib/recipes';
 
 const CHECKS: [string, string][] = [
   ['veg', 'Fruit or veg'],
@@ -22,6 +24,8 @@ export default function Today() {
   const s = useStore();
   const g = useGame();
   const [editing, setEditing] = useState<Entry | null>(null);
+  const [round, setRound] = useState(0); // how many times Close the gap was refreshed
+  const [open, setOpen] = useState<string | null>(null); // which idea's recipe is showing
 
   const day = s.days[date] ?? { entries: [], water: 0, checks: {} };
   const t = dayTotals(day);
@@ -36,11 +40,12 @@ export default function Today() {
   const now = new Date();
   const weekday = now.getDay() >= 1 && now.getDay() <= 5;
   const atSchool = isToday && weekday && now.getHours() >= 8 && now.getHours() < 15;
-  const gap = isToday ? gapSuggestions({ kcal: kLeft, protein: pLeft }, [...s.favourites, ...FOODS.filter((f) => f.tags)], { wheyOk: s.settings.wheyOk, atSchool }) : [];
+  const gap = isToday ? gapSuggestions({ kcal: kLeft, protein: pLeft }, [...s.favourites, ...FOODS.filter((f) => f.tags)], { wheyOk: s.settings.wheyOk, atSchool }, 3, round) : [];
 
   const addFood = (f: Food) => {
     s.addEntries(date, [{ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty: 1, source: 'db', foodId: f.id }], [f]);
     toast(`Added ${f.name}`, XP.meal);
+    setOpen(null);
   };
 
   const log = [...day.entries].sort((a, b) => a.at - b.at);
@@ -132,20 +137,52 @@ export default function Today() {
 
         {gap.length > 0 && (
           <section className="card hot">
-            <div className="between">
+            <div className="between" style={{ alignItems: 'center' }}>
               <h2 className="h2">Close the gap</h2>
-              <span className="mono" style={{ fontWeight: 600 }}>{energy(Math.max(0, kLeft), unit)} {unit} · {fmt(Math.max(0, pLeft))} g</span>
+              <button
+                className="btn dark sm"
+                aria-label="Show different ideas"
+                onClick={() => {
+                  setRound(round + 1);
+                  setOpen(null);
+                }}
+              >
+                <Icon name="refresh" size={16} /> Refresh
+              </button>
             </div>
             <p className="small" style={{ margin: '6px 0 12px' }}>
-              {atSchool ? 'Easy to eat at school. Tap one to log it.' : 'Any of these gets you closer. Tap one to log it.'}
+              {energy(Math.max(0, kLeft), unit)} {unit} and {fmt(Math.max(0, pLeft))} g protein to go.{atSchool ? ' These are easy to eat at school.' : ''} Tap an idea for the recipe, or + to log it.
             </p>
             <div className="stack">
-              {gap.map((f) => (
-                <button key={f.id} className="btn dark" style={{ justifyContent: 'space-between', minHeight: 48, fontWeight: 500, whiteSpace: 'normal', textAlign: 'left' }} onClick={() => addFood(f)}>
-                  <span>{f.name}</span>
-                  <span className="mono fuel" style={{ flex: 'none' }}>{energy(f.kcal, unit)} · {f.protein} g</span>
-                </button>
-              ))}
+              {gap.map((f) => {
+                const recipe = recipeFor(f);
+                const isOpen = open === f.id;
+                return (
+                  <div key={f.id} className="stack" style={{ gap: 6 }}>
+                    <div className="row" style={{ gap: 6 }}>
+                      <button
+                        className="btn dark grow"
+                        aria-expanded={isOpen}
+                        style={{ justifyContent: 'space-between', minHeight: 48, fontWeight: 500, whiteSpace: 'normal', textAlign: 'left', gap: 8 }}
+                        onClick={() => setOpen(isOpen ? null : f.id)}
+                      >
+                        <span>{f.name}</span>
+                        <span className="row" style={{ gap: 8, flex: 'none' }}>
+                          <span className="mono fuel">{energy(f.kcal, unit)} · {f.protein} g</span>
+                          <span style={{ display: 'flex', transform: isOpen ? 'rotate(90deg)' : undefined, transition: 'transform .15s' }}><Icon name="right" size={16} /></span>
+                        </span>
+                      </button>
+                      <button className="btn dark icon" aria-label={`Log ${f.name}`} onClick={() => addFood(f)}>+</button>
+                    </div>
+                    {isOpen && (
+                      <div className="stack" style={{ background: 'var(--bg)', color: 'var(--ink)', borderRadius: 4, padding: 14, gap: 12 }}>
+                        {recipe ? <RecipeView recipe={recipe} /> : <p className="small mut">Nothing to make: {f.serving}.</p>}
+                        <button className="btn primary block" onClick={() => addFood(f)}>Log it · +{XP.meal} XP</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}
