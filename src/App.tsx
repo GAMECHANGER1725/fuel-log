@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useStore } from './lib/store';
-import { Icon, Toast, toast, useGame, useRoute } from './components/ui';
+import { Icon, Toast, toast, useGame, useRoute, useToday } from './components/ui';
 import Today from './pages/Today';
 import FoodPage from './pages/Food';
 import Progress from './pages/Progress';
 import ProfilePage from './pages/Profile';
+import Coach from './pages/Coach';
 import LevelUp from './components/LevelUp';
 import Lock from './pages/Lock';
 import { useAuth } from './lib/auth';
 import { startSync, useSync } from './lib/sync';
+import { checkIn, reviewDue, useCoach } from './lib/coach';
 
 export default function App() {
   const theme = useStore((s) => s.settings.theme);
@@ -36,10 +38,24 @@ export default function App() {
   useEffect(() => (unlocked ? startSync() : undefined), [unlocked]);
   const sync = useSync();
 
+  // Weekly coach check-in, by itself. Waits a few seconds so sync can bring in the other device's log first.
+  const hasKey = useStore((s) => !!s.settings.geminiKey);
+  const today = useToday();
+  useEffect(() => {
+    const { auto, review } = useCoach.getState();
+    if (!unlocked || !hasKey || !auto || !reviewDue(review, today)) return;
+    const t = setTimeout(() => {
+      checkIn()
+        .then((r) => r.applied && toast('Your coach updated your targets. See Coach.'))
+        .catch(() => {}); // Tried again next time the app opens.
+    }, 5000);
+    return () => clearTimeout(t);
+  }, [unlocked, hasKey, today]);
+
   if (!unlocked) return <Lock />;
 
   const page =
-    path === 'food' ? <FoodPage /> : path === 'progress' ? <Progress /> : path === 'profile' ? <ProfilePage /> : <Today />;
+    path === 'food' ? <FoodPage /> : path === 'coach' ? <Coach /> : path === 'progress' ? <Progress /> : path === 'profile' ? <ProfilePage /> : <Today />;
 
   return (
     <div className="app">
@@ -68,7 +84,7 @@ function Nav({ path }: { path: string }) {
     <nav className="nav" aria-label="Sections">
       <div>
         {link('today', 'today', 'Today')}
-        {link('food', 'search', 'Food')}
+        {link('coach', 'bolt', 'Coach')}
         <a href="#/food?mode=new" className="fab" aria-label="Add food">
           <Icon name="plus" size={26} stroke={3} />
         </a>

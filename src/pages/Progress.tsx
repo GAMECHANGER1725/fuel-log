@@ -5,6 +5,7 @@ import { dayTotals, energy, fmt, r1 } from '../lib/nutrition';
 import { projectedDate, trendLine, weeklyNudge, weeklyRate, withKcal } from '../lib/targets';
 
 import { XP } from '../lib/game';
+import { useCoach } from '../lib/coach';
 import { Icon, Sheet, toast, useGame, useToday } from '../components/ui';
 
 export default function Progress() {
@@ -18,7 +19,9 @@ export default function Progress() {
   const latest = line[line.length - 1];
   const rate = weeklyRate(s.weighIns, today);
   const since = line.length >= 2 ? latest.trend - line[0].trend : null;
-  const nudge = weeklyNudge(dataOf(s), today);
+  // With the coach checking in by itself, its weekly targets replace this simpler nudge.
+  const coachAuto = useCoach((c) => c.auto) && !!s.settings.geminiKey;
+  const nudge = coachAuto ? null : weeklyNudge(dataOf(s), today);
   const proj = latest ? projectedDate(latest.trend, s.profile.goalKg, rate, today) : null;
 
   // Heatmap: 5 weeks, Monday first.

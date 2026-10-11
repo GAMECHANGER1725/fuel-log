@@ -1,6 +1,6 @@
 // AI food logging with Google Gemini. Three modes share one reply format:
-//   photo: estimate a plate of food
-//   label: read a nutrition information panel
+//   photo: estimate a meal from one or more photos
+//   label: read a nutrition information panel (one or more photos of the pack)
 //   text:  "2 rotli, dal and a glass of milk"
 // The request goes straight from the phone to Google with the user's own key.
 // Results are estimates and always go through a review sheet before logging.
@@ -66,13 +66,15 @@ const BASE = [
 export const PROMPTS: Record<AiMode, string> = {
   photo: [
     ...BASE,
-    'List each distinct food visible in the photo as its own item with an estimated portion (with grams) and its macros for that portion.',
-    'Never invent foods you cannot see. If the image is not food, return no items and say so in notes.',
+    'You may get several photos of ONE meal. They can be different angles of the same plate, close-ups, or separate dishes and drinks eaten together.',
+    'First work out which foods appear in more than one photo and count each real food ONCE. Use the other angles to judge portion size better (depth of the bowl, how many rotli are stacked, glass size); never add the same dish twice because it shows up twice.',
+    'List each distinct food as its own item with an estimated portion (with grams or ml) and its macros for that portion.',
+    'Never invent foods you cannot see. If no photo shows food, return no items and say so in notes. If you counted something only once on purpose because it appeared in several photos, say so briefly in notes.',
   ].join(' '),
   label: [
     ...BASE,
-    'The photo shows a nutrition information panel or packaging. Read it exactly.',
-    'Return ONE item for ONE serving as printed (use the serving size as the portion, e.g. "1 bar (40 g)").',
+    'The photos show a nutrition information panel or packaging. There may be several photos, e.g. the front of the pack and the panel on the back. Read the panel exactly.',
+    'Return ONE item per distinct product, for ONE serving as printed (use the serving size as the portion, e.g. "1 bar (40 g)"). Photos of the same product are one item.',
     'If only per-100 g values are visible, use 100 g as the portion. Convert kJ to kcal by dividing by 4.184.',
     'Use the product name from the pack if visible. Put the per-100 g values in notes. If you cannot read a panel, return no items.',
   ].join(' '),
@@ -83,13 +85,31 @@ export const PROMPTS: Record<AiMode, string> = {
   ].join(' '),
 };
 
-export function buildBody(mode: AiMode, input: { text?: string; imageBase64?: string; mimeType?: string }) {
+export interface AiImage {
+  base64: string;
+  mimeType: string;
+}
+
+/** Most photos sent in one request. */
+export const MAX_PHOTOS = 6;
+
+export function buildBody(mode: AiMode, input: { text?: string; images?: AiImage[] }) {
   const parts: unknown[] = [];
   if (mode === 'text') parts.push({ text: `What I ate: ${input.text ?? ''}` });
   else {
+    const images = (input.images ?? []).slice(0, MAX_PHOTOS);
     if (input.text?.trim()) parts.push({ text: `Extra details: ${input.text.trim()}` });
-    parts.push({ text: mode === 'label' ? 'Read this nutrition label.' : 'Estimate the nutrition of this meal.' });
-    parts.push({ inline_data: { mime_type: input.mimeType ?? 'image/jpeg', data: input.imageBase64 ?? '' } });
+    const n = images.length;
+    parts.push({
+      text:
+        mode === 'label'
+          ? n > 1 ? `Read this nutrition label. There are ${n} photos.` : 'Read this nutrition label.'
+          : n > 1 ? `Estimate the nutrition of this meal. There are ${n} photos of it; don't count a food twice.` : 'Estimate the nutrition of this meal.',
+    });
+    images.forEach((img, i) => {
+      if (n > 1) parts.push({ text: `Photo ${i + 1}:` });
+      parts.push({ inline_data: { mime_type: img.mimeType || 'image/jpeg', data: img.base64 } });
+    });
   }
   return {
     system_instruction: { parts: [{ text: PROMPTS[mode] }] },
@@ -197,7 +217,7 @@ async function call(key: string, model: string, body: unknown, signal?: AbortSig
 }
 
 /** One request, retried once on Flash-Lite if the chosen model is rate-limited or busy. Returns [text, model used]. */
-async function callWithFallback(key: string, model: string, body: unknown, signal?: AbortSignal): Promise<[string, string]> {
+export async function callWithFallback(key: string, model: string, body: unknown, signal?: AbortSignal): Promise<[string, string]> {
   try {
     return [await call(key, model, body, signal), model];
   } catch (e) {
@@ -211,8 +231,7 @@ export async function analyse(opts: {
   model: string;
   mode: AiMode;
   text?: string;
-  imageBase64?: string;
-  mimeType?: string;
+  images?: AiImage[];
   signal?: AbortSignal;
 }): Promise<AiResult> {
   if (!opts.key.trim()) throw new AiError('no-key', 'No key');

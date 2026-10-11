@@ -8,15 +8,19 @@ A personal, gamified calorie and protein tracker for a vegetarian (eggs and dair
 
 - **Today:** energy and protein rings, carb and fat bars, one running food log with the time each item was logged (every entry stores its exact timestamp for later insights), water, food-quality checks, copy yesterday, and past days.
 - **Close the gap:** suggests foods that cover the kcal and protein you still need. During school hours it only suggests food you can pack. Tap an idea to see its recipe (exact ingredient amounts and method), `+` to log it, or **Refresh** for different ideas. There are 26 vegetarian recipes (`src/lib/recipes.ts`); each dish's calories and macros are worked out from its ingredient amounts, and the recipe also shows in the add-food sheet.
+- **Coach** (needs the Gemini key): its own tab.
+  - **Weekly check-in:** once a week, by itself, the coach reads the last two weeks of logs, weigh-ins and meal times (how many times a day you eat, how much before 3 pm, weekdays vs weekends) and sets new kcal, protein, carbs and fat targets with a short explanation and 3 things to focus on. Gemini suggests the numbers, but code sets the limits (`src/lib/coach.ts`): calories only go up when you're gaining too slowly *and* eating at least 90% of your target, only go down when you're gaining too fast, change by at most 250 kcal, and can change at most once every 7 days. Protein stays at 1.6–2.2 g/kg and fat at 20–35% of energy, and carbs make up the rest. You can undo a change, or turn off auto-apply so the coach only suggests.
+  - **What to make now:** six ideas for what's left today, two each that take 5, 10 and 20 minutes, with amounts, method and macros, and `+` to log. Liquid food comes first: both 5-minute ideas are shakes or smoothies, and at least 4 of the 6 are drinks, shakes or soups. Respects whey off and school hours.
+  - **Ask your coach:** short answers to questions like "why am I not gaining?", based on your own log.
 - **Five ways to log food:**
   - search a built-in vegetarian list (about 150 Australian and Gujarati/Indian foods, eggs and dairy included) plus Australian products from [Open Food Facts](https://world.openfoodfacts.org)
   - **barcode scanner** (camera or typed, free, no key needed)
-  - **AI meal photo:** Gemini estimates each food on the plate
-  - **AI label reader:** for packets that aren't in Open Food Facts
+  - **AI meal photo:** up to 6 photos of one meal (different angles, close-ups, the drink); Gemini estimates each food and counts a food only once even if it's in several photos
+  - **AI label reader:** for packets that aren't in Open Food Facts (add the front and the panel as separate photos)
   - **AI "describe it":** e.g. "3 rotli, dal and a glass of milk"
 
   Every AI result opens in a review sheet where you can fix it before logging.
-- **Progress:** weigh-ins with a 7-day trend line, a target band and a projected goal date. A weekly check-in suggests ±150–200 kcal when gain is too slow or too fast (and tells you to eat your current target first if you haven't been). Also a days-hit heatmap and weekly averages.
+- **Progress:** weigh-ins with a 7-day trend line, a target band and a projected goal date. Without the coach, a weekly check-in suggests ±150–200 kcal when gain is too slow or too fast (and tells you to eat your current target first if you haven't been); with the coach's auto check-in on, the coach handles this instead. Also a days-hit heatmap and weekly averages.
 - **Game:**
   - XP for logging, hitting targets, water, scans and weigh-ins, with levels and 10 ranks
   - streaks with freeze tokens

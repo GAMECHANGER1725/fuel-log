@@ -7,7 +7,7 @@ export interface Macros {
   fat: number;
 }
 
-export type Source = 'db' | 'off' | 'scan' | 'ai-photo' | 'ai-label' | 'ai-text' | 'custom' | 'imported';
+export type Source = 'db' | 'off' | 'scan' | 'ai-photo' | 'ai-label' | 'ai-text' | 'coach' | 'custom' | 'imported';
 
 /** A food you can add: macros are for one serving. */
 export interface Food extends Macros {
