@@ -69,6 +69,7 @@ export const PROMPTS: Record<AiMode, string> = {
     'You may get several photos of ONE meal. They can be different angles of the same plate, close-ups, or separate dishes and drinks eaten together.',
     'First work out which foods appear in more than one photo and count each real food ONCE. Use the other angles to judge portion size better (depth of the bowl, how many rotli are stacked, glass size); never add the same dish twice because it shows up twice.',
     'List each distinct food as its own item with an estimated portion (with grams or ml) and its macros for that portion.',
+    'If a photo clearly shows leftovers after eating (a half-empty plate or glass), count only what was eaten.',
     'Never invent foods you cannot see. If no photo shows food, return no items and say so in notes. If you counted something only once on purpose because it appeared in several photos, say so briefly in notes.',
   ].join(' '),
   label: [
@@ -98,17 +99,18 @@ export function buildBody(mode: AiMode, input: { text?: string; images?: AiImage
   if (mode === 'text') parts.push({ text: `What I ate: ${input.text ?? ''}` });
   else {
     const images = (input.images ?? []).slice(0, MAX_PHOTOS);
-    if (input.text?.trim()) parts.push({ text: `Extra details: ${input.text.trim()}` });
     const n = images.length;
-    parts.push({
-      text:
-        mode === 'label'
-          ? n > 1 ? `Read this nutrition label. There are ${n} photos.` : 'Read this nutrition label.'
-          : n > 1 ? `Estimate the nutrition of this meal. There are ${n} photos of it; don't count a food twice.` : 'Estimate the nutrition of this meal.',
-    });
+    // Photos first, then the question: the model reads all of them before it starts answering.
     images.forEach((img, i) => {
       if (n > 1) parts.push({ text: `Photo ${i + 1}:` });
       parts.push({ inline_data: { mime_type: img.mimeType || 'image/jpeg', data: img.base64 } });
+    });
+    if (input.text?.trim()) parts.push({ text: `Extra details from me (these override what the photos suggest): ${input.text.trim()}` });
+    parts.push({
+      text:
+        mode === 'label'
+          ? n > 1 ? `Read this nutrition label from the ${n} photos above.` : 'Read this nutrition label.'
+          : n > 1 ? `Estimate the nutrition of this meal from the ${n} photos above. Don't count a food twice.` : 'Estimate the nutrition of this meal.',
     });
   }
   return {

@@ -10,7 +10,7 @@ import LevelUp from './components/LevelUp';
 import Lock from './pages/Lock';
 import { useAuth } from './lib/auth';
 import { startSync, useSync } from './lib/sync';
-import { checkIn, reviewDue, useCoach } from './lib/coach';
+import { autoDue, checkIn, useCoach } from './lib/coach';
 
 export default function App() {
   const theme = useStore((s) => s.settings.theme);
@@ -38,19 +38,22 @@ export default function App() {
   useEffect(() => (unlocked ? startSync() : undefined), [unlocked]);
   const sync = useSync();
 
-  // Weekly coach check-in, by itself. Waits a few seconds so sync can bring in the other device's log first.
+  // Weekly coach check-in, by itself. With sync on, waits for the first sync so it works from both devices' data.
   const hasKey = useStore((s) => !!s.settings.geminiKey);
+  const auto = useCoach((c) => c.auto);
   const today = useToday();
+  const synced = !sync.conn || (sync.status !== 'syncing' && (!!sync.last || sync.status === 'error'));
   useEffect(() => {
-    const { auto, review } = useCoach.getState();
-    if (!unlocked || !hasKey || !auto || !reviewDue(review, today)) return;
+    if (!unlocked || !hasKey || !synced || !autoDue(today)) return;
     const t = setTimeout(() => {
+      if (!autoDue(today)) return;
+      useCoach.getState().set({ tried: Date.now() });
       checkIn()
         .then((r) => r.applied && toast('Your coach updated your targets. See Coach.'))
-        .catch(() => {}); // Tried again next time the app opens.
-    }, 5000);
+        .catch(() => {}); // Tried again in a few hours.
+    }, 3000);
     return () => clearTimeout(t);
-  }, [unlocked, hasKey, today]);
+  }, [unlocked, hasKey, synced, auto, today]);
 
   if (!unlocked) return <Lock />;
 

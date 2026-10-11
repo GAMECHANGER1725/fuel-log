@@ -91,10 +91,10 @@ function CheckIn() {
             review.applied ? (
               <div className="row">
                 <span className="small grow" style={{ color: 'var(--pro)' }}>New targets are in use.</span>
-                <button className="btn sm" onClick={() => { undoCheckIn(); toast('Targets put back'); }}>Undo</button>
+                <button className="btn sm" onClick={() => toast(undoCheckIn() ? 'Targets put back' : 'Targets have changed since. Check in again instead.')}>Undo</button>
               </div>
             ) : (
-              <button className="btn primary" onClick={() => { applyCheckIn(); toast('Targets updated'); }}>Use these targets</button>
+              <button className="btn primary" onClick={() => toast(applyCheckIn() ? 'Targets updated' : 'This check-in is out of date. Check in again.')}>Use these targets</button>
             )
           ) : (
             <span className="small mut">Targets stay the same this week.</span>
@@ -272,10 +272,13 @@ function Chat() {
     setError('');
     try {
       const reply = await runChat(s.settings.geminiKey, s.settings.geminiModel, dataOf(useStore.getState()), history);
-      set({ chat: [...history, { role: 'model' as const, text: reply }].slice(-30) });
+      // Append to whatever is there now (it may have been cleared while waiting).
+      const cur = useCoach.getState().chat;
+      if (cur.length) set({ chat: [...cur, { role: 'model' as const, text: reply }].slice(-30) });
     } catch (e) {
       setError(friendlyError(e));
-      set({ chat: chat });
+      const cur = useCoach.getState().chat;
+      if (cur[cur.length - 1]?.text === t.slice(0, 500)) set({ chat: cur.slice(0, -1) });
       setQ(t);
     } finally {
       setBusy(false);
@@ -286,7 +289,7 @@ function Chat() {
     <section className="card stack" style={{ gap: 12 }}>
       <div className="between" style={{ alignItems: 'center' }}>
         <h2 className="h2">Ask your coach</h2>
-        {chat.length > 0 && <button className="btn sm" onClick={() => set({ chat: [] })}>Clear</button>}
+        {chat.length > 0 && <button className="btn sm" disabled={busy} onClick={() => set({ chat: [] })}>Clear</button>}
       </div>
       {chat.length === 0 ? (
         <>

@@ -1,5 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import { allowedChange, guardTargets, MAX_STEP, parseIdeas, parseReview, snapshot, type Snapshot } from '../src/lib/coach';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.hoisted(() => {
+  const mem = new Map<string, string>();
+  (globalThis as { localStorage?: unknown }).localStorage = {
+    getItem: (k: string) => mem.get(k) ?? null,
+    setItem: (k: string, v: string) => void mem.set(k, v),
+    removeItem: (k: string) => void mem.delete(k),
+  };
+});
+
+import { allowedChange, applyCheckIn, checkIn, guardTargets, kcalBounds, MAX_STEP, parseIdeas, parseReview, snapshot, undoCheckIn, useCoach, type Snapshot } from '../src/lib/coach';
+import { useStore } from '../src/lib/store';
 import { buildBody, MAX_PHOTOS } from '../src/lib/gemini';
 import { DEFAULT_DATA } from '../src/lib/backup';
 import { addDays, todayKey } from '../src/lib/dates';
@@ -67,6 +78,22 @@ describe('coach guardrails', () => {
     expect(guardTargets(T, { kcal: 2000 }, 58, { up: true, down: false }).kcal).toBe(T.kcal);
     expect(guardTargets(T, { kcal: 3600 }, 58, { up: false, down: false }).kcal).toBe(T.kcal);
   });
+  it('keeps the absolute 1,800–4,500 range without breaking the step or the direction', () => {
+    expect(kcalBounds(1500, { up: true, down: false })).toEqual([1500, 1500]);
+    expect(kcalBounds(1600, { up: false, down: true })).toEqual([1600, 1600]);
+    expect(kcalBounds(5000, { up: true, down: false })).toEqual([5000, 5000]);
+    expect(kcalBounds(4400, { up: true, down: false })).toEqual([4400, 4500]);
+  });
+  it('never moves targets on a reply without real numbers', () => {
+    const s = snap(3000, 0.8); // a cut would be allowed
+    expect(() => parseReview('{"headline":"x","summary":"x","focus":[]}', T, s, 'm')).toThrow();
+    expect(() => parseReview('{"targets":{"kcal":"","protein":120,"fat":80}}', T, s, 'm')).toThrow();
+    expect(() => parseReview('null', T, s, 'm')).toThrow();
+  });
+  it('takes the status from the data, not the model', () => {
+    const r = parseReview('{"status":"on-track","targets":{"kcal":3000,"protein":115,"carbs":440,"fat":85},"headline":"h","summary":"s","focus":[]}', T, snap(2400, 0.1), 'm');
+    expect(r.status).toBe('eat-more');
+  });
   it('parses a review through the guardrails', () => {
     const s: Snapshot = snap(3000, 0.1);
     const r = parseReview('```json\n{"status":"too-slow","headline":"Up it","summary":"x","targets":{"kcal":9999,"protein":120,"carbs":1,"fat":90},"focus":["a","b","c","d"]}\n```', T, s, 'm');
@@ -77,15 +104,11 @@ describe('coach guardrails', () => {
 });
 
 describe('coach meal ideas', () => {
-  const idea = (o: Record<string, unknown>) => ({ name: 'x', minutes: 5, kind: 'shake', serving: '1', kcal: 500, protein: 20, carbs: 60, fat: 20, ingredients: ['milk'], steps: ['blend'], why: '', ...o });
+  const idea = (o: Record<string, unknown>) => ({ name: 'x', kind: 'shake', serving: '1', kcal: 500, protein: 20, carbs: 60, fat: 20, ingredients: ['milk'], steps: ['blend'], why: '', ...o });
   it('puts quick and liquid ideas first, drops whey when off, fixes bad kcal', () => {
     const raw = JSON.stringify({
-      ideas: [
-        idea({ name: 'Toastie', minutes: 10, kind: 'food' }),
-        idea({ name: 'Lassi', minutes: 10, kind: 'drink' }),
-        idea({ name: 'Whey shake', minutes: 5, ingredients: ['30 g whey'] }),
-        idea({ name: 'PB shake', minutes: 4, kcal: 5000 }),
-      ],
+      five: [idea({ name: 'Whey shake', ingredients: ['30 g whey'] }), idea({ name: 'PB shake', kcal: 5000 })],
+      ten: [idea({ name: 'Toastie', kind: 'food' }), idea({ name: 'Lassi', kind: 'drink' })],
     });
     const list = parseIdeas(raw, false);
     expect(list.map((i) => i.name)).toEqual(['PB shake', 'Lassi', 'Toastie']);
@@ -103,10 +126,53 @@ describe('multi-photo meal check', () => {
     const parts = body.contents[0].parts as Record<string, unknown>[];
     expect(parts.filter((p) => p.inline_data)).toHaveLength(MAX_PHOTOS);
     expect(parts.some((p) => p.text === 'Photo 2:')).toBe(true);
-    expect(parts[0]).toEqual({ text: 'Extra details: cooked in ghee' });
+    // Photos come first, then the notes, then the question.
+    expect(parts[0]).toEqual({ text: 'Photo 1:' });
+    expect(String(parts[parts.length - 2].text)).toContain('cooked in ghee');
   });
   it('keeps a single photo simple', () => {
     const parts = buildBody('photo', { images: [{ base64: 'a', mimeType: 'image/jpeg' }] }).contents[0].parts as Record<string, unknown>[];
     expect(parts).toHaveLength(2);
+  });
+});
+
+describe('check-in, apply and undo', () => {
+  let reply: Record<string, unknown>;
+  beforeEach(() => {
+    reply = { targets: { kcal: 9999, protein: 120, carbs: 1, fat: 90 }, headline: 'h', summary: 's', focus: ['a', 'b', 'c'] };
+    globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(reply) }] } }] }) })) as unknown as typeof fetch;
+    const d = data(3000, 0.1);
+    d.settings.geminiKey = 'k';
+    useStore.setState({ ...d });
+    useCoach.setState({ auto: true, review: null, tried: 0, chat: [], ideas: null });
+  });
+
+  it('applies once, a same-day re-check can’t stack, and undo goes all the way back', async () => {
+    const r = await checkIn();
+    expect(r.applied).toBe(true);
+    expect(useStore.getState().settings.targets.kcal).toBe(3250);
+    const again = await checkIn();
+    expect(useStore.getState().settings.targets.kcal).toBe(3250); // changed today, so frozen
+    expect(again.from.kcal).toBe(3000);
+    expect(undoCheckIn()).toBe(true);
+    expect(useStore.getState().settings.targets.kcal).toBe(3000);
+  });
+  it('won’t undo or apply over targets that changed since', async () => {
+    await checkIn();
+    useStore.getState().setTargets({ kcal: 3500, protein: 120, carbs: 500, fat: 90 }); // e.g. synced from the other device
+    expect(undoCheckIn()).toBe(false);
+    expect(useStore.getState().settings.targets.kcal).toBe(3500);
+
+    useCoach.setState({ auto: false, review: null });
+    useStore.setState({ targetChanges: [] });
+    const r = await checkIn();
+    expect(r.applied).toBe(false);
+    useStore.getState().setTargets({ ...useStore.getState().settings.targets, protein: 100 });
+    expect(applyCheckIn()).toBe(false);
+  });
+  it('a bad reply leaves the targets alone', async () => {
+    reply = { headline: 'h' };
+    await expect(checkIn()).rejects.toThrow();
+    expect(useStore.getState().settings.targets).toEqual(T);
   });
 });
