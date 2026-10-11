@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useStore } from '../lib/store';
-import { analyse, fileToJpeg, friendlyError, type AiItem, type AiMode, type AiResult } from '../lib/gemini';
+import { analyse, fileToJpeg, friendlyError, MAX_PHOTOS, type AiItem, type AiMode, type AiResult } from '../lib/gemini';
 import { sumEntries, energy } from '../lib/nutrition';
 import { XP } from '../lib/game';
 import { go, Icon, MacroGrid, Sheet, toast } from './ui';
@@ -8,16 +8,17 @@ import { go, Icon, MacroGrid, Sheet, toast } from './ui';
 type Row = AiItem & { qty: number; removed: boolean };
 
 const COPY: Record<AiMode, { title: string; take: string; hint: string; source: 'ai-photo' | 'ai-label' | 'ai-text' }> = {
-  photo: { title: 'Snap meal', take: 'Take or choose a photo', hint: 'Anything the photo can’t show? e.g. “cooked in ghee”, “2 rotli under the dal”', source: 'ai-photo' },
-  label: { title: 'Read label', take: 'Photo of the nutrition panel', hint: 'Optional: product name', source: 'ai-label' },
+  photo: { title: 'Snap meal', take: 'Take or choose photos', hint: 'Anything the photo can’t show? e.g. “cooked in ghee”, “2 rotli under the dal”', source: 'ai-photo' },
+  label: { title: 'Read label', take: 'Photos of the pack and its nutrition panel', hint: 'Optional: product name', source: 'ai-label' },
   text: { title: 'Describe it', take: '', hint: 'e.g. 3 rotli with ghee, a bowl of toor dal and a glass of milk', source: 'ai-text' },
 };
 
 export default function AiSheet({ mode, date, initialText = '', onClose }: { mode: AiMode; date: string; initialText?: string; onClose: () => void }) {
   const s = useStore();
   const c = COPY[mode];
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [img, setImg] = useState<{ base64: string; mimeType: string; url: string } | null>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const [imgs, setImgs] = useState<{ base64: string; mimeType: string; url: string }[]>([]);
   const [text, setText] = useState(initialText);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -30,7 +31,7 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
     setBusy(true);
     setError('');
     try {
-      const r = await analyse({ key: s.settings.geminiKey, model: s.settings.geminiModel, mode, text, imageBase64: img?.base64, mimeType: img?.mimeType });
+      const r = await analyse({ key: s.settings.geminiKey, model: s.settings.geminiModel, mode, text, images: imgs });
       if (!r.items.length) setError(r.notes || 'No food found. Try again.');
       else {
         setResult(r);
@@ -74,27 +75,61 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
           </div>
           {mode !== 'text' && (
             <>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="sr"
-                aria-label={c.take}
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (f) setImg(await fileToJpeg(f).catch(() => null));
-                }}
-              />
-              {img ? (
-                <button style={{ padding: 0, border: 0, background: 'none' }} onClick={() => fileRef.current?.click()} aria-label="Retake photo">
-                  <img src={img.url} alt="Your photo" className="photo" />
-                </button>
+              {(
+                [
+                  [cameraRef, true],
+                  [galleryRef, false],
+                ] as const
+              ).map(([ref, camera]) => (
+                <input
+                  key={String(camera)}
+                  ref={ref}
+                  type="file"
+                  accept="image/*"
+                  // The camera adds one photo at a time; the gallery can pick several at once.
+                  capture={camera ? 'environment' : undefined}
+                  multiple={!camera}
+                  className="sr"
+                  aria-label={camera ? 'Take a photo' : 'Choose photos'}
+                  onChange={async (e) => {
+                    const files = [...(e.target.files ?? [])].slice(0, MAX_PHOTOS - imgs.length);
+                    e.target.value = '';
+                    const added = (await Promise.all(files.map((f) => fileToJpeg(f).catch(() => null)))).filter((x) => !!x);
+                    if (added.length) setImgs((cur) => [...cur, ...added].slice(0, MAX_PHOTOS));
+                  }}
+                />
+              ))}
+              {imgs.length > 0 ? (
+                <>
+                  <div className="thumbs">
+                    {imgs.map((im, i) => (
+                      <div key={im.url.slice(-40) + i} className="thumb">
+                        <img src={im.url} alt={`Photo ${i + 1}`} />
+                        <button className="btn icon sm" aria-label={`Remove photo ${i + 1}`} onClick={() => setImgs(imgs.filter((_, j) => j !== i))}>
+                          <Icon name="close" size={16} stroke={3} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {imgs.length < MAX_PHOTOS && (
+                    <div className="row">
+                      <button className="btn grow" onClick={() => cameraRef.current?.click()}><Icon name="camera" size={18} /> Add photo</button>
+                      <button className="btn grow" onClick={() => galleryRef.current?.click()}>From gallery</button>
+                    </div>
+                  )}
+                  <span className="mono dim">
+                    {imgs.length} of {MAX_PHOTOS} photos{mode === 'photo' ? ' · different angles help, nothing gets counted twice' : ''}
+                  </span>
+                </>
               ) : (
-                <button className="card" style={{ height: 180, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--ink)', borderStyle: 'dashed' }} onClick={() => fileRef.current?.click()}>
-                  <span className="fuel"><Icon name={mode === 'label' ? 'label' : 'camera'} size={34} /></span>
-                  <span style={{ fontWeight: 600 }}>{c.take}</span>
-                </button>
+                <>
+                  <button className="card" style={{ height: 160, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--ink)', borderStyle: 'dashed' }} onClick={() => cameraRef.current?.click()}>
+                    <span className="fuel"><Icon name={mode === 'label' ? 'label' : 'camera'} size={34} /></span>
+                    <span style={{ fontWeight: 600 }}>{c.take}</span>
+                    <span className="mut small">Up to {MAX_PHOTOS}{mode === 'photo' ? ': whole plate, close-ups, the drink' : ''}</span>
+                  </button>
+                  <button className="btn" onClick={() => galleryRef.current?.click()}>Choose from gallery (pick several)</button>
+                </>
               )}
             </>
           )}
@@ -107,8 +142,8 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
             )}
           </label>
           {error && <p className="small" style={{ color: 'var(--danger)' }} role="alert">{error}</p>}
-          <button className="btn primary block" disabled={busy || (mode === 'text' ? !text.trim() : !img)} onClick={run}>
-            {busy ? 'Gemini is thinking…' : mode === 'text' ? 'Work it out' : 'Analyse photo'}
+          <button className="btn primary block" disabled={busy || (mode === 'text' ? !text.trim() : !imgs.length)} onClick={run}>
+            {busy ? 'Gemini is thinking…' : mode === 'text' ? 'Work it out' : imgs.length > 1 ? `Analyse ${imgs.length} photos` : 'Analyse photo'}
           </button>
           <p className="mono dim">Estimates only · you review before logging</p>
         </>
@@ -116,7 +151,7 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
         <>
           <div className="between" style={{ alignItems: 'flex-start' }}>
             <div className="stack" style={{ gap: 2 }}>
-              <span className="mono mut">{mode === 'label' ? 'Gemini read the label' : mode === 'text' ? 'Gemini worked it out' : 'Gemini read your plate'}</span>
+              <span className="mono mut">{mode === 'label' ? 'Gemini read the label' : mode === 'text' ? 'Gemini worked it out' : imgs.length > 1 ? `Gemini read ${imgs.length} photos` : 'Gemini read your plate'}</span>
               <h2 className="title">{live.length} food{live.length === 1 ? '' : 's'} found</h2>
             </div>
             <span className="mono" style={{ padding: '6px 8px', border: '2px solid var(--carb)', color: 'var(--carb)', borderRadius: 4, flex: 'none' }}>{result.confidence} confidence</span>

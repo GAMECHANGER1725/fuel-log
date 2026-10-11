@@ -184,6 +184,9 @@ export default function Today() {
                 );
               })}
             </div>
+            <a href="#/coach" className="btn dark block" style={{ marginTop: 10 }}>
+              <Icon name="bolt" size={18} /> 5, 10 and 20 min ideas from your coach
+            </a>
           </section>
         )}
 

@@ -218,7 +218,13 @@ export function computeGame(d: AppData, today: string) {
   const start = first < today ? first : today;
 
   const stats: DayStats[] = [];
-  for (let k = start; k <= today; k = addDays(k, 1)) stats.push(dayStats(k, d.days[k], ctx, weighed.has(k)));
+  // Score each past day against the calorie target it had then, so a new target doesn't rewrite old days.
+  const changes = [...d.targetChanges].sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0));
+  const kcalOn = (k: string) => changes.find((c) => c.date > k)?.from ?? ctx.targets.kcal;
+  for (let k = start; k <= today; k = addDays(k, 1)) {
+    const kcal = kcalOn(k);
+    stats.push(dayStats(k, d.days[k], kcal === ctx.targets.kcal ? ctx : { ...ctx, targets: { ...ctx.targets, kcal } }, weighed.has(k)));
+  }
   const byDate = new Map(stats.map((s) => [s.date, s]));
 
   // Weekly bosses
