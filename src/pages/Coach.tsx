@@ -191,7 +191,7 @@ function Ideas() {
       <p className="small">
         {kLeft > 0 ? `${energy(kLeft, unit)} ${unit} and ${fmt(pLeft)} g protein left today.` : 'You’ve hit today’s energy target.'} Shakes and drinks come first: they’re the easiest way to get calories in without feeling stuffed.
       </p>
-      <input className="input" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="Optional: “no blender”, “use up paneer”, “out of bananas”" aria-label="Anything the coach should know" />
+      <input className="input" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="Optional: “no blender”, “use paneer”" aria-label="Anything the coach should know" />
       {error && <p className="small" style={{ color: 'var(--danger)' }} role="alert">{error}</p>}
       {list.length === 0 && (
         <button className="btn primary block" disabled={busy} onClick={get}>

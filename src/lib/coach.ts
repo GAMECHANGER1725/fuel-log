@@ -490,7 +490,13 @@ export async function runChat(key: string, model: string, d: AppData, history: C
     system_instruction: { parts: [{ text: `${CHAT_PROMPT}\n\n${snapText(snapshot(d))}` }] },
     contents: history.slice(-12).map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
   };
-  const [raw] = await ask(key, model, body);
+  let raw: string;
+  try {
+    [raw] = await ask(key, model, body);
+  } catch (e) {
+    // An empty reply isn't about a photo here.
+    throw e instanceof AiError && e.kind === 'blocked' ? new AiError('bad-reply', 'Empty reply') : e;
+  }
   return raw.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#+\s*/gm, '').trim();
 }
 
@@ -550,7 +556,10 @@ export function checkIn(): Promise<Review> {
     const cur = useStore.getState().settings.targets;
     // Targets edited (or synced in) while Gemini was answering: don't overwrite them.
     const untouched = same(cur, before);
-    if (useCoach.getState().auto && untouched && changes(review)) {
+    // No automatic tweaks right after a change (or an Undo); a manual "Use these targets" still works.
+    const last = st.targetChanges[st.targetChanges.length - 1];
+    const settled = !last || daysBetween(last.date, review.date) >= MIN_DAYS_BETWEEN;
+    if (useCoach.getState().auto && untouched && settled && changes(review)) {
       useStore.getState().setTargets(review.to);
       review = { ...review, applied: true };
     }

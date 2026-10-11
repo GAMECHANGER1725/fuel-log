@@ -157,6 +157,14 @@ describe('targets', () => {
 });
 
 describe('game', () => {
+  it('scores past days against the calorie target they had, not today’s', () => {
+    const today = '2026-10-10';
+    const d = data({ days: { '2026-10-08': day([entry(2900, 120)]) } });
+    d.settings.targets = { ...d.settings.targets, kcal: 3000, protein: 115 };
+    const before = computeGame(d, today).byDate.get('2026-10-08')!.xp;
+    const raised = { ...d, settings: { ...d.settings, targets: { ...d.settings.targets, kcal: 3250 } }, targetChanges: [{ date: '2026-10-09', from: 3000, to: 3250 }] };
+    expect(computeGame(raised, today).byDate.get('2026-10-08')!.xp).toBe(before);
+  });
   it('levels and ranks', () => {
     expect(levelFromXp(0)).toEqual({ level: 1, into: 0, need: 150 });
     expect(levelFromXp(150).level).toBe(2);
