@@ -89,13 +89,48 @@ export function Sheet({ onClose, children, label }: { onClose: () => void; child
   );
 }
 
-export function Stepper({ value, onChange, step = 0.5, min = 0.25, label, format }: { value: number; onChange: (v: number) => void; step?: number; min?: number; label: string; format?: (v: number) => string }) {
-  const round = (v: number) => Math.round(v * 100) / 100;
+/** Quick serving sizes shown under a servings Stepper. */
+export const SERVING_PRESETS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+
+/** − / + buttons around a number you can also tap and type (opens the decimal keypad), plus optional presets. */
+export function Stepper({ value, onChange, step = 0.25, min = 0.25, max = 50, label, unit = '×', presets }: { value: number; onChange: (v: number) => void; step?: number; min?: number; max?: number; label: string; unit?: string; presets?: number[] }) {
+  const set = (v: number) => onChange(Math.min(max, Math.max(min, Math.round(v * 100) / 100)));
+  const [text, setText] = useState(String(value));
+  // Follow changes from the buttons and presets, but leave half-typed input like "1." alone.
+  useEffect(() => {
+    if (parseFloat(text) !== value) setText(String(value));
+  }, [value]);
   return (
-    <div className="row" style={{ justifyContent: 'space-between' }}>
-      <button className="btn icon" aria-label={`Less ${label}`} onClick={() => onChange(Math.max(min, round(value - step)))}>−</button>
-      <span className="num" style={{ fontSize: 32, lineHeight: 1 }}>{format ? format(value) : `${value}×`}</span>
-      <button className="btn icon" aria-label={`More ${label}`} onClick={() => onChange(round(value + step))}>+</button>
+    <div className="stack" style={{ gap: 10 }}>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <button className="btn icon" aria-label={`Less ${label}`} onClick={() => set(value - step)}>−</button>
+        <span className="row" style={{ gap: 4 }}>
+          <input
+            className="num qty"
+            type="text"
+            inputMode="decimal"
+            aria-label={label}
+            value={text}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => {
+              const t = e.target.value.replace(',', '.').replace(/[^\d.]/g, '');
+              setText(t);
+              const v = parseFloat(t);
+              if (v > 0) set(v);
+            }}
+            onBlur={() => setText(String(value))}
+          />
+          <span className="num mut" style={{ fontSize: 24 }}>{unit}</span>
+        </span>
+        <button className="btn icon" aria-label={`More ${label}`} onClick={() => set(value + step)}>+</button>
+      </div>
+      {presets && (
+        <div className="row" style={{ flexWrap: 'wrap', gap: 6 }} role="group" aria-label={`Preset ${label}`}>
+          {presets.map((p) => (
+            <button key={p} className="chip" style={{ flex: '1 0 auto' }} aria-pressed={value === p} onClick={() => set(p)}>{p}×</button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

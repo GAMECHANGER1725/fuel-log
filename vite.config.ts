@@ -29,7 +29,7 @@ export default defineConfig(({ command, isPreview }) => ({
           { src: 'maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,wasm}'], maximumFileSizeToCacheInBytes: 4_000_000 },
+      workbox: { importScripts: ['sw-extra.js'], globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,wasm}'], maximumFileSizeToCacheInBytes: 4_000_000 },
     }),
   ],
   test: { include: ['tests/**/*.test.ts'] },

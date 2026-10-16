@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { dataOf, useStore } from '../lib/store';
 import { applyCheckIn, checkIn, MAX_STEP, runChat, runIdeas, undoCheckIn, useCoach, type ChatMsg, type Idea, type Review } from '../lib/coach';
-import { friendlyError } from '../lib/gemini';
+import { friendlyError } from '../lib/ai';
 import { dayTotals, energy, fmt } from '../lib/nutrition';
 import { fmtDate } from '../lib/dates';
 import { XP } from '../lib/game';
@@ -16,12 +16,12 @@ const STATUS: Record<Review['status'], [string, string]> = {
 };
 
 export default function Coach() {
-  const hasKey = useStore((s) => !!s.settings.geminiKey);
+  const hasKey = useStore((s) => !!s.settings.aiKey);
   return (
     <>
       <header className="head">
         <div className="stack" style={{ gap: 2 }}>
-          <span className="mono mut">Powered by Gemini</span>
+          <span className="mono mut">Powered by DeepSeek</span>
           <h1 className="title">Coach</h1>
         </div>
       </header>
@@ -29,8 +29,8 @@ export default function Coach() {
         {!hasKey ? (
           <section className="card stack">
             <h2 className="h2">Set up your coach</h2>
-            <p className="small">The coach reads your log and weigh-ins, adjusts your targets each week, and suggests quick shakes and meals for what’s left today. It uses Google Gemini with your own free key.</p>
-            <button className="btn primary block" onClick={() => go('profile?open=ai')}>Add Gemini key</button>
+            <p className="small">The coach reads your log and weigh-ins, adjusts your targets each week, and suggests quick shakes and meals for what’s left today. It uses DeepSeek through TokenHarbor with your own free key.</p>
+            <button className="btn primary block" onClick={() => go('profile?open=ai')}>Add TokenHarbor key</button>
           </section>
         ) : (
           <>
@@ -99,6 +99,12 @@ function CheckIn() {
           ) : (
             <span className="small mut">Targets stay the same this week.</span>
           )}
+          {review.water && (
+            <div className="stack rule" style={{ paddingTop: 12, gap: 6 }}>
+              <span className="mono pro">Water</span>
+              <p className="small">{review.water}</p>
+            </div>
+          )}
           {review.focus.length > 0 && (
             <div className="stack rule" style={{ paddingTop: 12, gap: 8 }}>
               <span className="mono fuel">This week, focus on</span>
@@ -142,10 +148,9 @@ function Delta({ label, from, to, color, show = (v) => String(Math.round(v)) }: 
 function Ideas() {
   const s = useStore();
   const today = useToday();
-  const { ideas, set } = useCoach();
+  const { ideas, note, set } = useCoach();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [note, setNote] = useState('');
   const [open, setOpen] = useState<number | null>(null);
   const unit = s.settings.unit;
   const T = s.settings.targets;
@@ -159,7 +164,8 @@ function Ideas() {
     setError('');
     setOpen(null);
     try {
-      const r = await runIdeas(s.settings.geminiKey, s.settings.geminiModel, dataOf(useStore.getState()), note);
+      // Today's earlier ideas go along so a retry brings new ones.
+      const r = await runIdeas(s.settings.aiKey, s.settings.aiModel, dataOf(useStore.getState()), note, list.map((x) => x.name));
       set({ ideas: { date: today, at: Date.now(), list: r.ideas, model: r.model } });
     } catch (e) {
       setError(friendlyError(e));
@@ -182,22 +188,16 @@ function Ideas() {
     <section className="card stack" style={{ gap: 12 }}>
       <div className="between" style={{ alignItems: 'center' }}>
         <h2 className="h2">What to make now</h2>
-        {list.length > 0 && (
-          <button className="btn sm" disabled={busy} onClick={get} aria-label="Get different ideas">
-            <Icon name="refresh" size={16} /> {busy ? '…' : 'New ideas'}
-          </button>
-        )}
       </div>
       <p className="small">
         {kLeft > 0 ? `${energy(kLeft, unit)} ${unit} and ${fmt(pLeft)} g protein left today.` : 'You’ve hit today’s energy target.'} Shakes and drinks come first: they’re the easiest way to get calories in without feeling stuffed.
       </p>
-      <input className="input" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="Optional: “no blender”, “use paneer”" aria-label="Anything the coach should know" />
+      <input className="input" value={note} onChange={(e) => set({ note: e.target.value })} maxLength={200} placeholder="Optional: “no blender”, “use paneer”" aria-label="Anything the coach should know" />
       {error && <p className="small" style={{ color: 'var(--danger)' }} role="alert">{error}</p>}
-      {list.length === 0 && (
-        <button className="btn primary block" disabled={busy} onClick={get}>
-          {busy ? 'Gemini is thinking…' : 'Get 5, 10 and 20 minute ideas'}
-        </button>
-      )}
+      <button className={`btn block${list.length ? '' : ' primary'}`} disabled={busy} onClick={get}>
+        {list.length > 0 && <Icon name="refresh" size={16} />}
+        {busy ? 'Thinking it through…' : list.length ? (note.trim() ? 'New ideas with my note' : 'New ideas') : 'Get 5, 10 and 20 minute ideas'}
+      </button>
       {groups.map(([m, items]) =>
         items.length ? (
           <div key={m} className="stack" style={{ gap: 6 }}>
@@ -271,7 +271,7 @@ function Chat() {
     setBusy(true);
     setError('');
     try {
-      const reply = await runChat(s.settings.geminiKey, s.settings.geminiModel, dataOf(useStore.getState()), history);
+      const reply = await runChat(s.settings.aiKey, s.settings.aiModel, dataOf(useStore.getState()), history);
       // Append to whatever is there now (it may have been cleared while waiting).
       const cur = useCoach.getState().chat;
       if (cur.length) set({ chat: [...cur, { role: 'model' as const, text: reply }].slice(-30) });

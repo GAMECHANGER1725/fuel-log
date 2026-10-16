@@ -11,6 +11,7 @@ import Lock from './pages/Lock';
 import { useAuth } from './lib/auth';
 import { startSync, useSync } from './lib/sync';
 import { autoDue, checkIn, useCoach } from './lib/coach';
+import { startReminders } from './lib/reminders';
 
 export default function App() {
   const theme = useStore((s) => s.settings.theme);
@@ -36,10 +37,11 @@ export default function App() {
 
   // Background sync runs only while signed in.
   useEffect(() => (unlocked ? startSync() : undefined), [unlocked]);
+  useEffect(() => (unlocked ? startReminders() : undefined), [unlocked]);
   const sync = useSync();
 
   // Weekly coach check-in, by itself. With sync on, waits for the first sync so it works from both devices' data.
-  const hasKey = useStore((s) => !!s.settings.geminiKey);
+  const hasKey = useStore((s) => !!s.settings.aiKey);
   const auto = useCoach((c) => c.auto);
   const today = useToday();
   const synced = !sync.conn || (sync.status !== 'syncing' && (!!sync.last || sync.status === 'error'));

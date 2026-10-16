@@ -20,7 +20,7 @@ export default function Progress() {
   const rate = weeklyRate(s.weighIns, today);
   const since = line.length >= 2 ? latest.trend - line[0].trend : null;
   // With the coach checking in by itself, its weekly targets replace this simpler nudge.
-  const coachAuto = useCoach((c) => c.auto) && !!s.settings.geminiKey;
+  const coachAuto = useCoach((c) => c.auto) && !!s.settings.aiKey;
   const nudge = coachAuto ? null : weeklyNudge(dataOf(s), today);
   const proj = latest ? projectedDate(latest.trend, s.profile.goalKg, rate, today) : null;
 

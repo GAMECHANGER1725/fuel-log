@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { useStore } from '../lib/store';
 import { addDays, fmtDate } from '../lib/dates';
 import { dayTotals, energy, entryMacros, fmt, timeOf } from '../lib/nutrition';
-import { FOODS, gapSuggestions } from '../lib/foods';
+import { FOCUS_LABEL, FOODS, gapFocus, gapSuggestions, remaining } from '../lib/foods';
 import { XP } from '../lib/game';
 import type { Entry, Food } from '../lib/types';
-import { Bar, Icon, MacroGrid, Rings, Sheet, Stepper, toast, useGame, useRoute, useToday } from '../components/ui';
+import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, toast, useGame, useRoute, useToday } from '../components/ui';
 import RecipeView from '../components/RecipeView';
-import { recipeFor } from '../lib/recipes';
+import { recipeFor, withEdit } from '../lib/recipes';
 
 const CHECKS: [string, string][] = [
   ['veg', 'Fruit or veg'],
@@ -40,7 +40,9 @@ export default function Today() {
   const now = new Date();
   const weekday = now.getDay() >= 1 && now.getDay() <= 5;
   const atSchool = isToday && weekday && now.getHours() >= 8 && now.getHours() < 15;
-  const gap = isToday ? gapSuggestions({ kcal: kLeft, protein: pLeft }, [...s.favourites, ...FOODS.filter((f) => f.tags)], { wheyOk: s.settings.wheyOk, atSchool }, 3, round) : [];
+  const need = remaining(T, t);
+  const focus = gapFocus(need, T);
+  const gap = isToday ? gapSuggestions(need, T, [...s.favourites, ...FOODS.filter((f) => f.tags)].map((f) => withEdit(f, s.recipeEdits)), { wheyOk: s.settings.wheyOk, atSchool }, 3, round) : [];
 
   const addFood = (f: Food) => {
     s.addEntries(date, [{ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty: 1, source: 'db', foodId: f.id }], [f]);
@@ -151,11 +153,11 @@ export default function Today() {
               </button>
             </div>
             <p className="small" style={{ margin: '6px 0 12px' }}>
-              {energy(Math.max(0, kLeft), unit)} {unit} and {fmt(Math.max(0, pLeft))} g protein to go.{atSchool ? ' These are easy to eat at school.' : ''} Tap an idea for the recipe, or + to log it.
+              {energy(Math.max(0, kLeft), unit)} {unit} and {fmt(Math.max(0, pLeft))} g protein to go.{focus && <> <b>{FOCUS_LABEL[focus]}</b> is your lowest, so these are picked for it.</>}{atSchool ? ' These are easy to eat at school.' : ''} Tap an idea for the recipe, or + to log it.
             </p>
             <div className="stack">
               {gap.map((f) => {
-                const recipe = recipeFor(f);
+                const recipe = recipeFor(f, s.recipeEdits);
                 const isOpen = open === f.id;
                 return (
                   <div key={f.id} className="stack" style={{ gap: 6 }}>
@@ -176,7 +178,7 @@ export default function Today() {
                     </div>
                     {isOpen && (
                       <div className="stack" style={{ background: 'var(--bg)', color: 'var(--ink)', borderRadius: 4, padding: 14, gap: 12 }}>
-                        {recipe ? <RecipeView recipe={recipe} /> : <p className="small mut">Nothing to make: {f.serving}.</p>}
+                        {recipe ? <RecipeView recipe={recipe} editable /> : <p className="small mut">Nothing to make: {f.serving}.</p>}
                         <button className="btn primary block" onClick={() => addFood(f)}>Log it · +{XP.meal} XP</button>
                       </div>
                     )}
@@ -276,7 +278,7 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
         <span className="mono mut">Logged {timeOf(entry.at)}{entry.serving ? ` · ${entry.serving}` : ''}</span>
         <h2 className="h2" style={{ fontSize: 26 }}>{entry.name}</h2>
       </div>
-      <Stepper value={qty} onChange={setQty} label="servings" />
+      <Stepper value={qty} onChange={setQty} label="servings" presets={SERVING_PRESETS} />
       <MacroGrid {...m} unit={s.settings.unit} />
       <div className="row">
         <button className="btn danger" onClick={() => { s.removeEntry(date, entry.id); toast(`Removed ${entry.name}`); onClose(); }} aria-label="Delete"><Icon name="trash" size={18} /></button>

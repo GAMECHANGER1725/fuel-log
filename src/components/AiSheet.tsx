@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import { useStore } from '../lib/store';
-import { analyse, fileToJpeg, friendlyError, MAX_PHOTOS, type AiItem, type AiMode, type AiResult } from '../lib/gemini';
+import { analyse, fileToJpeg, friendlyError, MAX_PHOTOS, type AiItem, type AiMode, type AiResult } from '../lib/ai';
 import { sumEntries, energy } from '../lib/nutrition';
 import { XP } from '../lib/game';
-import { go, Icon, MacroGrid, Sheet, toast } from './ui';
+import { go, Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, toast } from './ui';
 
 type Row = AiItem & { qty: number; removed: boolean };
 
@@ -24,14 +24,15 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
   const [error, setError] = useState('');
   const [result, setResult] = useState<AiResult | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
+  const [sizing, setSizing] = useState<number | null>(null); // row whose serving picker is open
 
-  const noKey = !s.settings.geminiKey;
+  const noKey = !s.settings.aiKey;
 
   const run = async () => {
     setBusy(true);
     setError('');
     try {
-      const r = await analyse({ key: s.settings.geminiKey, model: s.settings.geminiModel, mode, text, images: imgs });
+      const r = await analyse({ key: s.settings.aiKey, model: s.settings.aiModel, mode, text, images: imgs });
       if (!r.items.length) setError(r.notes || 'No food found. Try again.');
       else {
         setResult(r);
@@ -60,8 +61,8 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
     return (
       <Sheet onClose={onClose} label={c.title}>
         <h2 className="h2" style={{ fontSize: 26 }}>{c.title}</h2>
-        <p>AI logging uses Google Gemini with your own free API key. Add it once in Profile and it stays on this phone.</p>
-        <button className="btn primary block" onClick={() => { onClose(); go('profile?open=ai'); }}>Add Gemini key</button>
+        <p>AI logging uses DeepSeek through TokenHarbor with your own free API key. Add it once in Profile and it stays on this phone.</p>
+        <button className="btn primary block" onClick={() => { onClose(); go('profile?open=ai'); }}>Add TokenHarbor key</button>
       </Sheet>
     );
 
@@ -143,7 +144,7 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
           </label>
           {error && <p className="small" style={{ color: 'var(--danger)' }} role="alert">{error}</p>}
           <button className="btn primary block" disabled={busy || (mode === 'text' ? !text.trim() : !imgs.length)} onClick={run}>
-            {busy ? 'Gemini is thinking…' : mode === 'text' ? 'Work it out' : imgs.length > 1 ? `Analyse ${imgs.length} photos` : 'Analyse photo'}
+            {busy ? 'Thinking it through…' : mode === 'text' ? 'Work it out' : imgs.length > 1 ? `Analyse ${imgs.length} photos` : 'Analyse photo'}
           </button>
           <p className="mono dim">Estimates only · you review before logging</p>
         </>
@@ -151,7 +152,7 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
         <>
           <div className="between" style={{ alignItems: 'flex-start' }}>
             <div className="stack" style={{ gap: 2 }}>
-              <span className="mono mut">{mode === 'label' ? 'Gemini read the label' : mode === 'text' ? 'Gemini worked it out' : imgs.length > 1 ? `Gemini read ${imgs.length} photos` : 'Gemini read your plate'}</span>
+              <span className="mono mut">{mode === 'label' ? 'AI read the label' : mode === 'text' ? 'AI worked it out' : imgs.length > 1 ? `AI read ${imgs.length} photos` : 'AI read your plate'}</span>
               <h2 className="title">{live.length} food{live.length === 1 ? '' : 's'} found</h2>
             </div>
             <span className="mono" style={{ padding: '6px 8px', border: '2px solid var(--carb)', color: 'var(--carb)', borderRadius: 4, flex: 'none' }}>{result.confidence} confidence</span>
@@ -178,14 +179,19 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
                   ))}
                 </div>
               ) : (
-                <div key={i} className="item" style={{ gap: 8 }}>
+                <div key={i} className="item" style={{ flexWrap: 'wrap', gap: 8 }}>
                   <div className="grow stack" style={{ gap: 2 }}>
                     <span>{r.name}</span>
                     <span className="mono mut">{r.portion} · {energy(r.kcal * r.qty, s.settings.unit)} · {Math.round(r.protein * r.qty * 10) / 10} g P</span>
                   </div>
-                  <button className="btn icon sm" style={{ width: 40, minHeight: 40 }} aria-label={`Less ${r.name}`} onClick={() => (r.qty <= 0.5 ? patch(i, { removed: true }) : patch(i, { qty: r.qty - 0.5 }))}>−</button>
-                  <span className="num" style={{ fontSize: 20, minWidth: 28, textAlign: 'center' }}>{r.qty}</span>
-                  <button className="btn icon sm" style={{ width: 40, minHeight: 40 }} aria-label={`More ${r.name}`} onClick={() => patch(i, { qty: r.qty + 0.5 })}>+</button>
+                  <button className="btn icon sm" style={{ width: 40, minHeight: 40 }} aria-label={`Less ${r.name}`} onClick={() => (r.qty <= 0.25 ? patch(i, { removed: true }) : patch(i, { qty: Math.round((r.qty - 0.25) * 100) / 100 }))}>−</button>
+                  <button className="btn sm num" style={{ fontSize: 20, minWidth: 52, minHeight: 40, padding: '0 6px' }} aria-label={`Set amount of ${r.name}`} aria-expanded={sizing === i} onClick={() => setSizing(sizing === i ? null : i)}>{r.qty}×</button>
+                  <button className="btn icon sm" style={{ width: 40, minHeight: 40 }} aria-label={`More ${r.name}`} onClick={() => patch(i, { qty: Math.round((r.qty + 0.25) * 100) / 100 })}>+</button>
+                  {sizing === i && (
+                    <div style={{ flex: '1 1 100%' }}>
+                      <Stepper value={r.qty} onChange={(qty) => patch(i, { qty })} label={`servings of ${r.name}`} presets={SERVING_PRESETS} />
+                    </div>
+                  )}
                 </div>
               ),
             )}

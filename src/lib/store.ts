@@ -3,13 +3,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AppData, DayLog, Entry, Food, Macros, Profile, Settings } from './types';
+import type { Recipe } from './recipes';
 import { DEFAULT_DATA, normalize } from './backup';
 import { todayKey } from './dates';
 import { applyDoc, type SyncDoc } from './syncdoc';
 
 const emptyDay = (): DayLog => ({ entries: [], water: 0, checks: {} });
 /** Settings that stay on one device and so don't count as a change worth syncing. */
-const LOCAL_ONLY: (keyof Settings)[] = ['geminiKey', 'geminiModel', 'theme'];
+const LOCAL_ONLY: (keyof Settings)[] = ['aiKey', 'aiModel', 'theme'];
 const allIds = (days: Record<string, DayLog>) => Object.values(days).flatMap((d) => d.entries.map((e) => e.id));
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -26,6 +27,8 @@ interface Actions {
   addWeighIn: (date: string, kg: number) => void;
   removeWeighIn: (date: string) => void;
   toggleFavourite: (f: Food) => void;
+  /** Save your version of a recipe, or null to go back to the original. */
+  setRecipeEdit: (name: string, r: Recipe | null) => void;
   setSettings: (patch: Partial<Settings>) => void;
   setProfile: (patch: Partial<Profile>) => void;
   setTargets: (t: Macros) => void;
@@ -86,6 +89,11 @@ export const useStore = create<AppData & Actions>()(
               mod: Date.now(),
             };
           }),
+        setRecipeEdit: (name, r) =>
+          set((s) => {
+            const { [name.toLowerCase()]: _old, ...rest } = s.recipeEdits;
+            return { recipeEdits: r ? { ...rest, [name.toLowerCase()]: r } : rest, mod: Date.now() };
+          }),
         setSettings: (patch) =>
           set((s) => ({
             settings: { ...s.settings, ...patch },
@@ -113,7 +121,7 @@ export const useStore = create<AppData & Actions>()(
         reset: () =>
           set((s) => ({
             ...DEFAULT_DATA,
-            settings: { ...DEFAULT_DATA.settings, geminiKey: s.settings.geminiKey, geminiModel: s.settings.geminiModel },
+            settings: { ...DEFAULT_DATA.settings, aiKey: s.settings.aiKey, aiModel: s.settings.aiModel },
             tomb: { ...s.tomb, ...Object.fromEntries(allIds(s.days).map((id) => [id, Date.now()])) },
             mod: Date.now(),
           })),
@@ -132,6 +140,6 @@ export const useStore = create<AppData & Actions>()(
 
 /** Plain data snapshot (no actions), e.g. for export and the game engine. */
 export const dataOf = (s: AppData & Partial<Actions>): AppData => {
-  const { v, profile, settings, days, weighIns, favourites, recents, targetChanges, nudgeDismissed, lastExport, seen, tomb, mod } = s;
-  return { v, profile, settings, days, weighIns, favourites, recents, targetChanges, nudgeDismissed, lastExport, seen, tomb, mod };
+  const { v, profile, settings, days, weighIns, favourites, recipeEdits, recents, targetChanges, nudgeDismissed, lastExport, seen, tomb, mod } = s;
+  return { v, profile, settings, days, weighIns, favourites, recipeEdits, recents, targetChanges, nudgeDismissed, lastExport, seen, tomb, mod };
 };

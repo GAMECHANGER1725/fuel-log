@@ -4,17 +4,19 @@
 //  - Food entries: union by id. A deleted id is kept in `tomb` so it stays deleted everywhere.
 //    If both sides have the same id, the more recently edited copy wins.
 //  - Water and food-quality checks: per day, the side with the newer `m` timestamp wins.
-//  - Profile, targets, weigh-ins, favourites: the whole block from whichever device changed it last wins.
-//  - Never synced (stay per device): Gemini key and model, theme, recents, backup date, celebration state.
+//  - Profile, targets, weigh-ins, favourites, edited recipes: the whole block from whichever device changed it last wins.
+//  - Never synced (stay per device): AI key and model, theme, recents, backup date, celebration state.
 
 import type { AppData, DayLog, Entry, Food, Profile, Settings, TargetChange, WeighIn } from './types';
+import type { RecipeEdits } from './recipes';
 import { normalize, DEFAULT_DATA } from './backup';
 
 export interface SmallData {
   profile: Profile;
-  settings: Omit<Settings, 'geminiKey' | 'geminiModel' | 'theme'>;
+  settings: Omit<Settings, 'aiKey' | 'aiModel' | 'theme'>;
   weighIns: WeighIn[];
   favourites: Food[];
+  recipeEdits: RecipeEdits;
   targetChanges: TargetChange[];
   nudgeDismissed: string | null;
 }
@@ -50,12 +52,12 @@ function canon(doc: { days: Record<string, DayLog>; tomb: Record<string, number>
 }
 
 export function toDoc(d: AppData): SyncDoc {
-  const { geminiKey: _k, geminiModel: _m, theme: _t, ...settings } = d.settings;
+  const { aiKey: _k, aiModel: _m, theme: _t, ...settings } = d.settings;
   return canon({
     days: d.days,
     tomb: d.tomb,
     mod: d.mod,
-    small: { profile: d.profile, settings, weighIns: d.weighIns, favourites: d.favourites, targetChanges: d.targetChanges, nudgeDismissed: d.nudgeDismissed },
+    small: { profile: d.profile, settings, weighIns: d.weighIns, favourites: d.favourites, recipeEdits: d.recipeEdits, targetChanges: d.targetChanges, nudgeDismissed: d.nudgeDismissed },
   });
 }
 
@@ -127,6 +129,7 @@ function mergeSmall(a: SyncDoc, b: SyncDoc): SmallData {
     settings: base.settings,
     weighIns: union([...x.weighIns, ...y.weighIns], (w) => w.date),
     favourites: union([...x.favourites, ...y.favourites], (f) => f.name.toLowerCase()),
+    recipeEdits: base === x ? { ...y.recipeEdits, ...x.recipeEdits } : { ...x.recipeEdits, ...y.recipeEdits },
     targetChanges: union([...x.targetChanges, ...y.targetChanges], (t) => `${t.date}|${t.from}|${t.to}`),
     nudgeDismissed: [x.nudgeDismissed, y.nudgeDismissed].filter((v): v is string => !!v).sort().pop() ?? null,
   };
@@ -157,9 +160,10 @@ export function applyDoc(local: AppData, doc: SyncDoc): AppData {
     tomb: doc.tomb,
     mod: doc.mod,
     profile: doc.small.profile,
-    settings: { ...doc.small.settings, geminiKey: local.settings.geminiKey, geminiModel: local.settings.geminiModel, theme: local.settings.theme },
+    settings: { ...doc.small.settings, aiKey: local.settings.aiKey, aiModel: local.settings.aiModel, theme: local.settings.theme },
     weighIns: doc.small.weighIns,
     favourites: doc.small.favourites,
+    recipeEdits: doc.small.recipeEdits,
     targetChanges: doc.small.targetChanges,
     nudgeDismissed: doc.small.nudgeDismissed,
   };

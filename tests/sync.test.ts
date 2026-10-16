@@ -129,19 +129,19 @@ describe('sync between two devices (fake GitHub)', () => {
     expect(useStore.getState().days['2026-10-07'].water).toBe(1);
   });
 
-  it('newest change to targets wins, and Gemini key and theme stay per device', async () => {
+  it('newest change to targets wins, and the AI key and theme stay per device', async () => {
     on('phone'); await connect(GOOD);
-    useStore.getState().setSettings({ geminiKey: 'PHONE-KEY', theme: 'dark' });
+    useStore.getState().setSettings({ aiKey: 'PHONE-KEY', theme: 'dark' });
     on('laptop'); await connect(GOOD);
-    useStore.getState().setSettings({ geminiKey: 'LAPTOP-KEY', theme: 'light' });
+    useStore.getState().setSettings({ aiKey: 'LAPTOP-KEY', theme: 'light' });
     tick(); useStore.getState().setTargets({ kcal: 3300, protein: 120, carbs: 480, fat: 90 }); await syncNow();
     on('phone'); await syncNow();
     expect(useStore.getState().settings.targets.kcal).toBe(3300);
-    expect(useStore.getState().settings.geminiKey).toBe('PHONE-KEY');
+    expect(useStore.getState().settings.aiKey).toBe('PHONE-KEY');
     expect(useStore.getState().settings.theme).toBe('dark');
     // Nothing secret ever reaches the gist.
     const raw = gists.get('gist1')!.files['fuel-log-sync.json'].content;
-    expect(raw).not.toMatch(/KEY|geminiKey|ghp_/);
+    expect(raw).not.toMatch(/KEY|aiKey|ghp_/);
   });
 
   it('first sync from pre-sync data (no timestamps) keeps the phone weigh-ins, targets and favourites', async () => {
@@ -176,11 +176,11 @@ describe('sync between two devices (fake GitHub)', () => {
     expect(useStore.getState().weighIns.map((w) => w.date)).toEqual(['2026-10-01', '2026-10-05']);
   });
 
-  it('saving only a Gemini key does not count as a settings change', async () => {
+  it('saving only an AI key does not count as a settings change', async () => {
     on('phone'); await connect(GOOD);
     on('laptop'); await connect(GOOD);
     tick(); useStore.getState().setTargets({ kcal: 3200, protein: 115, carbs: 470, fat: 88 }); await syncNow();
-    on('phone'); tick(); useStore.getState().setSettings({ geminiKey: 'new-key' }); await syncNow();
+    on('phone'); tick(); useStore.getState().setSettings({ aiKey: 'new-key' }); await syncNow();
     expect(useStore.getState().settings.targets.kcal).toBe(3200); // not reverted by the stale phone copy
   });
 

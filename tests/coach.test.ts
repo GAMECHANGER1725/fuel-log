@@ -9,9 +9,13 @@ vi.hoisted(() => {
   };
 });
 
-import { allowedChange, applyCheckIn, checkIn, guardTargets, kcalBounds, MAX_STEP, parseIdeas, parseReview, snapshot, undoCheckIn, useCoach, type Snapshot } from '../src/lib/coach';
+import { allowedChange, applyCheckIn, checkIn, guardTargets, ideasRequest, kcalBounds, MAX_STEP, parseIdeas, parseRecipeEdit, parseReview, snapshot, undoCheckIn, useCoach, type Snapshot } from '../src/lib/coach';
+import { RECIPES, recipeFor, recipeMacros, withEdit } from '../src/lib/recipes';
+import { FOODS } from '../src/lib/foods';
+import { applyDoc, toDoc } from '../src/lib/syncdoc';
+import { normalize } from '../src/lib/backup';
 import { useStore } from '../src/lib/store';
-import { buildBody, MAX_PHOTOS } from '../src/lib/gemini';
+import { buildBody, MAX_PHOTOS } from '../src/lib/ai';
 import { DEFAULT_DATA } from '../src/lib/backup';
 import { addDays, todayKey } from '../src/lib/dates';
 import type { AppData, Entry } from '../src/lib/types';
@@ -49,6 +53,48 @@ describe('coach snapshot', () => {
     expect(s.days[0].beforeThree).toBe(0.4);
     expect(s.rate).toBeCloseTo(0.1, 2);
     expect(s.usualFoods).toEqual(['Milk']);
+  });
+  it('includes water: today, the week average and days at goal', () => {
+    const d = data(3000, 0.1);
+    d.settings.waterL = 2;
+    d.days[addDays(today, -1)].water = 8; // 2 L
+    d.days[addDays(today, -2)].water = 4; // 1 L
+    d.days[today] = { entries: [], water: 3, checks: {} };
+    const s = snapshot(d);
+    expect(s.days[0].waterL).toBe(2);
+    expect(s.water).toEqual({ targetL: 2, todayL: 0.75, avg7L: 0.4, daysAtGoal7: 1 });
+  });
+});
+
+describe('meal ideas request', () => {
+  it('puts the note last as the priority, and lists ideas already seen', () => {
+    const msg = ideasRequest({ now: '16:00' }, '  no blender ', ['PB shake', 'Lassi']);
+    expect(msg.trim().endsWith('MY NOTE (follow this first, it overrides the usual rules): no blender')).toBe(true);
+    expect(msg).toContain('already seen today (suggest different ones): PB shake; Lassi.');
+    expect(ideasRequest({}, '')).not.toContain('MY NOTE');
+  });
+});
+
+describe('recipe edits', () => {
+  const orig = RECIPES[0];
+  const raw = JSON.stringify({ serving: '1 glass (~550 ml)', time: '5 min', ingredients: [{ amount: '350 ml', item: 'full cream milk' }, { amount: '', item: '' }], steps: ['Blend.'], kcal: 9000, protein: 20, carbs: 80, fat: 20, changes: 'More milk.' });
+  it('keeps the name, drops empty lines and trusts macros over a wrong kcal', () => {
+    const { recipe, changes } = parseRecipeEdit(`Sure!\n${raw}`, orig);
+    expect(recipe.name).toBe(orig.name);
+    expect(recipe.lines).toEqual([[null, 0, '350 ml', 'full cream milk']]);
+    expect(recipeMacros(recipe)).toEqual({ kcal: 20 * 4 + 80 * 4 + 20 * 9, protein: 20, carbs: 80, fat: 20 });
+    expect(changes).toBe('More milk.');
+  });
+  it('replaces the built-in recipe and food numbers, and survives backup and sync', () => {
+    const { recipe } = parseRecipeEdit(raw, orig);
+    const edits = { [orig.name.toLowerCase()]: recipe };
+    const food = FOODS.find((f) => f.name === orig.name)!;
+    expect(withEdit(food, edits)).toMatchObject({ id: food.id, serving: '1 glass (~550 ml)', kcal: 580 });
+    expect(recipeFor(food, edits)).toBe(recipe);
+    expect(recipeFor(food)).toBe(orig);
+    const d = normalize({ ...structuredClone(DEFAULT_DATA), recipeEdits: edits });
+    expect(d.recipeEdits).toEqual(edits);
+    expect(applyDoc(structuredClone(DEFAULT_DATA), toDoc(d)).recipeEdits).toEqual(edits);
   });
 });
 
@@ -123,15 +169,16 @@ describe('multi-photo meal check', () => {
   it('sends every photo, numbered, up to the limit', () => {
     const images = Array.from({ length: MAX_PHOTOS + 2 }, (_, i) => ({ base64: `img${i}`, mimeType: 'image/jpeg' }));
     const body = buildBody('photo', { images, text: 'cooked in ghee' });
-    const parts = body.contents[0].parts as Record<string, unknown>[];
-    expect(parts.filter((p) => p.inline_data)).toHaveLength(MAX_PHOTOS);
+    const parts = body.messages[1].content as Record<string, unknown>[];
+    expect(parts.filter((p) => p.type === 'image_url')).toHaveLength(MAX_PHOTOS);
+    expect(parts[1]).toEqual({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,img0' } });
     expect(parts.some((p) => p.text === 'Photo 2:')).toBe(true);
     // Photos come first, then the notes, then the question.
-    expect(parts[0]).toEqual({ text: 'Photo 1:' });
+    expect(parts[0]).toEqual({ type: 'text', text: 'Photo 1:' });
     expect(String(parts[parts.length - 2].text)).toContain('cooked in ghee');
   });
   it('keeps a single photo simple', () => {
-    const parts = buildBody('photo', { images: [{ base64: 'a', mimeType: 'image/jpeg' }] }).contents[0].parts as Record<string, unknown>[];
+    const parts = buildBody('photo', { images: [{ base64: 'a', mimeType: 'image/jpeg' }] }).messages[1].content as Record<string, unknown>[];
     expect(parts).toHaveLength(2);
   });
 });
@@ -140,9 +187,9 @@ describe('check-in, apply and undo', () => {
   let reply: Record<string, unknown>;
   beforeEach(() => {
     reply = { targets: { kcal: 9999, protein: 120, carbs: 1, fat: 90 }, headline: 'h', summary: 's', focus: ['a', 'b', 'c'] };
-    globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(reply) }] } }] }) })) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify(reply) } }] }) })) as unknown as typeof fetch;
     const d = data(3000, 0.1);
-    d.settings.geminiKey = 'k';
+    d.settings.aiKey = 'k';
     useStore.setState({ ...d });
     useCoach.setState({ auto: true, review: null, tried: 0, chat: [], ideas: null });
   });

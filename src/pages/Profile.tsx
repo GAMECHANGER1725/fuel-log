@@ -3,12 +3,13 @@ import { useStore, dataOf } from '../lib/store';
 import { RANKS, BOSS_XP, computeGame } from '../lib/game';
 import { suggestTargets } from '../lib/targets';
 import { exportText, parseBackup } from '../lib/backup';
-import { GEMINI_MODELS, friendlyError, testKey } from '../lib/gemini';
+import { AI_MODELS, friendlyError, testKey } from '../lib/ai';
 import { fmt, KJ } from '../lib/nutrition';
 import { todayKey, fmtDate } from '../lib/dates';
 import type { AppData, Macros } from '../lib/types';
 import { Bar, toast, useGame, useRoute } from '../components/ui';
 import { useAuth } from '../lib/auth';
+import { remindersOn, remindersSupported, setReminders } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
 
 const TONE = { fuel: 'var(--fuel)', protein: 'var(--pro)', sand: 'var(--carb)', ink: 'var(--ink)' };
@@ -84,7 +85,7 @@ export default function ProfilePage() {
         <Section title="Daily targets" hint={`${fmt(s.settings.targets.kcal)} kcal · ${s.settings.targets.protein} g`} open={open === 'targets'}>
           <TargetsForm />
         </Section>
-        <Section title="AI food scanner" hint={s.settings.geminiKey ? 'Gemini key added' : 'Not set up'} hintColor={s.settings.geminiKey ? 'var(--pro)' : undefined} open={open === 'ai'}>
+        <Section title="AI" hint={s.settings.aiKey ? 'TokenHarbor key added' : 'Not set up'} hintColor={s.settings.aiKey ? 'var(--pro)' : undefined} open={open === 'ai'}>
           <AiForm />
         </Section>
         <Section title="Sync between devices" hint={syncHint} hintColor={sync.status === 'error' && sync.kind !== 'offline' ? 'var(--danger)' : sync.conn ? 'var(--pro)' : undefined} open={open === 'sync'}>
@@ -201,18 +202,18 @@ function TargetsForm() {
 
 function AiForm() {
   const s = useStore();
-  const [key, setKey] = useState(s.settings.geminiKey);
+  const [key, setKey] = useState(s.settings.aiKey);
   const [show, setShow] = useState(false);
   const [status, setStatus] = useState('');
-  const custom = !GEMINI_MODELS.some((m) => m.id === s.settings.geminiModel);
+  const custom = !AI_MODELS.some((m) => m.id === s.settings.aiModel);
   return (
     <>
       <p className="small mut">
-        Snap meal, Read label and Describe it use Google Gemini with your own free key. It’s stored only on this phone and sent only to Google. Get one at{' '}
-        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a>. Google requires an adult (18+) to create the key, so ask a parent.
+        Snap meal, Read label, Describe it, recipe edits and the coach use DeepSeek V4.1 Flash, free through TokenHarbor with your own key. It’s stored only on this phone and sent only to TokenHarbor. Get one at{' '}
+        <a href="https://tokenharbor.ai/dashboard/api-keys" target="_blank" rel="noreferrer">tokenharbor.ai</a> (API Keys).
       </p>
       <label className="field">
-        <span>Gemini API key</span>
+        <span>TokenHarbor API key</span>
         <div className="row">
           <input className="input" type={show ? 'text' : 'password'} value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} placeholder="Paste key" />
           <button className="btn" onClick={() => setShow(!show)}>{show ? 'Hide' : 'Show'}</button>
@@ -220,19 +221,19 @@ function AiForm() {
       </label>
       <label className="field">
         <span>Model</span>
-        <select className="input" value={custom ? 'custom' : s.settings.geminiModel} onChange={(e) => s.setSettings({ geminiModel: e.target.value === 'custom' ? '' : e.target.value })}>
-          {GEMINI_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label} · {m.hint}</option>)}
+        <select className="input" value={custom ? 'custom' : s.settings.aiModel} onChange={(e) => s.setSettings({ aiModel: e.target.value === 'custom' ? '' : e.target.value })}>
+          {AI_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label} · {m.hint}</option>)}
           <option value="custom">Custom model ID…</option>
         </select>
       </label>
-      {custom && <input className="input" placeholder="e.g. gemini-3.8-flash" value={s.settings.geminiModel} onChange={(e) => s.setSettings({ geminiModel: e.target.value.trim() })} aria-label="Custom model ID" />}
+      {custom && <input className="input" placeholder="e.g. deepseek-v4.1-flash:free" value={s.settings.aiModel} onChange={(e) => s.setSettings({ aiModel: e.target.value.trim() })} aria-label="Custom model ID" />}
       <div className="row">
         <button
           className="btn"
           onClick={async () => {
             setStatus('Testing…');
             try {
-              await testKey(key, s.settings.geminiModel || GEMINI_MODELS[0].id);
+              await testKey(key, s.settings.aiModel || AI_MODELS[0].id);
               setStatus('Key works.');
             } catch (e) {
               setStatus(friendlyError(e));
@@ -241,7 +242,7 @@ function AiForm() {
         >
           Test
         </button>
-        <button className="btn primary grow" onClick={() => { s.setSettings({ geminiKey: key.trim() }); toast(key.trim() ? 'Key saved' : 'Key removed'); }}>Save key</button>
+        <button className="btn primary grow" onClick={() => { s.setSettings({ aiKey: key.trim() }); toast(key.trim() ? 'Key saved' : 'Key removed'); }}>Save key</button>
       </div>
       {status && <p className="small" role="status">{status}</p>}
     </>
@@ -266,6 +267,31 @@ function DisplayForm() {
         <input type="checkbox" checked={s.settings.wheyOk} onChange={(e) => s.setSettings({ wheyOk: e.target.checked })} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
         Include whey protein in “Close the gap” (off by default; whey can make acne worse for some people)
       </label>
+      <span className="mono mut">Reminders</span>
+      <ReminderToggle />
+    </>
+  );
+}
+
+function ReminderToggle() {
+  const [on, setOn] = useState(remindersOn);
+  if (!remindersSupported()) return <p className="small mut">This browser can’t show notifications. On iPhone, add the app to your Home Screen first.</p>;
+  return (
+    <>
+      <label className="row small">
+        <input
+          type="checkbox"
+          checked={on}
+          style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }}
+          onChange={async (e) => {
+            const ok = await setReminders(e.target.checked);
+            setOn(ok);
+            if (e.target.checked && !ok) toast('Notifications are blocked. Allow them for this app in your browser settings.');
+          }}
+        />
+        Remind me to drink water if I haven’t for 2 hours (8 am to 9 pm), and what to eat at 5 PM
+      </label>
+      <p className="small mut" style={{ margin: 0 }}>Reminders arrive while the app is open or running in the background. They can’t fire once your phone has fully closed it.</p>
     </>
   );
 }
@@ -316,7 +342,7 @@ function SyncForm() {
       <p className="small" role="status">
         {status === 'syncing' ? 'Syncing…' : status === 'error' ? <span style={{ color: 'var(--danger)' }}>{error}</span> : last ? `Up to date. Last synced ${ago(last)}.` : 'Connected.'}
       </p>
-      <p className="small mut">It syncs when you open the app, a few seconds after each change, and every minute while it’s open. Your Gemini key, theme and recents stay on each device.</p>
+      <p className="small mut">It syncs when you open the app, a few seconds after each change, and every minute while it’s open. Your AI key, theme and recents stay on each device.</p>
       <div className="row">
         <button className="btn primary grow" disabled={status === 'syncing'} onClick={() => void syncNow()}>Sync now</button>
         <button className="btn danger" onClick={() => { disconnect(); toast('Disconnected. Your data stays on this device.'); }}>Disconnect</button>

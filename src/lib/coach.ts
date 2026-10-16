@@ -1,20 +1,22 @@
-// Personal coach, powered by Gemini with the user's own key.
+// Personal coach, powered by DeepSeek (through TokenHarbor) with the user's own key.
 //
 //  1. Weekly review: reads the log, weigh-ins and meal timing, and adjusts the daily targets.
-//     Gemini proposes numbers and explains them, but the code below decides what is ALLOWED:
+//     The model proposes numbers and explains them, but the code below decides what is ALLOWED:
 //     calories only move in the direction the weight trend supports, by at most MAX_STEP,
 //     at most once a week, and protein and fat stay inside safe ranges. Carbs are always
 //     recomputed so the four numbers add up.
 //  2. Meal ideas: 5, 10 and 20 minute options for what's left today, liquid foods and shakes first.
 //  3. Ask the coach: short answers to questions, grounded in the same snapshot of the log.
+//  4. Recipe edits: rewrite a suggested recipe the way you asked and work its macros out again.
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AppData, Entry, Macros } from './types';
+import type { AppData, DayLog, Macros } from './types';
+import type { Recipe } from './recipes';
 import { addDays, daysBetween, keyOf, todayKey } from './dates';
 import { dayTotals, entryMacros, r1 } from './nutrition';
 import { trendLine, weeklyRate } from './targets';
-import { AiError, DEFAULT_MODEL, callWithFallback } from './gemini';
+import { AiError, complete, jsonRule, parseJson, type Body } from './ai';
 import { dataOf, useStore } from './store';
 
 // ----- Snapshot: what the coach gets to see ---------------------------------------
@@ -29,6 +31,8 @@ export interface DaySummary extends Macros {
   /** Clock time of the first and last food, e.g. "7:40". */
   first: string;
   last: string;
+  /** Litres of water logged that day. */
+  waterL: number;
 }
 
 export interface Snapshot {
@@ -55,6 +59,8 @@ export interface Snapshot {
   rate: number | null;
   soFar: Macros;
   left: Macros;
+  /** Daily water goal, water drunk today and the average over logged days in the last week, in litres. */
+  water: { targetL: number; todayL: number; avg7L: number | null; daysAtGoal7: number };
   /** The foods logged most often in the last 28 days. */
   usualFoods: string[];
 }
@@ -74,8 +80,9 @@ const avg = (xs: Macros[]): Macros | null =>
       }
     : null;
 
-function summarise(date: string, entries: Entry[]): DaySummary {
-  const t = dayTotals({ entries, water: 0, checks: {} });
+function summarise(date: string, day: DayLog): DaySummary {
+  const { entries } = day;
+  const t = dayTotals(day);
   const sorted = [...entries].sort((a, b) => a.at - b.at);
   let meals = 0;
   let prev = -Infinity;
@@ -96,13 +103,14 @@ function summarise(date: string, entries: Entry[]): DaySummary {
     beforeThree: t.kcal ? Math.round((early / t.kcal) * 100) / 100 : 0,
     first: sorted.length ? clock(sorted[0].at) : '',
     last: sorted.length ? clock(sorted[sorted.length - 1].at) : '',
+    waterL: day.water * 0.25,
   };
 }
 
 export function snapshot(d: AppData, now = new Date()): Snapshot {
   const today = keyOf(now);
   const past = Array.from({ length: 14 }, (_, i) => addDays(today, -i - 1));
-  const days = past.filter((k) => d.days[k]?.entries.length).map((k) => summarise(k, d.days[k].entries));
+  const days = past.filter((k) => d.days[k]?.entries.length).map((k) => summarise(k, d.days[k]));
   const last7 = days.filter((x) => daysBetween(x.date, today) <= 7);
   const isWeekend = (k: string) => [0, 6].includes(new Date(`${k}T12:00:00`).getDay());
   const wk = days.filter((x) => !isWeekend(x.date));
@@ -158,6 +166,12 @@ export function snapshot(d: AppData, now = new Date()): Snapshot {
       fat: Math.max(0, r1(T.fat - soFar.fat)),
     },
     usualFoods,
+    water: {
+      targetL: d.settings.waterL,
+      todayL: (d.days[today]?.water ?? 0) * 0.25,
+      avg7L: last7.length ? Math.round((last7.reduce((t, x) => t + x.waterL, 0) / last7.length) * 10) / 10 : null,
+      daysAtGoal7: last7.filter((x) => x.waterL >= d.settings.waterL).length,
+    },
   };
 }
 
@@ -242,6 +256,7 @@ const LEGEND = [
   'avg7 / avg14 = averages over logged days only. loggedDays7 = how many of the last 7 days were logged. weekdayKcal / weekendKcal = average kcal Mon–Fri vs Sat–Sun (Mon–Fri may include school holidays).',
   'weighIns.kg = scale weight; weighIns.trend = 7-day smoothed weight. rate = change in smoothed weight in kg per week (null = not enough weigh-ins). gainPerWeek = his target range in kg per week.',
   'usualFoods = the foods he logged most in the last 4 weeks.',
+  'water = litres: targetL is his daily goal, todayL so far today, avg7L the average on logged days this week, daysAtGoal7 how many of those days hit the goal. days[].waterL = litres that day. Water is logged in 250 ml glasses and he may forget to log it, so 0 can mean "not logged".',
 ].join(' ');
 
 export const REVIEW_PROMPT = [
@@ -251,6 +266,7 @@ export const REVIEW_PROMPT = [
   'Protein: about 1.8–2 g per kg, inside the protein range, rounded to 5 g. Fat: 25–30% of calories. The app works carbs out itself, so put any sensible number there.',
   'Look for patterns that explain the result: days not logged, weekdays vs weekends, eating late, most food after 3 pm, too few eating occasions (under 4 a day), protein short even when calories are hit. Name the ONE thing that would help most.',
   'headline: max 10 words, matching allowed.status. summary: 2–3 sentences that quote what HAPPENED (his average intake vs target, his rate vs range) and say which way the targets move and why. Do NOT state the new kcal, protein, carbs or fat numbers in the text: the app shows them right next to it.',
+  'water: one or two sentences on his water this week from the water block (average vs goal, how many days he hit it, any pattern like low water on school days), with one concrete tip that fits his day (e.g. "Fill a 1 L bottle before school and finish it by lunch"). Remind him that water itself has no calories, so it should not replace milk or shakes, and that big drinks right before meals can fill him up.',
   'focus: exactly 3 specific actions for this week that fit HIS foods and his school day (e.g. "Drink a 500 ml milk, banana and oats shake at recess", not "eat more"). At least one must be a drink or shake, because liquids are the easiest way for him to add calories.',
 ].join('\n');
 
@@ -260,6 +276,8 @@ export const IDEAS_PROMPT = [
   'Fill three groups by total time (prep + cooking): five = 2 ideas taking 5 minutes, ten = 2 ideas taking 10 minutes, twenty = 2 ideas taking 20 minutes.',
   'PRIORITY: LIQUID FOOD FIRST. Shakes, smoothies, lassis, milky drinks, hot chocolate made on milk, and drinkable soups and dals are the easiest way for him to get calories in without feeling stuffed. five: both are shakes or smoothies. ten: the first is liquid. twenty: the first is liquid (e.g. a thick dal or soup, a kheer-style milk drink, a hot milky drink). That makes at least 4 liquid ideas out of 6.',
   'Calorie-dense add-ins that work: full cream milk, rolled oats, peanut butter, banana, dates, honey, Greek yoghurt, ice cream, nuts and nut butters, milk powder, cocoa, avocado, ghee, paneer, cheese, eggs (cooked only).',
+  'HIS NOTE: if the message includes a note from him, it is the most important instruction and overrides every rule above (e.g. "no blender" means no blended shakes, so use drinks made by stirring or shaking in a bottle; "use paneer" means paneer appears in most ideas; "not hungry" means smaller, drinkable ideas). Follow it in all 6 ideas.',
+  'If the message lists ideas he has already seen, suggest different ones.',
   'Size: each idea 30–60% of left.kcal, at least 300 and at most 900 kcal, with as much protein as fits. If left.kcal is under 300, make each a 250–400 kcal snack.',
   'Use ingredients from an Australian supermarket or a Gujarati home kitchen. Prefer foods he already eats (usualFoods). Do not repeat the same base twice (e.g. not two banana-oat shakes).',
   'If atSchool is true, every idea must be something he can make at home in the morning and drink or eat cold at school from a bottle or container; the minutes are morning prep time, and the steps say how to pack it.',
@@ -269,6 +287,7 @@ export const IDEAS_PROMPT = [
 export const CHAT_PROMPT = [
   ...WHO,
   'TASK: answer his question using the snapshot of his log below. Be specific to his numbers and foods.',
+  'You can also see his water (the water block). Bring it up when it is relevant, e.g. low water on hot or training days, or if he asks about energy or headaches.',
   'Keep answers under 120 words. Use short paragraphs or a few "- " bullet lines. When you suggest food, prefer drinks and shakes first, and give amounts and rough kcal/protein.',
   'You cannot change his targets from chat; if he asks, explain what the weekly check-in on the Coach tab will look at.',
 ].join('\n');
@@ -294,9 +313,10 @@ export const REVIEW_SCHEMA = {
     targets: MACROS_SCHEMA,
     headline: { type: 'string' },
     summary: { type: 'string' },
+    water: { type: 'string' },
     focus: { type: 'array', items: { type: 'string' }, minItems: 3, maxItems: 3 },
   },
-  required: ['targets', 'headline', 'summary', 'focus'],
+  required: ['targets', 'headline', 'summary', 'water', 'focus'],
 } as const;
 
 export const IDEA_KINDS = ['shake', 'smoothie', 'drink', 'soup', 'food'] as const;
@@ -340,13 +360,15 @@ const num = (v: unknown, max: number) => {
 };
 const n = (v: unknown, max: number) => num(v, max) ?? 0;
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
-const json = (s: string) => JSON.parse(s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()) as unknown;
+const json = parseJson;
 
 export interface Review {
   date: string;
   status: Status;
   headline: string;
   summary: string;
+  /** Water insight; missing on check-ins saved before it existed. */
+  water?: string;
   focus: string[];
   /** Targets before and after (after = guarded). */
   from: Macros;
@@ -369,6 +391,7 @@ export function parseReview(raw: string, cur: Macros, s: Snapshot, model: string
     status: allowed.status,
     headline: text(r.headline, 90) || 'Weekly check-in',
     summary: text(r.summary, 600),
+    water: text(r.water, 400),
     focus: (Array.isArray(r.focus) ? r.focus : []).map((x) => text(x, 200)).filter(Boolean).slice(0, 3),
     from: cur,
     to,
@@ -430,24 +453,21 @@ export function parseIdeas(raw: string, wheyOk: boolean): Idea[] {
 
 const snapText = (s: object) => `${LEGEND}\n\nSNAPSHOT (JSON):\n${JSON.stringify(s)}`;
 
-async function ask(key: string, model: string, body: unknown): Promise<[string, string]> {
-  if (!key.trim()) throw new AiError('no-key', 'No key');
-  return callWithFallback(key.trim(), model || DEFAULT_MODEL, body);
-}
-
-// Temperature is left at Gemini's default: current Flash models are tuned for it.
+/** System prompt + one user message, with the JSON reply format in the prompt when a schema is given. */
+const body = (system: string, user: string, schema?: object): Body => ({
+  messages: [
+    { role: 'system', content: schema ? `${system}\n\n${jsonRule(schema)}` : system },
+    { role: 'user', content: user },
+  ],
+});
 
 export async function runReview(key: string, model: string, d: AppData): Promise<Review> {
   const s = snapshot(d);
   const a = allowedChange(s);
   const [kcalMin, kcalMax] = kcalBounds(s.targets.kcal, a);
   const [proteinMin, proteinMax] = proteinBounds(s.profile.weightKg);
-  const body = {
-    system_instruction: { parts: [{ text: REVIEW_PROMPT }] },
-    contents: [{ role: 'user', parts: [{ text: `${snapText({ ...s, allowed: { status: a.status, reason: a.why, kcalMin, kcalMax, proteinMin, proteinMax } })}\n\nDo my weekly check-in.` }] }],
-    generationConfig: { responseMimeType: 'application/json', responseJsonSchema: REVIEW_SCHEMA },
-  };
-  const [raw, used] = await ask(key, model, body);
+  const allowed = { status: a.status, reason: a.why, kcalMin, kcalMax, proteinMin, proteinMax };
+  const [raw, used] = await complete(key, model, body(REVIEW_PROMPT, `${snapText({ ...s, allowed })}\n\nDo my weekly check-in.`, REVIEW_SCHEMA));
   try {
     return parseReview(raw, d.settings.targets, s, used);
   } catch {
@@ -455,21 +475,24 @@ export async function runReview(key: string, model: string, d: AppData): Promise
   }
 }
 
-export async function runIdeas(key: string, model: string, d: AppData, note = ''): Promise<{ ideas: Idea[]; model: string }> {
+/** The message for "What to make now": the note goes last and is labelled as the priority. */
+export function ideasRequest(snap: object, note = '', seen: string[] = []): string {
+  const n = note.trim().slice(0, 200);
+  return [
+    snapText(snap),
+    seen.length ? `Ideas I have already seen today (suggest different ones): ${seen.slice(0, 18).join('; ')}.` : '',
+    'What should I have now?',
+    n ? `MY NOTE (follow this first, it overrides the usual rules): ${n}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+export async function runIdeas(key: string, model: string, d: AppData, note = '', seen: string[] = []): Promise<{ ideas: Idea[]; model: string }> {
   const s = snapshot(d);
   // Only what matters for right now; the history isn't needed and costs tokens.
   const { now, weekday, atSchool, targets, soFar, left, usualFoods, wheyOk } = s;
-  const body = {
-    system_instruction: { parts: [{ text: IDEAS_PROMPT }] },
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: `${snapText({ now, weekday, atSchool, targets, soFar, left, usualFoods, wheyOk })}\n\nWhat should I have now?${note.trim() ? ` Note from me: ${note.trim().slice(0, 200)}` : ''}` }],
-      },
-    ],
-    generationConfig: { responseMimeType: 'application/json', responseJsonSchema: IDEAS_SCHEMA },
-  };
-  const [raw, used] = await ask(key, model, body);
+  const [raw, used] = await complete(key, model, body(IDEAS_PROMPT, ideasRequest({ now, weekday, atSchool, targets, soFar, left, usualFoods, wheyOk }, note, seen), IDEAS_SCHEMA));
   let ideas: Idea[];
   try {
     ideas = parseIdeas(raw, d.settings.wheyOk);
@@ -486,18 +509,96 @@ export interface ChatMsg {
 }
 
 export async function runChat(key: string, model: string, d: AppData, history: ChatMsg[]): Promise<string> {
-  const body = {
-    system_instruction: { parts: [{ text: `${CHAT_PROMPT}\n\n${snapText(snapshot(d))}` }] },
-    contents: history.slice(-12).map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
+  const req: Body = {
+    messages: [
+      { role: 'system', content: `${CHAT_PROMPT}\n\n${snapText(snapshot(d))}` },
+      ...history.slice(-12).map((m) => ({ role: m.role === 'model' ? ('assistant' as const) : ('user' as const), content: m.text })),
+    ],
   };
   let raw: string;
   try {
-    [raw] = await ask(key, model, body);
+    [raw] = await complete(key, model, req);
   } catch (e) {
     // An empty reply isn't about a photo here.
     throw e instanceof AiError && e.kind === 'blocked' ? new AiError('bad-reply', 'Empty reply') : e;
   }
   return raw.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#+\s*/gm, '').trim();
+}
+
+// ----- Recipe edits ---------------------------------------------------------------
+
+export const RECIPE_PROMPT = [
+  ...WHO,
+  'TASK: he wants to change one of the recipes the app suggests. Rewrite the recipe the way he asks and keep everything else the same where you can. It stays ONE serving.',
+  'Keep the safety rules above (no caffeine, cooked eggs only, whey only if wheyOk is true). If he asks for something unsafe, leave that part out and say so in changes.',
+  'Then work the macros out again from the ACTUAL ingredient amounts, step by step: grams or ml of each ingredient times typical per-100 g values (Australian products), summed. Include any oil, ghee, butter or milk. Do not guess the totals.',
+  'ingredients: each with amount (e.g. "300 ml", "1 tbsp", "2") and item (what it is, e.g. "full cream milk"). steps: 2–5 short steps. time: total minutes as text, e.g. "5 min". changes: one short sentence on what you changed.',
+].join('\n');
+
+export const RECIPE_SCHEMA = {
+  type: 'object',
+  properties: {
+    serving: { type: 'string', description: 'e.g. "1 large glass (~500 ml)"' },
+    time: { type: 'string' },
+    ingredients: { type: 'array', items: { type: 'object', properties: { amount: { type: 'string' }, item: { type: 'string' } }, required: ['amount', 'item'] } },
+    steps: { type: 'array', items: { type: 'string' } },
+    kcal: { type: 'number' },
+    protein: { type: 'number' },
+    carbs: { type: 'number' },
+    fat: { type: 'number' },
+    changes: { type: 'string' },
+  },
+  required: ['serving', 'time', 'ingredients', 'steps', 'kcal', 'protein', 'carbs', 'fat', 'changes'],
+} as const;
+
+/** Turn the model's rewrite into a recipe with the same name (so it stays linked to its food). Throws if unusable. */
+export function parseRecipeEdit(raw: string, orig: Recipe): { recipe: Recipe; changes: string } {
+  const r = obj(json(raw));
+  const lines = (Array.isArray(r.ingredients) ? r.ingredients : [])
+    .map(obj)
+    .map((i): Recipe['lines'][number] => [null, 0, text(i.amount, 30), text(i.item, 120)])
+    .filter((l) => l[3])
+    .slice(0, 20);
+  const protein = r1(n(r.protein, 300));
+  const carbs = r1(n(r.carbs, 500));
+  const fat = r1(n(r.fat, 300));
+  const fromMacros = protein * 4 + carbs * 4 + fat * 9;
+  const stated = n(r.kcal, 3000);
+  const kcal = Math.round(fromMacros && Math.abs(stated - fromMacros) / fromMacros > 0.2 ? fromMacros : stated);
+  if (!lines.length || !kcal) throw new Error('Empty recipe');
+  return {
+    recipe: {
+      name: orig.name,
+      serving: text(r.serving, 60) || orig.serving,
+      tags: orig.tags,
+      time: text(r.time, 40) || orig.time,
+      lines,
+      steps: (Array.isArray(r.steps) ? r.steps : []).map((x) => text(x, 300)).filter(Boolean).slice(0, 10),
+      macros: { kcal, protein, carbs, fat },
+    },
+    changes: text(r.changes, 200),
+  };
+}
+
+export async function editRecipe(key: string, model: string, recipe: Recipe, macros: Macros, request: string, wheyOk: boolean) {
+  const current = {
+    name: recipe.name,
+    serving: recipe.serving,
+    time: recipe.time,
+    ingredients: recipe.lines.map(([, , amount, item]) => ({ amount, item })),
+    steps: recipe.steps,
+    ...macros,
+  };
+  const [raw, used] = await complete(
+    key,
+    model,
+    body(RECIPE_PROMPT, `wheyOk: ${wheyOk}\n\nCURRENT RECIPE (JSON):\n${JSON.stringify(current)}\n\nHOW I WANT IT CHANGED: ${request.trim().slice(0, 300)}`, RECIPE_SCHEMA),
+  );
+  try {
+    return { ...parseRecipeEdit(raw, recipe), model: used };
+  } catch {
+    throw new AiError('bad-reply', 'Unreadable reply');
+  }
 }
 
 // ----- Coach state (this device only; targets themselves sync as usual) ----------
@@ -509,6 +610,8 @@ interface CoachState {
   /** Epoch ms of the last automatic attempt, so a failing one doesn't retry on every open. */
   tried: number;
   ideas: { date: string; at: number; list: Idea[]; model: string } | null;
+  /** The optional note for meal ideas, kept so it is still there for the next try. */
+  note: string;
   chat: ChatMsg[];
   set: (patch: Partial<Omit<CoachState, 'set'>>) => void;
 }
@@ -520,6 +623,7 @@ export const useCoach = create<CoachState>()(
       review: null,
       tried: 0,
       ideas: null,
+      note: '',
       chat: [],
       set: (patch) => set(patch),
     }),
@@ -552,9 +656,9 @@ export function checkIn(): Promise<Review> {
     const st = useStore.getState();
     const before = st.settings.targets;
     const prev = useCoach.getState().review;
-    let review = await runReview(st.settings.geminiKey, st.settings.geminiModel, dataOf(st));
+    let review = await runReview(st.settings.aiKey, st.settings.aiModel, dataOf(st));
     const cur = useStore.getState().settings.targets;
-    // Targets edited (or synced in) while Gemini was answering: don't overwrite them.
+    // Targets edited (or synced in) while the model was answering: don't overwrite them.
     const untouched = same(cur, before);
     // No automatic tweaks right after a change (or an Undo); a manual "Use these targets" still works.
     const last = st.targetChanges[st.targetChanges.length - 1];

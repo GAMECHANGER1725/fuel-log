@@ -5,12 +5,12 @@ import { searchProducts } from '../lib/off';
 import { energy, forGrams, scale, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
 import type { Food, Source } from '../lib/types';
-import { Icon, MacroGrid, Sheet, Stepper, go, toast, useRoute, useToday } from '../components/ui';
+import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, go, toast, useRoute, useToday } from '../components/ui';
 import Scanner from '../components/Scanner';
 import AiSheet from '../components/AiSheet';
-import type { AiMode } from '../lib/gemini';
+import type { AiMode } from '../lib/ai';
 import RecipeView from '../components/RecipeView';
-import { recipeFor } from '../lib/recipes';
+import { recipeFor, withEdit } from '../lib/recipes';
 
 type Picked = { food: Food; source: Source };
 
@@ -25,7 +25,7 @@ export default function FoodPage() {
   const s = useStore();
   const unit = s.settings.unit;
 
-  const local = useMemo(() => searchFoods([...s.favourites, ...FOODS], q), [q, s.favourites]);
+  const local = useMemo(() => searchFoods([...s.favourites, ...FOODS.map((f) => withEdit(f, s.recipeEdits))], q), [q, s.favourites, s.recipeEdits]);
 
   // Open Food Facts search, debounced, only when online and the query is real.
   useEffect(() => {
@@ -52,7 +52,7 @@ export default function FoodPage() {
     <div key={`${source}-${f.id}`} className="item">
       <button className="item-btn" onClick={() => setPicked({ food: f, source })}>
         <span>{f.name}</span>
-        <span className="mono mut">{f.serving} · {energy(f.kcal, unit)} {unit} · {f.protein} g P{recipeFor(f) ? ' · recipe' : ''}</span>
+        <span className="mono mut">{f.serving} · {energy(f.kcal, unit)} {unit} · {f.protein} g P{recipeFor(f, s.recipeEdits) ? ' · recipe' : ''}</span>
       </button>
       <button className="btn icon" aria-label={`Add ${f.name}`} onClick={() => setPicked({ food: f, source })}>+</button>
     </div>
@@ -142,8 +142,10 @@ export default function FoodPage() {
 }
 
 function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onClose: () => void }) {
-  const { food, source } = picked;
   const s = useStore();
+  const { source } = picked;
+  // Live, so saving a recipe edit here updates the numbers straight away.
+  const food = withEdit(picked.food, s.recipeEdits);
   const byGrams = !!food.per100;
   const [useGrams, setUseGrams] = useState(false);
   const [qty, setQty] = useState(1);
@@ -151,7 +153,7 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
   const m = useGrams && food.per100 ? forGrams(food.per100, grams) : scale(foodMacros(food), qty);
   const fav = s.favourites.some((f) => f.name.toLowerCase() === food.name.toLowerCase());
   const xp = XP.meal + (source === 'scan' ? XP.scan : 0);
-  const recipe = recipeFor(food);
+  const recipe = recipeFor(food, s.recipeEdits);
 
   const add = () => {
     const entry =
@@ -176,15 +178,15 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
         </div>
       )}
       {useGrams ? (
-        <Stepper value={grams} onChange={setGrams} step={10} min={5} label="grams" format={(v) => `${v} g`} />
+        <Stepper value={grams} onChange={setGrams} step={10} min={5} max={5000} label="grams" unit="g" />
       ) : (
-        <Stepper value={qty} onChange={setQty} label="servings" format={(v) => `${v}×`} />
+        <Stepper value={qty} onChange={setQty} label="servings" presets={SERVING_PRESETS} />
       )}
       <MacroGrid {...m} unit={s.settings.unit} />
       {recipe && (
         <details className="rule">
           <summary style={{ minHeight: 48, display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 600 }}>Recipe and method</summary>
-          <div style={{ paddingBottom: 8 }}><RecipeView recipe={recipe} /></div>
+          <div style={{ paddingBottom: 8 }}><RecipeView recipe={recipe} editable /></div>
         </details>
       )}
       <div className="row">

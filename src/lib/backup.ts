@@ -4,7 +4,8 @@
 import type { AppData, DayLog, Entry, Food, Macros, Source } from './types';
 import { isKey } from './dates';
 import { r1 } from './nutrition';
-import { DEFAULT_MODEL } from './gemini';
+import { DEFAULT_MODEL } from './ai';
+import type { Recipe, RecipeEdits } from './recipes';
 
 // Personal app: starts set up for its one user. Targets = suggestTargets(profile).
 export const DEFAULT_DATA: AppData = {
@@ -17,13 +18,14 @@ export const DEFAULT_DATA: AppData = {
     gainHigh: 0.5,
     unit: 'kcal',
     theme: 'auto',
-    geminiKey: '',
-    geminiModel: DEFAULT_MODEL,
+    aiKey: '',
+    aiModel: DEFAULT_MODEL,
     wheyOk: false,
   },
   days: {},
   weighIns: [],
   favourites: [],
+  recipeEdits: {},
   recents: [],
   targetChanges: [],
   nudgeDismissed: null,
@@ -63,6 +65,31 @@ function food(v: unknown): Food | null {
     servingGrams: f.servingGrams ? num(f.servingGrams, 100, 1, 5000) : undefined,
     barcode: str(f.barcode, 20) || undefined,
   };
+}
+
+function recipe(v: unknown): Recipe | null {
+  const r = obj(v);
+  const name = str(r.name, 80).trim();
+  if (!name) return null;
+  return {
+    name,
+    serving: str(r.serving, 60) || '1 serve',
+    tags: str(r.tags, 8),
+    time: str(r.time, 40),
+    // Edited recipes carry their own macros, so ingredient keys aren't needed (or trusted).
+    lines: arr(r.lines).slice(0, 20).map((l): Recipe['lines'][number] => [null, 0, str(arr(l)[2], 30), str(arr(l)[3], 120)]).filter((l) => l[3]),
+    steps: arr(r.steps).slice(0, 10).map((x) => str(x, 300)).filter(Boolean),
+    macros: macros(r.macros),
+  };
+}
+
+function recipeEdits(v: unknown): RecipeEdits {
+  const out: RecipeEdits = {};
+  for (const x of Object.values(obj(v)).slice(0, 100)) {
+    const r = recipe(x);
+    if (r) out[r.name.toLowerCase()] = r;
+  }
+  return out;
 }
 
 function entry(v: unknown): Entry {
@@ -122,13 +149,14 @@ export function normalize(raw: unknown): AppData {
       gainHigh: Math.max(gainLow, num(s.gainHigh, D.settings.gainHigh, 0, 2)),
       unit: s.unit === 'kJ' ? 'kJ' : 'kcal',
       theme: s.theme === 'dark' || s.theme === 'light' ? s.theme : 'auto',
-      geminiKey: str(s.geminiKey, 200).trim(),
-      geminiModel: str(s.geminiModel, 60).trim() || DEFAULT_MODEL,
+      aiKey: str(s.aiKey, 200).trim(),
+      aiModel: str(s.aiModel, 60).trim() || DEFAULT_MODEL,
       wheyOk: !!s.wheyOk,
     },
     days,
     weighIns: weighIns.filter((w, i) => weighIns.findIndex((x) => x.date === w.date) === i),
     favourites: arr(r.favourites).slice(0, 200).map(food).filter((f): f is Food => !!f),
+    recipeEdits: recipeEdits(r.recipeEdits),
     recents: arr(r.recents).slice(0, 30).map(food).filter((f): f is Food => !!f),
     targetChanges: arr(r.targetChanges)
       .map(obj)

@@ -172,22 +172,57 @@ export function searchFoods(list: Food[], query: string, limit = 30): Food[] {
     .slice(0, limit);
 }
 
+/** What is still to eat today (negative once a target is passed). */
+export const remaining = (targets: Macros, eaten: Macros): Macros => ({
+  kcal: targets.kcal - eaten.kcal,
+  protein: targets.protein - eaten.protein,
+  carbs: targets.carbs - eaten.carbs,
+  fat: targets.fat - eaten.fat,
+});
+
+export type Focus = 'protein' | 'kcal' | 'carbs' | 'fat';
+const FOCUS_KEYS: Focus[] = ['protein', 'kcal', 'carbs', 'fat'];
+export const FOCUS_LABEL: Record<Focus, string> = { protein: 'protein', kcal: 'energy', carbs: 'carbs', fat: 'fat' };
+
 /**
- * "Close the gap": foods that best cover what's still needed today.
- * Protein counts a bit more than energy, and big overshoots are penalised.
- * During school hours only foods you can pack are suggested.
+ * How much each nutrient matters right now: the share of its daily target still missing, squared so
+ * the lowest one dominates. Protein gets a small boost because it is the priority on a bulk.
+ */
+function gapWeights(need: Macros, targets: Macros): Record<Focus, number> {
+  const w = {} as Record<Focus, number>;
+  for (const k of FOCUS_KEYS) {
+    const left = targets[k] > 0 ? Math.min(1, Math.max(0, need[k]) / targets[k]) : 0;
+    w[k] = (left * (k === 'protein' ? 1.3 : 1)) ** 2;
+  }
+  return w;
+}
+
+/** The nutrient furthest behind today, or null if everything is (nearly) covered. */
+export function gapFocus(need: Macros, targets: Macros): Focus | null {
+  const w = gapWeights(need, targets);
+  const best = FOCUS_KEYS.reduce((a, k) => (w[k] > w[a] ? k : a));
+  return w[best] > 0 ? best : null;
+}
+
+/**
+ * "Close the gap": foods that best cover what is still missing today. Each nutrient counts in
+ * proportion to how far behind it is (see gapWeights), so low protein gives protein-heavy foods,
+ * and big overshoots on energy are penalised. During school hours only foods you can pack are suggested.
  * `round` is the refresh count: each round shows the next `limit` of the best dozen or so, wrapping around.
  */
 export function gapSuggestions(
-  need: { kcal: number; protein: number },
+  need: Macros,
+  targets: Macros,
   candidates: Food[],
   opts: { wheyOk: boolean; atSchool: boolean },
   limit = 3,
   round = 0,
 ): Food[] {
   const K = Math.max(0, need.kcal);
-  const P = Math.max(0, need.protein);
-  if (K < 100 && P < 5) return [];
+  if (K < 100 && need.protein < 5) return [];
+  const w = gapWeights(need, targets);
+  const wSum = FOCUS_KEYS.reduce((t, k) => t + w[k], 0);
+  if (!wSum) return [];
   const seen = new Set<string>();
   const ranked = candidates
     .filter((f) => (opts.wheyOk || !f.tags?.includes('w')) && f.kcal > 0 && (!opts.atSchool || !!f.tags?.includes('p')))
@@ -198,10 +233,9 @@ export function gapSuggestions(
       return true;
     })
     .map((f) => {
-      const p = P > 0 ? Math.min(f.protein, P) / P : 0;
-      const k = K > 0 ? Math.min(f.kcal, K) / K : 0;
+      const covered = FOCUS_KEYS.reduce((t, k) => t + (need[k] > 0 ? (w[k] * Math.min(f[k], need[k])) / need[k] : 0), 0) / wSum;
       const over = Math.max(0, f.kcal - K - 150) / 500;
-      return { f, score: 0.55 * p + 0.45 * k - over };
+      return { f, score: covered - over };
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, limit * 4)

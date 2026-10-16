@@ -1,18 +1,15 @@
-// AI food logging with Google Gemini. Three modes share one reply format:
+// AI food logging with DeepSeek V4.1 Flash through TokenHarbor (OpenAI-style chat API, free model).
+// Three modes share one reply format:
 //   photo: estimate a meal from one or more photos
 //   label: read a nutrition information panel (one or more photos of the pack)
 //   text:  "2 rotli, dal and a glass of milk"
-// The request goes straight from the phone to Google with the user's own key.
+// The request goes straight from the phone to TokenHarbor with the user's own key.
+// DeepSeek thinks step by step before answering (its default mode), which is what makes the estimates add up.
 // Results are estimates and always go through a review sheet before logging.
 
-export const GEMINI_MODELS = [
-  { id: 'gemini-flash-latest', label: 'Gemini Flash (latest)', hint: 'Best balance, always up to date' },
-  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', hint: 'Pinned version' },
-  { id: 'gemini-flash-lite-latest', label: 'Gemini Flash-Lite', hint: 'Faster, more free uses' },
-];
-export const DEFAULT_MODEL = GEMINI_MODELS[0].id;
-const FALLBACK_MODEL = 'gemini-flash-lite-latest';
-const API = 'https://generativelanguage.googleapis.com/v1beta/models';
+export const AI_MODELS = [{ id: 'deepseek-v4.1-flash:free', label: 'DeepSeek V4.1 Flash', hint: 'Free on TokenHarbor, reads photos' }];
+export const DEFAULT_MODEL = AI_MODELS[0].id;
+const API = 'https://tokenharbor.ai/v1/chat/completions';
 
 export type AiMode = 'photo' | 'label' | 'text';
 
@@ -32,6 +29,16 @@ export interface AiResult {
   model: string;
 }
 
+export type Part = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
+export interface Msg {
+  role: 'system' | 'user' | 'assistant';
+  content: string | Part[];
+}
+/** A chat request without the model, which `complete` adds. */
+export interface Body {
+  messages: Msg[];
+}
+
 export const SCHEMA = {
   type: 'object',
   properties: {
@@ -41,8 +48,8 @@ export const SCHEMA = {
         type: 'object',
         properties: {
           name: { type: 'string' },
-          portion: { type: 'string', description: 'Amount with grams, e.g. "3 rotli (~120 g)".' },
-          kcal: { type: 'number', description: 'kilocalories (not kJ)' },
+          portion: { type: 'string', description: 'Amount with grams, e.g. "3 rotli (~120 g)" or "8 slices (large, ~560 g)".' },
+          kcal: { type: 'number', description: 'kilocalories (not kJ) for the whole portion' },
           protein: { type: 'number', description: 'grams' },
           carbs: { type: 'number', description: 'grams' },
           fat: { type: 'number', description: 'grams' },
@@ -51,16 +58,24 @@ export const SCHEMA = {
       },
     },
     confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
-    notes: { type: 'string', description: 'One or two short sentences.' },
+    notes: { type: 'string', description: 'One or two short sentences: the main assumption, e.g. the per-slice figure used.' },
   },
   required: ['items', 'confidence', 'notes'],
 } as const;
+
+/** The model has no schema mode here, so the schema goes in the prompt and the reply is parsed leniently. */
+export const jsonRule = (schema: object) => `Reply with ONLY one JSON object, no other text and no code fences, matching this JSON Schema:\n${JSON.stringify(schema)}`;
 
 const BASE = [
   'You estimate nutrition for a teenager in Australia who is trying to gain weight healthily.',
   'They are vegetarian but eat eggs and dairy: no meat, fish or seafood. If a dish could contain meat, assume the vegetarian version (e.g. veggie burger, paneer instead of chicken).',
   'They often eat Gujarati/Indian home cooking (rotli, dal, shaak, thepla, rice, kadhi) as well as Australian food.',
-  'Always give energy in kcal, never kJ. Be realistic, not optimistic, and include typical cooking oil or ghee.',
+  'Always give energy in kcal, never kJ (kJ / 4.184 = kcal).',
+  'Be ACCURATE, not cautious: never pad numbers up or down "to be safe".',
+  'Home cooking: include the typical oil or ghee. Restaurant, takeaway and packaged food (Domino\'s, Pizza Hut, McDonald\'s, Hungry Jack\'s, Subway, Guzman y Gomez, supermarket products): use the brand\'s published Australian nutrition figures when you know them. Those already include the oil, cheese and sauce, so add nothing on top.',
+  'Method, before you answer: (1) name each food and its size or variant; (2) for food eaten in pieces (pizza slices, rotli, dumplings, biscuits, nuggets) work out ONE piece in grams and kcal, then multiply by the count; (3) otherwise estimate grams and use per-100 g values; (4) sanity-check every total against reference points.',
+  'Reference points: a Domino\'s Australia pizza slice is about 70-75 g and 150-170 kcal for most vegetarian pizzas on classic crust, so a whole 8-slice large is about 1,200-1,400 kcal (thin crust less, deep pan or extra cheese more). A medium plain rotli is about 80 kcal (+35 with a tsp of ghee). A cup of cooked rice is about 200 kcal. 250 ml of full cream milk is about 165 kcal.',
+  'confidence: high only when you are using a brand\'s published figures or a printed label; medium for a clear, standard food and portion; low when the portion or recipe is a guess.',
 ];
 
 export const PROMPTS: Record<AiMode, string> = {
@@ -81,7 +96,7 @@ export const PROMPTS: Record<AiMode, string> = {
   ].join(' '),
   text: [
     ...BASE,
-    'The user describes what they ate. Split it into separate foods with sensible portions (with grams) and macros.',
+    'The user describes what they ate. Split it into separate foods with sensible portions (with grams) and macros. A whole named dish (e.g. "a large Domino\'s peppy paneer pizza") is ONE item with the count in the portion.',
     'If an amount is missing, assume a typical teenage portion and say so in notes.',
   ].join(' '),
 };
@@ -94,19 +109,20 @@ export interface AiImage {
 /** Most photos sent in one request. */
 export const MAX_PHOTOS = 6;
 
-export function buildBody(mode: AiMode, input: { text?: string; images?: AiImage[] }) {
-  const parts: unknown[] = [];
-  if (mode === 'text') parts.push({ text: `What I ate: ${input.text ?? ''}` });
+export function buildBody(mode: AiMode, input: { text?: string; images?: AiImage[] }): Body {
+  const parts: Part[] = [];
+  if (mode === 'text') parts.push({ type: 'text', text: `What I ate: ${input.text ?? ''}` });
   else {
     const images = (input.images ?? []).slice(0, MAX_PHOTOS);
     const n = images.length;
     // Photos first, then the question: the model reads all of them before it starts answering.
     images.forEach((img, i) => {
-      if (n > 1) parts.push({ text: `Photo ${i + 1}:` });
-      parts.push({ inline_data: { mime_type: img.mimeType || 'image/jpeg', data: img.base64 } });
+      if (n > 1) parts.push({ type: 'text', text: `Photo ${i + 1}:` });
+      parts.push({ type: 'image_url', image_url: { url: `data:${img.mimeType || 'image/jpeg'};base64,${img.base64}` } });
     });
-    if (input.text?.trim()) parts.push({ text: `Extra details from me (these override what the photos suggest): ${input.text.trim()}` });
+    if (input.text?.trim()) parts.push({ type: 'text', text: `Extra details from me (these override what the photos suggest): ${input.text.trim()}` });
     parts.push({
+      type: 'text',
       text:
         mode === 'label'
           ? n > 1 ? `Read this nutrition label from the ${n} photos above.` : 'Read this nutrition label.'
@@ -114,16 +130,26 @@ export function buildBody(mode: AiMode, input: { text?: string; images?: AiImage
     });
   }
   return {
-    system_instruction: { parts: [{ text: PROMPTS[mode] }] },
-    contents: [{ role: 'user', parts }],
-    generationConfig: { responseMimeType: 'application/json', responseJsonSchema: SCHEMA, temperature: 0.2 },
+    messages: [
+      { role: 'system', content: `${PROMPTS[mode]}\n\n${jsonRule(SCHEMA)}` },
+      { role: 'user', content: parts },
+    ],
   };
 }
 
+/** The answer text from a chat completion (the model's thinking comes separately and is ignored). */
 export function extractText(json: unknown): string {
-  const parts = (json as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] })
-    ?.candidates?.[0]?.content?.parts;
-  return Array.isArray(parts) ? parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim() : '';
+  const c = (json as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]?.message?.content;
+  if (typeof c === 'string') return c.trim();
+  return Array.isArray(c) ? c.map((p: { text?: unknown }) => (typeof p?.text === 'string' ? p.text : '')).join('').trim() : '';
+}
+
+/** The JSON object in a reply, even with code fences or a sentence around it. Throws if there is none. */
+export function parseJson(text: string): unknown {
+  const a = text.indexOf('{');
+  const b = text.lastIndexOf('}');
+  if (a < 0 || b < a) throw new Error('No JSON');
+  return JSON.parse(text.slice(a, b + 1));
 }
 
 const clamp = (v: unknown, max: number) => {
@@ -134,8 +160,7 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
 
 /** Parse and sanity-check the model's JSON. Throws if unusable. */
 export function parseReply(text: string, model: string): AiResult {
-  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-  const raw = JSON.parse(cleaned) as Record<string, unknown>;
+  const raw = parseJson(text) as Record<string, unknown>;
   const items = (Array.isArray(raw.items) ? raw.items : [])
     .filter((i): i is Record<string, unknown> => !!i && typeof i === 'object')
     .map((i) => ({
@@ -168,36 +193,38 @@ export class AiError extends Error {
 }
 
 export function errorFromResponse(status: number, body: unknown): AiError {
-  const err = (Array.isArray(body) ? body[0] : body) as { error?: { message?: string; status?: string } } | null;
+  const err = (Array.isArray(body) ? body[0] : body) as { error?: { message?: string; code?: string } } | null;
   const message = err?.error?.message ?? `HTTP ${status}`;
-  if (status === 429 || err?.error?.status === 'RESOURCE_EXHAUSTED') return new AiError('rate-limit', message);
+  if (status === 429) return new AiError('rate-limit', message);
   if (status >= 500) return new AiError('busy', message);
-  if (status === 400 && /api key/i.test(message)) return new AiError('bad-key', message);
-  if (status === 401 || status === 403) return new AiError('bad-key', message);
+  if (status === 401 || status === 403 || /api key/i.test(message)) return new AiError('bad-key', message);
   return new AiError('error', message);
 }
 
 export function friendlyError(e: unknown): string {
   const kind = e instanceof AiError ? e.kind : 'error';
   switch (kind) {
-    case 'no-key': return 'Add your Gemini API key in Profile → AI food scanner first.';
-    case 'bad-key': return 'Gemini didn’t accept your API key. Check it in Profile.';
-    case 'rate-limit': return 'You’ve hit Gemini’s free limit for now. Try again in a minute.';
-    case 'busy': return 'Gemini is busy right now. Try again in a moment.';
-    case 'offline': return 'You’re offline. AI logging needs the internet.';
-    case 'blocked': return 'Gemini couldn’t read that. Try a clearer photo.';
-    case 'bad-reply': return 'Gemini’s answer didn’t make sense. Try again.';
+    case 'no-key': return 'Add your TokenHarbor API key in Profile → AI first.';
+    case 'bad-key': return 'TokenHarbor didn’t accept your API key. Check it in Profile.';
+    case 'rate-limit': return 'Too many requests for now. Try again in a minute.';
+    case 'busy': return 'The AI is busy right now. Try again in a moment.';
+    case 'offline': return 'You’re offline. AI features need the internet.';
+    case 'blocked': return 'The AI couldn’t read that. Try a clearer photo.';
+    case 'bad-reply': return 'The AI’s answer didn’t make sense. Try again.';
     default: return `Something went wrong${e instanceof Error && e.message ? `: ${e.message}` : ''}.`;
   }
 }
 
-async function call(key: string, model: string, body: unknown, signal?: AbortSignal): Promise<string> {
+/** One chat request. Returns [answer text, model used]. */
+export async function complete(key: string, model: string, body: Body, signal?: AbortSignal): Promise<[string, string]> {
+  if (!key.trim()) throw new AiError('no-key', 'No key');
+  const m = model || DEFAULT_MODEL;
   let res: Response;
   try {
-    res = await fetch(`${API}/${encodeURIComponent(model)}:generateContent`, {
+    res = await fetch(API, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key.trim()}` },
+      body: JSON.stringify({ model: m, ...body }),
       signal,
     });
   } catch (e) {
@@ -215,17 +242,7 @@ async function call(key: string, model: string, body: unknown, signal?: AbortSig
   }
   const text = extractText(await res.json());
   if (!text) throw new AiError('blocked', 'Empty reply');
-  return text;
-}
-
-/** One request, retried once on Flash-Lite if the chosen model is rate-limited or busy. Returns [text, model used]. */
-export async function callWithFallback(key: string, model: string, body: unknown, signal?: AbortSignal): Promise<[string, string]> {
-  try {
-    return [await call(key, model, body, signal), model];
-  } catch (e) {
-    if (!(e instanceof AiError && (e.kind === 'rate-limit' || e.kind === 'busy')) || model === FALLBACK_MODEL) throw e;
-    return [await call(key, FALLBACK_MODEL, body, signal), FALLBACK_MODEL];
-  }
+  return [text, m];
 }
 
 export async function analyse(opts: {
@@ -236,8 +253,7 @@ export async function analyse(opts: {
   images?: AiImage[];
   signal?: AbortSignal;
 }): Promise<AiResult> {
-  if (!opts.key.trim()) throw new AiError('no-key', 'No key');
-  const [text, model] = await callWithFallback(opts.key.trim(), opts.model || DEFAULT_MODEL, buildBody(opts.mode, opts), opts.signal);
+  const [text, model] = await complete(opts.key, opts.model, buildBody(opts.mode, opts), opts.signal);
   try {
     return parseReply(text, model);
   } catch {
@@ -246,9 +262,8 @@ export async function analyse(opts: {
 }
 
 export async function testKey(key: string, model: string): Promise<void> {
-  if (!key.trim()) throw new AiError('no-key', 'No key');
   try {
-    await callWithFallback(key.trim(), model, { contents: [{ role: 'user', parts: [{ text: 'Reply with OK.' }] }] });
+    await complete(key, model, { messages: [{ role: 'user', content: 'Reply with OK.' }] });
   } catch (e) {
     // An accepted request with an empty reply still proves the key works.
     if (!(e instanceof AiError && e.kind === 'blocked')) throw e;

@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { dayTotals, energy, forGrams } from '../src/lib/nutrition';
-import { FOODS, gapSuggestions, searchFoods } from '../src/lib/foods';
+import { foodDue, waterDue } from '../src/lib/reminders';
+import { FOODS, gapFocus, gapSuggestions, searchFoods } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
 import { addDays, weekStart } from '../src/lib/dates';
 import { suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
 import { computeGame, levelFromXp, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
 import { DEFAULT_DATA, exportText, normalize, parseBackup } from '../src/lib/backup';
 import { parseProduct } from '../src/lib/off';
-import { errorFromResponse, extractText, parseReply } from '../src/lib/gemini';
+import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 
@@ -37,6 +38,9 @@ describe('nutrition', () => {
   });
 });
 
+const TARGETS = { kcal: 3000, protein: 115, carbs: 450, fat: 85 };
+const NEED = { kcal: 1100, protein: 45, carbs: 150, fat: 35 };
+
 describe('foods', () => {
   it('has unique ids', () => {
     expect(new Set(FOODS.map((f) => f.id)).size).toBe(FOODS.length);
@@ -52,23 +56,22 @@ describe('foods', () => {
     expect(searchFoods(FOODS, 'toor dal')[0].name).toBe('Toor dal');
   });
   it('close the gap: skips whey by default, ranks protein-dense fillers', () => {
-    const picks = gapSuggestions({ kcal: 1100, protein: 45 }, FOODS, { wheyOk: false, atSchool: false });
+    const picks = gapSuggestions(NEED, TARGETS, FOODS, { wheyOk: false, atSchool: false });
     expect(picks).toHaveLength(3);
     expect(picks.some((f) => f.tags?.includes('w'))).toBe(false);
     expect(picks.every((f) => f.kcal >= 300)).toBe(true);
-    expect(gapSuggestions({ kcal: 50, protein: 2 }, FOODS, { wheyOk: false, atSchool: false })).toEqual([]);
+    expect(gapSuggestions({ kcal: 50, protein: 2, carbs: 5, fat: 2 }, TARGETS, FOODS, { wheyOk: false, atSchool: false })).toEqual([]);
   });
   it('is vegetarian (eggs and dairy OK)', () => {
     const meat = /chicken|beef|lamb|pork|ham\b|bacon|steak|mince|salmon|tuna|fish|prawn|meat pie|sausage roll'|bolognese|pepperoni|kebab/i;
     expect(FOODS.filter((f) => meat.test(f.name) && !/veg|vegetarian|lentil/i.test(f.name)).map((f) => f.name)).toEqual([]);
   });
   it('close the gap: refresh shows different ideas, wraps around, and never repeats within a round', () => {
-    const need = { kcal: 1100, protein: 45 };
     const opts = { wheyOk: false, atSchool: false };
-    const round = (n: number) => gapSuggestions(need, FOODS, opts, 3, n).map((f) => f.name);
+    const round = (n: number) => gapSuggestions(NEED, TARGETS, FOODS, opts, 3, n).map((f) => f.name);
     const r0 = round(0);
     expect(round(0)).toEqual(r0); // same round, same answer
-    expect(r0).toEqual(gapSuggestions(need, FOODS, opts).map((f) => f.name)); // default = round 0
+    expect(r0).toEqual(gapSuggestions(NEED, TARGETS, FOODS, opts).map((f) => f.name)); // default = round 0
     const seen = new Set<string>();
     for (let n = 0; n < 4; n++) {
       const r = round(n);
@@ -79,8 +82,22 @@ describe('foods', () => {
     expect(seen.size).toBe(12); // 4 rounds cover the top 12 before it cycles
     expect(round(4)).toEqual(r0);
   });
+  it('close the gap: follows whichever nutrient is lowest', () => {
+    const opts = { wheyOk: false, atSchool: false };
+    const lowProtein = { kcal: 500, protein: 80, carbs: 40, fat: 10 }; // 70% of protein target missing
+    const lowFat = { kcal: 500, protein: 5, carbs: 40, fat: 70 }; // 80% of fat target missing
+    expect(gapFocus(lowProtein, TARGETS)).toBe('protein');
+    expect(gapFocus(lowFat, TARGETS)).toBe('fat');
+    expect(gapFocus({ kcal: 0, protein: 0, carbs: 0, fat: 0 }, TARGETS)).toBeNull();
+    const ratio = (n: typeof lowProtein, key: 'protein' | 'fat') => {
+      const picks = gapSuggestions(n, TARGETS, FOODS, opts);
+      return picks.reduce((t, f) => t + f[key] / f.kcal, 0) / picks.length;
+    };
+    expect(ratio(lowProtein, 'protein')).toBeGreaterThan(ratio(lowFat, 'protein')); // low protein -> protein-dense picks
+    expect(ratio(lowFat, 'fat')).toBeGreaterThan(ratio(lowProtein, 'fat')); // low fat -> fat-dense picks
+  });
   it('close the gap: at school prefers packable food', () => {
-    const picks = gapSuggestions({ kcal: 600, protein: 30 }, FOODS, { wheyOk: false, atSchool: true });
+    const picks = gapSuggestions({ kcal: 600, protein: 30, carbs: 80, fat: 20 }, TARGETS, FOODS, { wheyOk: false, atSchool: true });
     expect(picks.every((f) => f.tags?.includes('p'))).toBe(true);
   });
 });
@@ -250,18 +267,24 @@ describe('open food facts', () => {
   });
 });
 
-describe('gemini', () => {
+describe('ai', () => {
   it('parses and clamps the reply', () => {
     const r = parseReply('```json\n{"items":[{"name":"Rotli","portion":"3","kcal":99999,"protein":"10","carbs":50,"fat":-3}],"confidence":"high","notes":"ok"}\n```', 'm');
     expect(r.items[0]).toEqual({ name: 'Rotli', portion: '3', kcal: 3000, protein: 10, carbs: 50, fat: 0 });
     expect(r.confidence).toBe('high');
   });
-  it('skips thought parts', () => {
-    expect(extractText({ candidates: [{ content: { parts: [{ text: 'hmm', thought: true }, { text: '{}' }] } }] })).toBe('{}');
+  it('finds the JSON even with words around it', () => {
+    expect(parseReply('Here you go:\n{"items":[],"confidence":"medium","notes":"n"} Hope that helps', 'm').notes).toBe('n');
+    expect(() => parseReply('no json here', 'm')).toThrow();
+  });
+  it('reads the answer, not the thinking', () => {
+    expect(extractText({ choices: [{ message: { reasoning_content: 'hmm', content: ' {} ' } }] })).toBe('{}');
+    expect(extractText({})).toBe('');
   });
   it('maps errors', () => {
     expect(errorFromResponse(429, {}).kind).toBe('rate-limit');
     expect(errorFromResponse(400, { error: { message: 'API key not valid' } }).kind).toBe('bad-key');
+    expect(errorFromResponse(401, { error: { message: 'Invalid or revoked API key.' } }).kind).toBe('bad-key');
     expect(errorFromResponse(503, {}).kind).toBe('busy');
   });
 });
@@ -272,5 +295,26 @@ describe('passcode', () => {
     expect(await hashCode('1234')).toBe('07b299323add332a50a3e99105ac849ad118666ebf4f30b037185375ddaef0a6'); // matches `shasum -a 256`
     expect(await hashCode('1234')).not.toBe(await hashCode('1235'));
     for (const c of ['0000', '1234', '9999', '']) expect(await checkPasscode(c)).toBe(false);
+  });
+});
+
+describe('reminders', () => {
+  const at = (h: number, m = 0) => new Date(2026, 9, 9, h, m).getTime();
+  it('water: due 2 h after the last drink, not before, not asleep, not once the goal is hit', () => {
+    expect(waterDue(at(12), at(10, 5), 0, 3, 8)).toBe(false); // 1 h 55 m
+    expect(waterDue(at(12, 5), at(10, 5), 0, 3, 8)).toBe(true);
+    expect(waterDue(at(12, 5), at(10, 5), at(12), 3, 8)).toBe(false); // just reminded: wait another 2 h
+    expect(waterDue(at(9), 0, 0, 0, 8)).toBe(false); // nothing yet, but only 1 h since 8 am
+    expect(waterDue(at(10), 0, 0, 0, 8)).toBe(true); // nothing all morning
+    expect(waterDue(at(7, 30), 0, 0, 0, 8)).toBe(false);
+    expect(waterDue(at(22), 0, 0, 0, 8)).toBe(false);
+    expect(waterDue(at(14), 0, 0, 8, 8)).toBe(false);
+  });
+  it('food: once a day from 5 PM to 8 PM', () => {
+    expect(foodDue(at(16, 59), '')).toBe(false);
+    expect(foodDue(at(17), '')).toBe(true);
+    expect(foodDue(at(17), '2026-10-09')).toBe(false);
+    expect(foodDue(at(17), '2026-10-08')).toBe(true);
+    expect(foodDue(at(20), '')).toBe(false);
   });
 });

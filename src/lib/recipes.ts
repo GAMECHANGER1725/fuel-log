@@ -2,7 +2,7 @@
 // ingredient amounts using the table below, so the recipe and the numbers you log can't disagree.
 // Typical values per 100 g (per 100 ml for liquids): [kcal, protein, carbs, fat].
 
-import type { Macros } from './types';
+import type { Food, Macros } from './types';
 import { ZERO, add, roundMacros, scale } from './nutrition';
 
 const ING = {
@@ -50,6 +50,8 @@ export interface Recipe {
   time: string;
   lines: Line[];
   steps: string[];
+  /** Set on a recipe you edited with the AI: its macros as worked out then (its lines have no ingredient keys). */
+  macros?: Macros;
 }
 
 export const RECIPES: Recipe[] = [
@@ -388,6 +390,7 @@ export const RECIPES: Recipe[] = [
 
 /** Macros for one serving, worked out from the ingredient amounts. */
 export function recipeMacros(r: Recipe): Macros {
+  if (r.macros) return r.macros;
   const total = r.lines.reduce((sum, [k, g]) => {
     if (!k) return sum;
     const [kcal, protein, carbs, fat] = ING[k];
@@ -398,5 +401,14 @@ export function recipeMacros(r: Recipe): Macros {
 
 const BY_NAME = new Map(RECIPES.map((r) => [r.name.toLowerCase(), r]));
 
-/** The recipe for a food (matched by name, so favourites and logged copies find it too). */
-export const recipeFor = (f: { name: string }): Recipe | undefined => BY_NAME.get(f.name.toLowerCase());
+/** Your edited recipes, keyed by lower-case name (stored in AppData.recipeEdits). */
+export type RecipeEdits = Record<string, Recipe>;
+
+/** The recipe for a food (matched by name, so favourites and logged copies find it too). Your edit wins over the built-in one. */
+export const recipeFor = (f: { name: string }, edits: RecipeEdits = {}): Recipe | undefined => edits[f.name.toLowerCase()] ?? BY_NAME.get(f.name.toLowerCase());
+
+/** A food with your edited recipe's serving and macros, so suggestions and logging use the new numbers. */
+export function withEdit(f: Food, edits: RecipeEdits): Food {
+  const r = edits[f.name.toLowerCase()];
+  return r ? { ...f, serving: r.serving, ...recipeMacros(r) } : f;
+}

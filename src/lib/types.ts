@@ -1,5 +1,7 @@
 // Shared types. Energy is always stored in kcal; kJ is display-only.
 
+import type { RecipeEdits } from './recipes';
+
 export interface Macros {
   kcal: number;
   protein: number;
@@ -71,8 +73,8 @@ export interface Settings {
   gainHigh: number;
   unit: 'kcal' | 'kJ';
   theme: 'auto' | 'dark' | 'light';
-  geminiKey: string;
-  geminiModel: string;
+  aiKey: string;
+  aiModel: string;
   wheyOk: boolean;
 }
 
@@ -94,6 +96,8 @@ export interface AppData {
   days: Record<string, DayLog>;
   weighIns: WeighIn[];
   favourites: Food[];
+  /** Recipes you changed with the AI, keyed by lower-case name; synced with favourites. */
+  recipeEdits: RecipeEdits;
   recents: Food[];
   targetChanges: TargetChange[];
   /** Week start (yyyy-MM-dd) of the last dismissed calorie nudge. */
