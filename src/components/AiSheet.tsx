@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import { useStore } from '../lib/store';
-import { analyse, fileToJpeg, friendlyError, MAX_PHOTOS, type AiItem, type AiMode, type AiResult } from '../lib/ai';
+import { analyse, fileToJpeg, hasAi, friendlyError, MAX_PHOTOS, type AiItem, type AiMode, type AiResult } from '../lib/ai';
 import { sumEntries, energy } from '../lib/nutrition';
 import { XP } from '../lib/game';
-import { go, Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, toast } from './ui';
+import { go, Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, useEatenAt } from './ui';
 
 type Row = AiItem & { qty: number; removed: boolean };
 
@@ -26,13 +26,14 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
   const [rows, setRows] = useState<Row[]>([]);
   const [sizing, setSizing] = useState<number | null>(null); // row whose serving picker is open
 
-  const noKey = !s.settings.aiKey;
+  const noKey = !hasAi(s.settings);
+  const when = useEatenAt(date);
 
   const run = async () => {
     setBusy(true);
     setError('');
     try {
-      const r = await analyse({ key: s.settings.aiKey, model: s.settings.aiModel, mode, text, images: imgs });
+      const r = await analyse({ cfg: s.settings, mode, text, images: imgs });
       if (!r.items.length) setError(r.notes || 'No food found. Try again.');
       else {
         setResult(r);
@@ -61,8 +62,8 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
     return (
       <Sheet onClose={onClose} label={c.title}>
         <h2 className="h2" style={{ fontSize: 26 }}>{c.title}</h2>
-        <p>AI logging uses DeepSeek through TokenHarbor with your own free API key. Add it once in Profile and it stays on this phone.</p>
-        <button className="btn primary block" onClick={() => { onClose(); go('profile?open=ai'); }}>Add TokenHarbor key</button>
+        <p>AI logging uses DeepSeek (through TokenHarbor) or Google Gemini with your own free API key. Add one, or both so one can take over when the other hits its limit. Keys stay on this phone.</p>
+        <button className="btn primary block" onClick={() => { onClose(); go('profile?open=ai'); }}>Add an AI key</button>
       </Sheet>
     );
 
@@ -198,6 +199,7 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
           </div>
           <button className="btn dashed" onClick={() => setRows([...rows, { name: '', portion: '__new', kcal: 0, protein: 0, carbs: 0, fat: 0, qty: 1, removed: false }])}>+ Add something it missed</button>
           <MacroGrid {...total} unit={s.settings.unit} />
+          <TimeField value={when.hhmm} onChange={when.setHhmm} />
           <div className="row">
             <button className="btn" onClick={() => setResult(null)}>Retry</button>
             <button
@@ -205,7 +207,7 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
               style={{ minHeight: 52 }}
               disabled={!entries.length}
               onClick={() => {
-                s.addEntries(date, entries.map((e) => ({ ...e, serving: e.serving === '__new' ? '' : e.serving })));
+                s.addEntries(date, entries.map((e) => ({ ...e, serving: e.serving === '__new' ? '' : e.serving })), [], when.at);
                 toast(`Logged ${entries.length} item${entries.length === 1 ? '' : 's'}`, xp);
                 onClose();
               }}

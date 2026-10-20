@@ -1,4 +1,4 @@
-// Personal coach, powered by DeepSeek (through TokenHarbor) with the user's own key.
+// Personal coach, powered by DeepSeek (through TokenHarbor) or Gemini with the user's own keys.
 //
 //  1. Weekly review: reads the log, weigh-ins and meal timing, and adjusts the daily targets.
 //     The model proposes numbers and explains them, but the code below decides what is ALLOWED:
@@ -16,7 +16,7 @@ import type { Recipe } from './recipes';
 import { addDays, daysBetween, keyOf, todayKey } from './dates';
 import { dayTotals, entryMacros, r1 } from './nutrition';
 import { trendLine, weeklyRate } from './targets';
-import { AiError, complete, jsonRule, parseJson, type Body } from './ai';
+import { AiError, complete, jsonRule, parseJson, type AiConfig, type Body } from './ai';
 import { dataOf, useStore } from './store';
 
 // ----- Snapshot: what the coach gets to see ---------------------------------------
@@ -459,15 +459,16 @@ const body = (system: string, user: string, schema?: object): Body => ({
     { role: 'system', content: schema ? `${system}\n\n${jsonRule(schema)}` : system },
     { role: 'user', content: user },
   ],
+  json: !!schema,
 });
 
-export async function runReview(key: string, model: string, d: AppData): Promise<Review> {
+export async function runReview(cfg: AiConfig, d: AppData): Promise<Review> {
   const s = snapshot(d);
   const a = allowedChange(s);
   const [kcalMin, kcalMax] = kcalBounds(s.targets.kcal, a);
   const [proteinMin, proteinMax] = proteinBounds(s.profile.weightKg);
   const allowed = { status: a.status, reason: a.why, kcalMin, kcalMax, proteinMin, proteinMax };
-  const [raw, used] = await complete(key, model, body(REVIEW_PROMPT, `${snapText({ ...s, allowed })}\n\nDo my weekly check-in.`, REVIEW_SCHEMA));
+  const [raw, used] = await complete(cfg, body(REVIEW_PROMPT, `${snapText({ ...s, allowed })}\n\nDo my weekly check-in.`, REVIEW_SCHEMA));
   try {
     return parseReview(raw, d.settings.targets, s, used);
   } catch {
@@ -488,11 +489,11 @@ export function ideasRequest(snap: object, note = '', seen: string[] = []): stri
     .join('\n\n');
 }
 
-export async function runIdeas(key: string, model: string, d: AppData, note = '', seen: string[] = []): Promise<{ ideas: Idea[]; model: string }> {
+export async function runIdeas(cfg: AiConfig, d: AppData, note = '', seen: string[] = []): Promise<{ ideas: Idea[]; model: string }> {
   const s = snapshot(d);
   // Only what matters for right now; the history isn't needed and costs tokens.
   const { now, weekday, atSchool, targets, soFar, left, usualFoods, wheyOk } = s;
-  const [raw, used] = await complete(key, model, body(IDEAS_PROMPT, ideasRequest({ now, weekday, atSchool, targets, soFar, left, usualFoods, wheyOk }, note, seen), IDEAS_SCHEMA));
+  const [raw, used] = await complete(cfg, body(IDEAS_PROMPT, ideasRequest({ now, weekday, atSchool, targets, soFar, left, usualFoods, wheyOk }, note, seen), IDEAS_SCHEMA));
   let ideas: Idea[];
   try {
     ideas = parseIdeas(raw, d.settings.wheyOk);
@@ -508,7 +509,7 @@ export interface ChatMsg {
   text: string;
 }
 
-export async function runChat(key: string, model: string, d: AppData, history: ChatMsg[]): Promise<string> {
+export async function runChat(cfg: AiConfig, d: AppData, history: ChatMsg[]): Promise<string> {
   const req: Body = {
     messages: [
       { role: 'system', content: `${CHAT_PROMPT}\n\n${snapText(snapshot(d))}` },
@@ -517,7 +518,7 @@ export async function runChat(key: string, model: string, d: AppData, history: C
   };
   let raw: string;
   try {
-    [raw] = await complete(key, model, req);
+    [raw] = await complete(cfg, req);
   } catch (e) {
     // An empty reply isn't about a photo here.
     throw e instanceof AiError && e.kind === 'blocked' ? new AiError('bad-reply', 'Empty reply') : e;
@@ -580,7 +581,7 @@ export function parseRecipeEdit(raw: string, orig: Recipe): { recipe: Recipe; ch
   };
 }
 
-export async function editRecipe(key: string, model: string, recipe: Recipe, macros: Macros, request: string, wheyOk: boolean) {
+export async function editRecipe(cfg: AiConfig, recipe: Recipe, macros: Macros, request: string, wheyOk: boolean) {
   const current = {
     name: recipe.name,
     serving: recipe.serving,
@@ -590,8 +591,7 @@ export async function editRecipe(key: string, model: string, recipe: Recipe, mac
     ...macros,
   };
   const [raw, used] = await complete(
-    key,
-    model,
+    cfg,
     body(RECIPE_PROMPT, `wheyOk: ${wheyOk}\n\nCURRENT RECIPE (JSON):\n${JSON.stringify(current)}\n\nHOW I WANT IT CHANGED: ${request.trim().slice(0, 300)}`, RECIPE_SCHEMA),
   );
   try {
@@ -656,7 +656,7 @@ export function checkIn(): Promise<Review> {
     const st = useStore.getState();
     const before = st.settings.targets;
     const prev = useCoach.getState().review;
-    let review = await runReview(st.settings.aiKey, st.settings.aiModel, dataOf(st));
+    let review = await runReview(st.settings, dataOf(st));
     const cur = useStore.getState().settings.targets;
     // Targets edited (or synced in) while the model was answering: don't overwrite them.
     const untouched = same(cur, before);

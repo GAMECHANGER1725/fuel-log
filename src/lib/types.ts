@@ -73,8 +73,14 @@ export interface Settings {
   gainHigh: number;
   unit: 'kcal' | 'kJ';
   theme: 'auto' | 'dark' | 'light';
+  /** TokenHarbor key and model (DeepSeek). */
   aiKey: string;
   aiModel: string;
+  /** Google Gemini key and model, the second provider. */
+  geminiKey: string;
+  geminiModel: string;
+  /** Which provider to try first; the other is the fallback. */
+  aiFirst: 'deepseek' | 'gemini';
   wheyOk: boolean;
 }
 

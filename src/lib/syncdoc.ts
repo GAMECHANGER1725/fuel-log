@@ -13,7 +13,7 @@ import { normalize, DEFAULT_DATA } from './backup';
 
 export interface SmallData {
   profile: Profile;
-  settings: Omit<Settings, 'aiKey' | 'aiModel' | 'theme'>;
+  settings: Omit<Settings, 'aiKey' | 'aiModel' | 'geminiKey' | 'geminiModel' | 'aiFirst' | 'theme'>;
   weighIns: WeighIn[];
   favourites: Food[];
   recipeEdits: RecipeEdits;
@@ -52,7 +52,7 @@ function canon(doc: { days: Record<string, DayLog>; tomb: Record<string, number>
 }
 
 export function toDoc(d: AppData): SyncDoc {
-  const { aiKey: _k, aiModel: _m, theme: _t, ...settings } = d.settings;
+  const { aiKey: _k, aiModel: _m, geminiKey: _gk, geminiModel: _gm, aiFirst: _f, theme: _t, ...settings } = d.settings;
   return canon({
     days: d.days,
     tomb: d.tomb,
@@ -160,7 +160,15 @@ export function applyDoc(local: AppData, doc: SyncDoc): AppData {
     tomb: doc.tomb,
     mod: doc.mod,
     profile: doc.small.profile,
-    settings: { ...doc.small.settings, aiKey: local.settings.aiKey, aiModel: local.settings.aiModel, theme: local.settings.theme },
+    settings: {
+      ...doc.small.settings,
+      aiKey: local.settings.aiKey,
+      aiModel: local.settings.aiModel,
+      geminiKey: local.settings.geminiKey,
+      geminiModel: local.settings.geminiModel,
+      aiFirst: local.settings.aiFirst,
+      theme: local.settings.theme,
+    },
     weighIns: doc.small.weighIns,
     favourites: doc.small.favourites,
     recipeEdits: doc.small.recipeEdits,

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from './lib/store';
+import { hasAi } from './lib/ai';
 import { Icon, Toast, toast, useGame, useRoute, useToday } from './components/ui';
 import Today from './pages/Today';
 import FoodPage from './pages/Food';
@@ -41,7 +42,7 @@ export default function App() {
   const sync = useSync();
 
   // Weekly coach check-in, by itself. With sync on, waits for the first sync so it works from both devices' data.
-  const hasKey = useStore((s) => !!s.settings.aiKey);
+  const hasKey = useStore((s) => hasAi(s.settings));
   const auto = useCoach((c) => c.auto);
   const today = useToday();
   const synced = !sync.conn || (sync.status !== 'syncing' && (!!sync.last || sync.status === 'error'));

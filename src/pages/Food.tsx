@@ -5,7 +5,7 @@ import { searchProducts } from '../lib/off';
 import { energy, forGrams, scale, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
 import type { Food, Source } from '../lib/types';
-import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, go, toast, useRoute, useToday } from '../components/ui';
+import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, useEatenAt, useRoute, useToday } from '../components/ui';
 import Scanner from '../components/Scanner';
 import AiSheet from '../components/AiSheet';
 import type { AiMode } from '../lib/ai';
@@ -154,13 +154,14 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
   const fav = s.favourites.some((f) => f.name.toLowerCase() === food.name.toLowerCase());
   const xp = XP.meal + (source === 'scan' ? XP.scan : 0);
   const recipe = recipeFor(food, s.recipeEdits);
+  const when = useEatenAt(date);
 
   const add = () => {
     const entry =
       useGrams && food.per100
         ? { name: food.name, serving: `${grams} g`, base: m, qty: 1 }
         : { name: food.name, serving: food.serving, base: foodMacros(food), qty };
-    s.addEntries(date, [{ ...entry, source, foodId: food.id }], [food]);
+    s.addEntries(date, [{ ...entry, source, foodId: food.id }], [food], when.at);
     toast(`Added ${food.name}`, xp);
     onClose();
   };
@@ -183,6 +184,7 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
         <Stepper value={qty} onChange={setQty} label="servings" presets={SERVING_PRESETS} />
       )}
       <MacroGrid {...m} unit={s.settings.unit} />
+      <TimeField value={when.hhmm} onChange={when.setHhmm} />
       {recipe && (
         <details className="rule">
           <summary style={{ minHeight: 48, display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 600 }}>Recipe and method</summary>
@@ -212,12 +214,13 @@ function ManualSheet({ date, onClose }: { date: string; onClose: () => void }) {
   const n = (v: string) => Math.max(0, parseFloat(v) || 0);
   const kcal = unit === 'kJ' ? n(f.energy) / KJ : n(f.energy);
   const ok = f.name.trim() && kcal > 0;
+  const when = useEatenAt(date);
   const set = (k: keyof typeof f) => (e: ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: k === 'fav' ? e.target.checked : e.target.value });
 
   const save = () => {
     const base = { kcal: Math.round(kcal), protein: n(f.protein), carbs: n(f.carbs), fat: n(f.fat) };
     const food: Food = { id: `fav-${Date.now().toString(36)}`, name: f.name.trim().slice(0, 60), serving: f.serving.trim() || '1 serve', ...base };
-    s.addEntries(date, [{ name: food.name, serving: food.serving, base, qty: 1, source: 'custom' }], [food]);
+    s.addEntries(date, [{ name: food.name, serving: food.serving, base, qty: 1, source: 'custom' }], [food], when.at);
     if (f.fav) s.toggleFavourite(food);
     toast(`Added ${food.name}`, XP.meal);
     onClose();
@@ -234,6 +237,7 @@ function ManualSheet({ date, onClose }: { date: string; onClose: () => void }) {
         <label className="field"><span>Carbs (g)</span><input className="input" inputMode="decimal" type="number" min="0" value={f.carbs} onChange={set('carbs')} /></label>
         <label className="field"><span>Fat (g)</span><input className="input" inputMode="decimal" type="number" min="0" value={f.fat} onChange={set('fat')} /></label>
       </div>
+      <TimeField value={when.hhmm} onChange={when.setHhmm} />
       <label className="row small"><input type="checkbox" checked={f.fav} onChange={set('fav')} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} /> Save as a favourite for one-tap adding</label>
       <button className="btn primary block" disabled={!ok} onClick={save}>Add · +{XP.meal} XP</button>
     </Sheet>

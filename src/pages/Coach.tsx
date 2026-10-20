@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { dataOf, useStore } from '../lib/store';
 import { applyCheckIn, checkIn, MAX_STEP, runChat, runIdeas, undoCheckIn, useCoach, type ChatMsg, type Idea, type Review } from '../lib/coach';
-import { friendlyError } from '../lib/ai';
+import { friendlyError, hasAi } from '../lib/ai';
 import { dayTotals, energy, fmt } from '../lib/nutrition';
 import { fmtDate } from '../lib/dates';
 import { XP } from '../lib/game';
@@ -16,7 +16,7 @@ const STATUS: Record<Review['status'], [string, string]> = {
 };
 
 export default function Coach() {
-  const hasKey = useStore((s) => !!s.settings.aiKey);
+  const hasKey = useStore((s) => hasAi(s.settings));
   return (
     <>
       <header className="head">
@@ -29,8 +29,8 @@ export default function Coach() {
         {!hasKey ? (
           <section className="card stack">
             <h2 className="h2">Set up your coach</h2>
-            <p className="small">The coach reads your log and weigh-ins, adjusts your targets each week, and suggests quick shakes and meals for what’s left today. It uses DeepSeek through TokenHarbor with your own free key.</p>
-            <button className="btn primary block" onClick={() => go('profile?open=ai')}>Add TokenHarbor key</button>
+            <p className="small">The coach reads your log and weigh-ins, adjusts your targets each week, and suggests quick shakes and meals for what’s left today. It uses DeepSeek (through TokenHarbor) or Gemini with your own free key.</p>
+            <button className="btn primary block" onClick={() => go('profile?open=ai')}>Add an AI key</button>
           </section>
         ) : (
           <>
@@ -165,7 +165,7 @@ function Ideas() {
     setOpen(null);
     try {
       // Today's earlier ideas go along so a retry brings new ones.
-      const r = await runIdeas(s.settings.aiKey, s.settings.aiModel, dataOf(useStore.getState()), note, list.map((x) => x.name));
+      const r = await runIdeas(s.settings, dataOf(useStore.getState()), note, list.map((x) => x.name));
       set({ ideas: { date: today, at: Date.now(), list: r.ideas, model: r.model } });
     } catch (e) {
       setError(friendlyError(e));
@@ -271,7 +271,7 @@ function Chat() {
     setBusy(true);
     setError('');
     try {
-      const reply = await runChat(s.settings.aiKey, s.settings.aiModel, dataOf(useStore.getState()), history);
+      const reply = await runChat(s.settings, dataOf(useStore.getState()), history);
       // Append to whatever is there now (it may have been cleared while waiting).
       const cur = useCoach.getState().chat;
       if (cur.length) set({ chat: [...cur, { role: 'model' as const, text: reply }].slice(-30) });

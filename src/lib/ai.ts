@@ -1,15 +1,59 @@
-// AI food logging with DeepSeek V4.1 Flash through TokenHarbor (OpenAI-style chat API, free model).
+// AI food logging with two providers, each with the user's own key:
+//   DeepSeek V4.1 Flash through TokenHarbor (OpenAI-style chat API, free model)
+//   Google Gemini (its own generateContent API)
+// Whichever is first in Profile is tried first; when it hits its limit, is busy or rejects the key,
+// the same request goes to the other one, so one running out doesn't stop logging.
 // Three modes share one reply format:
 //   photo: estimate a meal from one or more photos
 //   label: read a nutrition information panel (one or more photos of the pack)
 //   text:  "2 rotli, dal and a glass of milk"
-// The request goes straight from the phone to TokenHarbor with the user's own key.
+// Requests go straight from the phone to the provider.
 // DeepSeek thinks step by step before answering (its default mode), which is what makes the estimates add up.
 // Results are estimates and always go through a review sheet before logging.
 
+export type Provider = 'deepseek' | 'gemini';
+export const PROVIDER_NAME: Record<Provider, string> = { deepseek: 'DeepSeek', gemini: 'Gemini' };
+
 export const AI_MODELS = [{ id: 'deepseek-v4.1-flash:free', label: 'DeepSeek V4.1 Flash', hint: 'Free on TokenHarbor, reads photos' }];
 export const DEFAULT_MODEL = AI_MODELS[0].id;
+export const GEMINI_MODELS = [
+  { id: 'gemini-flash-latest', label: 'Gemini Flash (latest)', hint: 'Best balance, always up to date' },
+  { id: 'gemini-flash-lite-latest', label: 'Gemini Flash-Lite', hint: 'Faster, more free uses' },
+];
+export const DEFAULT_GEMINI_MODEL = GEMINI_MODELS[0].id;
+const GEMINI_LITE = 'gemini-flash-lite-latest';
 const API = 'https://tokenharbor.ai/v1/chat/completions';
+const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+/** The AI settings every call needs (Settings has all of these). */
+export interface AiConfig {
+  aiKey: string;
+  aiModel: string;
+  geminiKey: string;
+  geminiModel: string;
+  aiFirst: Provider;
+}
+
+/** Just the AI fields, e.g. to keep them through a reset. */
+export const aiOf = ({ aiKey, aiModel, geminiKey, geminiModel, aiFirst }: AiConfig): AiConfig => ({ aiKey, aiModel, geminiKey, geminiModel, aiFirst });
+
+export const hasAi = (c: Pick<AiConfig, 'aiKey' | 'geminiKey'>) => !!(c.aiKey.trim() || c.geminiKey.trim());
+
+export interface Attempt {
+  provider: Provider;
+  key: string;
+  model: string;
+}
+
+/** The order to try: the first provider, then the other; Gemini also gets one go on Flash-Lite, which has more free uses. */
+export function attempts(c: AiConfig): Attempt[] {
+  const ds: Attempt[] = c.aiKey.trim() ? [{ provider: 'deepseek', key: c.aiKey.trim(), model: c.aiModel || DEFAULT_MODEL }] : [];
+  const gm = c.geminiModel || DEFAULT_GEMINI_MODEL;
+  const ge: Attempt[] = c.geminiKey.trim()
+    ? [{ provider: 'gemini', key: c.geminiKey.trim(), model: gm }, ...(gm === GEMINI_LITE ? [] : [{ provider: 'gemini' as const, key: c.geminiKey.trim(), model: GEMINI_LITE }])]
+    : [];
+  return c.aiFirst === 'gemini' ? [...ge, ...ds] : [...ds, ...ge];
+}
 
 export type AiMode = 'photo' | 'label' | 'text';
 
@@ -34,9 +78,10 @@ export interface Msg {
   role: 'system' | 'user' | 'assistant';
   content: string | Part[];
 }
-/** A chat request without the model, which `complete` adds. */
+/** A chat request without the model, which `complete` adds. `json` asks for a JSON-only reply where the provider supports it. */
 export interface Body {
   messages: Msg[];
+  json?: boolean;
 }
 
 export const SCHEMA = {
@@ -134,7 +179,32 @@ export function buildBody(mode: AiMode, input: { text?: string; images?: AiImage
       { role: 'system', content: `${PROMPTS[mode]}\n\n${jsonRule(SCHEMA)}` },
       { role: 'user', content: parts },
     ],
+    json: true,
   };
+}
+
+/** The same request in Gemini's generateContent format: system text becomes the system instruction, images inline data. */
+export function toGemini(body: Body) {
+  const parts = (content: string | Part[]) =>
+    typeof content === 'string'
+      ? [{ text: content }]
+      : content.map((p) => {
+          if (p.type === 'text') return { text: p.text };
+          const m = /^data:([^;]+);base64,(.*)$/.exec(p.image_url.url);
+          return { inline_data: { mime_type: m?.[1] ?? 'image/jpeg', data: m?.[2] ?? '' } };
+        });
+  const system = body.messages.filter((m) => m.role === 'system').map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n\n');
+  return {
+    ...(system ? { system_instruction: { parts: [{ text: system }] } } : {}),
+    contents: body.messages.filter((m) => m.role !== 'system').map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: parts(m.content) })),
+    ...(body.json ? { generationConfig: { responseMimeType: 'application/json', temperature: 0.2 } } : {}),
+  };
+}
+
+/** The answer text from a Gemini reply, without its thinking parts. */
+export function extractGeminiText(json: unknown): string {
+  const ps = (json as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] })?.candidates?.[0]?.content?.parts;
+  return Array.isArray(ps) ? ps.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim() : '';
 }
 
 /** The answer text from a chat completion (the model's thinking comes separately and is ignored). */
@@ -187,27 +257,41 @@ export class AiError extends Error {
   constructor(
     public kind: AiErrorKind,
     message: string,
+    /** Every provider that was tried, in order (set by `complete`). */
+    public tried: Provider[] = [],
   ) {
     super(message);
   }
 }
 
 export function errorFromResponse(status: number, body: unknown): AiError {
-  const err = (Array.isArray(body) ? body[0] : body) as { error?: { message?: string; code?: string } } | null;
+  const err = (Array.isArray(body) ? body[0] : body) as { error?: { message?: string; code?: string; status?: string } } | null;
   const message = err?.error?.message ?? `HTTP ${status}`;
-  if (status === 429) return new AiError('rate-limit', message);
+  // 402 / "insufficient balance" is how a used-up free allowance can come back.
+  if (status === 429 || status === 402 || err?.error?.status === 'RESOURCE_EXHAUSTED' || /quota|rate.?limit|insufficient (balance|credit)/i.test(message))
+    return new AiError('rate-limit', message);
   if (status >= 500) return new AiError('busy', message);
   if (status === 401 || status === 403 || /api key/i.test(message)) return new AiError('bad-key', message);
   return new AiError('error', message);
 }
 
-export function friendlyError(e: unknown): string {
+/** Errors worth trying the other provider for: the next one may well work. */
+const switchable = (e: unknown) => e instanceof AiError && (e.kind === 'rate-limit' || e.kind === 'busy' || e.kind === 'bad-key' || e.kind === 'error');
+
+const names = (ps: Provider[]) => [...new Set(ps)].map((p) => PROVIDER_NAME[p]).join(' and ');
+
+/** A message for the user. `backup` adds where to put the other key when only one provider was tried. */
+export function friendlyError(e: unknown, backup = true): string {
   const kind = e instanceof AiError ? e.kind : 'error';
+  const tried = e instanceof AiError ? [...new Set(e.tried)] : [];
+  const who = tried.length ? names(tried) : 'The AI';
+  // With only one key, say where the backup goes.
+  const tip = backup && tried.length === 1 ? ` Add a ${tried[0] === 'deepseek' ? 'Gemini' : 'TokenHarbor'} key in Profile → AI as a backup.` : '';
   switch (kind) {
-    case 'no-key': return 'Add your TokenHarbor API key in Profile → AI first.';
-    case 'bad-key': return 'TokenHarbor didn’t accept your API key. Check it in Profile.';
-    case 'rate-limit': return 'Too many requests for now. Try again in a minute.';
-    case 'busy': return 'The AI is busy right now. Try again in a moment.';
+    case 'no-key': return 'Add a TokenHarbor (DeepSeek) or Gemini API key in Profile → AI first.';
+    case 'bad-key': return `${tried.length ? PROVIDER_NAME[tried[tried.length - 1]] : 'The AI'} didn’t accept your API key. Check it in Profile → AI.${tip}`;
+    case 'rate-limit': return `${tried.length > 1 ? `Both ${who} have` : `${who} has`} hit the limit for now. Try again later.${tip}`;
+    case 'busy': return `${who} ${tried.length > 1 ? 'are' : 'is'} busy right now. Try again in a moment.${tip}`;
     case 'offline': return 'You’re offline. AI features need the internet.';
     case 'blocked': return 'The AI couldn’t read that. Try a clearer photo.';
     case 'bad-reply': return 'The AI’s answer didn’t make sense. Try again.';
@@ -215,18 +299,10 @@ export function friendlyError(e: unknown): string {
   }
 }
 
-/** One chat request. Returns [answer text, model used]. */
-export async function complete(key: string, model: string, body: Body, signal?: AbortSignal): Promise<[string, string]> {
-  if (!key.trim()) throw new AiError('no-key', 'No key');
-  const m = model || DEFAULT_MODEL;
+async function post(url: string, headers: Record<string, string>, payload: unknown, signal?: AbortSignal): Promise<unknown> {
   let res: Response;
   try {
-    res = await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key.trim()}` },
-      body: JSON.stringify({ model: m, ...body }),
-      signal,
-    });
+    res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(payload), signal });
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
     throw new AiError(navigator.onLine === false ? 'offline' : 'error', 'Network error');
@@ -240,20 +316,50 @@ export async function complete(key: string, model: string, body: Body, signal?: 
     }
     throw errorFromResponse(res.status, b);
   }
-  const text = extractText(await res.json());
+  return res.json();
+}
+
+/** One request to one provider. Returns the answer text. */
+export async function call(a: Attempt, body: Body, signal?: AbortSignal): Promise<string> {
+  const text =
+    a.provider === 'gemini'
+      ? extractGeminiText(await post(`${GEMINI_API}/${encodeURIComponent(a.model)}:generateContent`, { 'x-goog-api-key': a.key }, toGemini(body), signal))
+      : extractText(await post(API, { Authorization: `Bearer ${a.key}` }, { model: a.model, messages: body.messages }, signal));
   if (!text) throw new AiError('blocked', 'Empty reply');
-  return [text, m];
+  return text;
+}
+
+/** One chat request, moving on to the next provider when one is out of uses. Returns [answer text, model used]. */
+export async function complete(cfg: AiConfig, body: Body, signal?: AbortSignal): Promise<[string, string]> {
+  const list = attempts(cfg);
+  if (!list.length) throw new AiError('no-key', 'No key');
+  const tried: Provider[] = [];
+  const badKey = new Set<Provider>();
+  let last: unknown;
+  for (const a of list) {
+    // A rejected Gemini key won't work on Flash-Lite either.
+    if (badKey.has(a.provider)) continue;
+    tried.push(a.provider);
+    try {
+      return [await call(a, body, signal), a.model];
+    } catch (e) {
+      last = e;
+      if (!switchable(e)) break;
+      if ((e as AiError).kind === 'bad-key') badKey.add(a.provider);
+    }
+  }
+  if (last instanceof AiError) last.tried = tried;
+  throw last;
 }
 
 export async function analyse(opts: {
-  key: string;
-  model: string;
+  cfg: AiConfig;
   mode: AiMode;
   text?: string;
   images?: AiImage[];
   signal?: AbortSignal;
 }): Promise<AiResult> {
-  const [text, model] = await complete(opts.key, opts.model, buildBody(opts.mode, opts), opts.signal);
+  const [text, model] = await complete(opts.cfg, buildBody(opts.mode, opts), opts.signal);
   try {
     return parseReply(text, model);
   } catch {
@@ -261,12 +367,16 @@ export async function analyse(opts: {
   }
 }
 
-export async function testKey(key: string, model: string): Promise<void> {
+/** Check one provider's key on its own, without falling back to the other. */
+export async function testKey(provider: Provider, key: string, model: string): Promise<void> {
+  if (!key.trim()) throw new AiError('no-key', 'No key', [provider]);
   try {
-    await complete(key, model, { messages: [{ role: 'user', content: 'Reply with OK.' }] });
+    await call({ provider, key: key.trim(), model }, { messages: [{ role: 'user', content: 'Reply with OK.' }] });
   } catch (e) {
     // An accepted request with an empty reply still proves the key works.
-    if (!(e instanceof AiError && e.kind === 'blocked')) throw e;
+    if (e instanceof AiError && e.kind === 'blocked') return;
+    if (e instanceof AiError) e.tried = [provider];
+    throw e;
   }
 }
 

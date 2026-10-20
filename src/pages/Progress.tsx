@@ -6,6 +6,7 @@ import { projectedDate, trendLine, weeklyNudge, weeklyRate, withKcal } from '../
 
 import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
+import { hasAi } from '../lib/ai';
 import { Icon, Sheet, toast, useGame, useToday } from '../components/ui';
 
 export default function Progress() {
@@ -20,7 +21,7 @@ export default function Progress() {
   const rate = weeklyRate(s.weighIns, today);
   const since = line.length >= 2 ? latest.trend - line[0].trend : null;
   // With the coach checking in by itself, its weekly targets replace this simpler nudge.
-  const coachAuto = useCoach((c) => c.auto) && !!s.settings.aiKey;
+  const coachAuto = useCoach((c) => c.auto) && hasAi(s.settings);
   const nudge = coachAuto ? null : weeklyNudge(dataOf(s), today);
   const proj = latest ? projectedDate(latest.trend, s.profile.goalKg, rate, today) : null;
 

@@ -3,7 +3,7 @@ import { useStore, dataOf } from '../lib/store';
 import { RANKS, BOSS_XP, computeGame } from '../lib/game';
 import { suggestTargets } from '../lib/targets';
 import { exportText, parseBackup } from '../lib/backup';
-import { AI_MODELS, friendlyError, testKey } from '../lib/ai';
+import { AI_MODELS, GEMINI_MODELS, PROVIDER_NAME, friendlyError, hasAi, testKey, type Provider } from '../lib/ai';
 import { fmt, KJ } from '../lib/nutrition';
 import { todayKey, fmtDate } from '../lib/dates';
 import type { AppData, Macros } from '../lib/types';
@@ -85,7 +85,7 @@ export default function ProfilePage() {
         <Section title="Daily targets" hint={`${fmt(s.settings.targets.kcal)} kcal · ${s.settings.targets.protein} g`} open={open === 'targets'}>
           <TargetsForm />
         </Section>
-        <Section title="AI" hint={s.settings.aiKey ? 'TokenHarbor key added' : 'Not set up'} hintColor={s.settings.aiKey ? 'var(--pro)' : undefined} open={open === 'ai'}>
+        <Section title="AI" hint={aiHint(s.settings)} hintColor={hasAi(s.settings) ? 'var(--pro)' : undefined} open={open === 'ai'}>
           <AiForm />
         </Section>
         <Section title="Sync between devices" hint={syncHint} hintColor={sync.status === 'error' && sync.kind !== 'offline' ? 'var(--danger)' : sync.conn ? 'var(--pro)' : undefined} open={open === 'sync'}>
@@ -200,52 +200,106 @@ function TargetsForm() {
   );
 }
 
+const aiHint = (st: { aiKey: string; geminiKey: string }) =>
+  st.aiKey && st.geminiKey ? 'DeepSeek + Gemini' : st.aiKey ? 'DeepSeek key added' : st.geminiKey ? 'Gemini key added' : 'Not set up';
+
 function AiForm() {
   const s = useStore();
-  const [key, setKey] = useState(s.settings.aiKey);
-  const [show, setShow] = useState(false);
-  const [status, setStatus] = useState('');
-  const custom = !AI_MODELS.some((m) => m.id === s.settings.aiModel);
+  const first = s.settings.aiFirst;
   return (
     <>
       <p className="small mut">
-        Snap meal, Read label, Describe it, recipe edits and the coach use DeepSeek V4.1 Flash, free through TokenHarbor with your own key. It’s stored only on this phone and sent only to TokenHarbor. Get one at{' '}
-        <a href="https://tokenharbor.ai/dashboard/api-keys" target="_blank" rel="noreferrer">tokenharbor.ai</a> (API Keys).
+        Snap meal, Read label, Describe it, recipe edits and the coach use your own free key for DeepSeek (through TokenHarbor), Google Gemini, or both. With
+        both, the app tries your first choice and switches to the other when it hits its limit. Keys are stored only on this phone and sent only to that provider.
       </p>
+      {s.settings.aiKey && s.settings.geminiKey && (
+        <label className="field">
+          <span>Try first</span>
+          <div className="row">
+            {(['deepseek', 'gemini'] as const).map((p) => (
+              <button key={p} className="chip" aria-pressed={first === p} onClick={() => s.setSettings({ aiFirst: p })}>{PROVIDER_NAME[p]}</button>
+            ))}
+          </div>
+        </label>
+      )}
+      <KeyForm
+        provider="deepseek"
+        label="TokenHarbor API key (DeepSeek)"
+        link={<>Get one at <a href="https://tokenharbor.ai/dashboard/api-keys" target="_blank" rel="noreferrer">tokenharbor.ai</a> (API Keys).</>}
+        saved={s.settings.aiKey}
+        models={AI_MODELS}
+        model={s.settings.aiModel}
+        placeholder="e.g. deepseek-v4.1-flash:free"
+        save={(k) => s.setSettings({ aiKey: k })}
+        setModel={(m) => s.setSettings({ aiModel: m })}
+      />
+      <KeyForm
+        provider="gemini"
+        label="Gemini API key"
+        link={<>Get one free at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com</a> (Get API key).</>}
+        saved={s.settings.geminiKey}
+        models={GEMINI_MODELS}
+        model={s.settings.geminiModel}
+        placeholder="e.g. gemini-flash-latest"
+        save={(k) => s.setSettings({ geminiKey: k })}
+        setModel={(m) => s.setSettings({ geminiModel: m })}
+      />
+    </>
+  );
+}
+
+function KeyForm(p: {
+  provider: Provider;
+  label: string;
+  link: ReactNode;
+  saved: string;
+  models: { id: string; label: string; hint: string }[];
+  model: string;
+  placeholder: string;
+  save: (key: string) => void;
+  setModel: (m: string) => void;
+}) {
+  const [key, setKey] = useState(p.saved);
+  const [show, setShow] = useState(false);
+  const [status, setStatus] = useState('');
+  const custom = !p.models.some((m) => m.id === p.model);
+  return (
+    <div className="rule" style={{ paddingTop: 12, display: 'grid', gap: 10 }}>
       <label className="field">
-        <span>TokenHarbor API key</span>
+        <span>{p.label}{p.saved ? ' · added' : ''}</span>
         <div className="row">
           <input className="input" type={show ? 'text' : 'password'} value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} placeholder="Paste key" />
           <button className="btn" onClick={() => setShow(!show)}>{show ? 'Hide' : 'Show'}</button>
         </div>
       </label>
+      <p className="small mut">{p.link}</p>
       <label className="field">
         <span>Model</span>
-        <select className="input" value={custom ? 'custom' : s.settings.aiModel} onChange={(e) => s.setSettings({ aiModel: e.target.value === 'custom' ? '' : e.target.value })}>
-          {AI_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label} · {m.hint}</option>)}
+        <select className="input" value={custom ? 'custom' : p.model} onChange={(e) => p.setModel(e.target.value === 'custom' ? '' : e.target.value)}>
+          {p.models.map((m) => <option key={m.id} value={m.id}>{m.label} · {m.hint}</option>)}
           <option value="custom">Custom model ID…</option>
         </select>
       </label>
-      {custom && <input className="input" placeholder="e.g. deepseek-v4.1-flash:free" value={s.settings.aiModel} onChange={(e) => s.setSettings({ aiModel: e.target.value.trim() })} aria-label="Custom model ID" />}
+      {custom && <input className="input" placeholder={p.placeholder} value={p.model} onChange={(e) => p.setModel(e.target.value.trim())} aria-label="Custom model ID" />}
       <div className="row">
         <button
           className="btn"
           onClick={async () => {
             setStatus('Testing…');
             try {
-              await testKey(key, s.settings.aiModel || AI_MODELS[0].id);
+              await testKey(p.provider, key, p.model || p.models[0].id);
               setStatus('Key works.');
             } catch (e) {
-              setStatus(friendlyError(e));
+              setStatus(friendlyError(e, false));
             }
           }}
         >
           Test
         </button>
-        <button className="btn primary grow" onClick={() => { s.setSettings({ aiKey: key.trim() }); toast(key.trim() ? 'Key saved' : 'Key removed'); }}>Save key</button>
+        <button className="btn primary grow" onClick={() => { p.save(key.trim()); toast(key.trim() ? 'Key saved' : 'Key removed'); }}>Save key</button>
       </div>
       {status && <p className="small" role="status">{status}</p>}
-    </>
+    </div>
   );
 }
 

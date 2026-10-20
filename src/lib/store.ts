@@ -5,12 +5,13 @@ import { persist } from 'zustand/middleware';
 import type { AppData, DayLog, Entry, Food, Macros, Profile, Settings } from './types';
 import type { Recipe } from './recipes';
 import { DEFAULT_DATA, normalize } from './backup';
+import { aiOf } from './ai';
 import { todayKey } from './dates';
 import { applyDoc, type SyncDoc } from './syncdoc';
 
 const emptyDay = (): DayLog => ({ entries: [], water: 0, checks: {} });
 /** Settings that stay on one device and so don't count as a change worth syncing. */
-const LOCAL_ONLY: (keyof Settings)[] = ['aiKey', 'aiModel', 'theme'];
+export const LOCAL_ONLY = ['aiKey', 'aiModel', 'geminiKey', 'geminiModel', 'aiFirst', 'theme'] as const satisfies readonly (keyof Settings)[];
 const allIds = (days: Record<string, DayLog>) => Object.values(days).flatMap((d) => d.entries.map((e) => e.id));
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -18,7 +19,8 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 export type NewEntry = Omit<Entry, 'id' | 'at'>;
 
 interface Actions {
-  addEntries: (date: string, items: NewEntry[], foods?: Food[]) => void;
+  /** `at` = when it was eaten (epoch ms), now if left out. */
+  addEntries: (date: string, items: NewEntry[], foods?: Food[], at?: number) => void;
   updateEntry: (date: string, id: string, patch: Partial<Entry>) => void;
   removeEntry: (date: string, id: string) => void;
   copyDay: (from: string, to: string) => number;
@@ -49,9 +51,11 @@ export const useStore = create<AppData & Actions>()(
       return {
         ...DEFAULT_DATA,
 
-        addEntries: (date, items, foods = []) => {
+        addEntries: (date, items, foods = [], at) => {
           const now = Date.now();
-          editDay(date, (d) => ({ ...d, entries: [...d.entries, ...items.map((e, i) => ({ ...e, id: uid(), at: now + i }))] }));
+          // A picked time can be later than now, so stamp the edit time too: sync compares `upd ?? at`.
+          const stamp = at == null ? {} : { upd: now };
+          editDay(date, (d) => ({ ...d, entries: [...d.entries, ...items.map((e, i) => ({ ...e, id: uid(), at: (at ?? now) + i, ...stamp }))] }));
           if (foods.length)
             set((s) => {
               const names = new Set(foods.map((f) => f.name.toLowerCase()));
@@ -97,7 +101,7 @@ export const useStore = create<AppData & Actions>()(
         setSettings: (patch) =>
           set((s) => ({
             settings: { ...s.settings, ...patch },
-            mod: Object.keys(patch).some((k) => !LOCAL_ONLY.includes(k as keyof Settings)) ? Date.now() : s.mod,
+            mod: Object.keys(patch).some((k) => !(LOCAL_ONLY as readonly string[]).includes(k)) ? Date.now() : s.mod,
           })),
         setProfile: (patch) => set((s) => ({ profile: { ...s.profile, ...patch }, mod: Date.now() })),
         setTargets: (t) =>
@@ -121,7 +125,7 @@ export const useStore = create<AppData & Actions>()(
         reset: () =>
           set((s) => ({
             ...DEFAULT_DATA,
-            settings: { ...DEFAULT_DATA.settings, aiKey: s.settings.aiKey, aiModel: s.settings.aiModel },
+            settings: { ...DEFAULT_DATA.settings, ...aiOf(s.settings) },
             tomb: { ...s.tomb, ...Object.fromEntries(allIds(s.days).map((id) => [id, Date.now()])) },
             mod: Date.now(),
           })),

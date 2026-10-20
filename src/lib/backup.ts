@@ -4,7 +4,7 @@
 import type { AppData, DayLog, Entry, Food, Macros, Source } from './types';
 import { isKey } from './dates';
 import { r1 } from './nutrition';
-import { DEFAULT_MODEL } from './ai';
+import { DEFAULT_GEMINI_MODEL, DEFAULT_MODEL } from './ai';
 import type { Recipe, RecipeEdits } from './recipes';
 
 // Personal app: starts set up for its one user. Targets = suggestTargets(profile).
@@ -20,6 +20,9 @@ export const DEFAULT_DATA: AppData = {
     theme: 'auto',
     aiKey: '',
     aiModel: DEFAULT_MODEL,
+    geminiKey: '',
+    geminiModel: DEFAULT_GEMINI_MODEL,
+    aiFirst: 'deepseek',
     wheyOk: false,
   },
   days: {},
@@ -151,6 +154,13 @@ export function normalize(raw: unknown): AppData {
       theme: s.theme === 'dark' || s.theme === 'light' ? s.theme : 'auto',
       aiKey: str(s.aiKey, 200).trim(),
       aiModel: str(s.aiModel, 60).trim() || DEFAULT_MODEL,
+      // Saves from before the switch to DeepSeek still carry geminiKey, so an old backup brings it back.
+      geminiKey: str(s.geminiKey, 200).trim(),
+      geminiModel: (() => {
+        const m = str(s.geminiModel, 60).trim();
+        return m.startsWith('gemini') ? m : DEFAULT_GEMINI_MODEL;
+      })(),
+      aiFirst: s.aiFirst === 'gemini' ? 'gemini' : 'deepseek',
       wheyOk: !!s.wheyOk,
     },
     days,

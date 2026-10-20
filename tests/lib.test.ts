@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { dayTotals, energy, forGrams } from '../src/lib/nutrition';
 import { foodDue, waterDue } from '../src/lib/reminders';
-import { FOODS, gapFocus, gapSuggestions, searchFoods } from '../src/lib/foods';
+import { FOODS, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
-import { addDays, weekStart } from '../src/lib/dates';
+import { addDays, atOn, hhmmOf, weekStart } from '../src/lib/dates';
 import { suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
 import { computeGame, levelFromXp, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
 import { DEFAULT_DATA, exportText, normalize, parseBackup } from '../src/lib/backup';
@@ -96,6 +96,24 @@ describe('foods', () => {
     expect(ratio(lowProtein, 'protein')).toBeGreaterThan(ratio(lowFat, 'protein')); // low protein -> protein-dense picks
     expect(ratio(lowFat, 'fat')).toBeGreaterThan(ratio(lowProtein, 'fat')); // low fat -> fat-dense picks
   });
+  it('close the gap: follows the time of day', () => {
+    expect([3, 7, 11, 13, 16, 19, 22].map(momentOf)).toEqual(['late', 'breakfast', 'morning', 'lunch', 'afternoon', 'dinner', 'late']);
+    expect(mealsLeft(7)).toBe(5);
+    expect(mealsLeft(22)).toBe(1);
+    const byName = (n: string) => FOODS.find((f) => f.name === n)!;
+    expect(timeFit(byName('Poha'), 'breakfast')).toBeGreaterThan(timeFit(byName('Poha'), 'dinner'));
+    expect(timeFit({ ...byName('Poha'), tags: undefined }, 'dinner')).toBe(0.8); // your own foods stay neutral
+    const opts = { wheyOk: false, atSchool: false };
+    const pool = FOODS.filter((f) => f.tags);
+    const pick = (hour: number, need = NEED) => [0, 1].flatMap((r) => gapSuggestions(need, TARGETS, pool, { ...opts, hour }, 3, r));
+    const share = (fs: typeof pool, t: string) => fs.filter((f) => f.tags?.includes(t)).length / fs.length;
+    // Breakfast foods in the morning, mains at dinner, drinks late at night.
+    expect(share(pick(7.5, TARGETS), 'b')).toBeGreaterThanOrEqual(0.5);
+    expect(share(pick(19), 'm')).toBeGreaterThanOrEqual(0.5);
+    expect(share(pick(22, { kcal: 500, protein: 25, carbs: 60, fat: 15 }), 'd')).toBeGreaterThanOrEqual(0.5);
+    // Early in the day nothing is sized to eat the whole day's gap in one go.
+    expect(Math.max(...pick(7.5, TARGETS).map((f) => f.kcal))).toBeLessThan(1000);
+  });
   it('close the gap: at school prefers packable food', () => {
     const picks = gapSuggestions({ kcal: 600, protein: 30, carbs: 80, fat: 20 }, TARGETS, FOODS, { wheyOk: false, atSchool: true });
     expect(picks.every((f) => f.tags?.includes('p'))).toBe(true);
@@ -133,6 +151,18 @@ describe('recipes', () => {
   it('finds a recipe by name, including a favourite saved under another id', () => {
     expect(recipeFor({ name: 'cheese omelette' })?.lines[0][2]).toBe('3');
     expect(recipeFor({ name: 'Banana' })).toBeUndefined();
+  });
+});
+
+describe('log time', () => {
+  it('turns a picked clock time into a timestamp on that day', () => {
+    const at = atOn('2026-10-07', '07:45');
+    expect(new Date(at).getDate()).toBe(7);
+    expect(hhmmOf(at)).toBe('07:45');
+    expect(hhmmOf(atOn('2026-10-07', '23:59'))).toBe('23:59');
+    const now = Date.now();
+    expect(atOn('2026-10-07', '')).toBeGreaterThanOrEqual(now); // a cleared field means now
+    expect(atOn('2026-10-07', '25:00')).toBeGreaterThanOrEqual(now);
   });
 });
 

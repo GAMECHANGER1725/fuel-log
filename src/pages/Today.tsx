@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store';
-import { addDays, fmtDate } from '../lib/dates';
+import { addDays, fmtDate, hhmmOf } from '../lib/dates';
 import { dayTotals, energy, entryMacros, fmt, timeOf } from '../lib/nutrition';
-import { FOCUS_LABEL, FOODS, gapFocus, gapSuggestions, remaining } from '../lib/foods';
+import { FOCUS_LABEL, FOODS, MOMENT_LABEL, gapFocus, gapSuggestions, momentOf, remaining } from '../lib/foods';
 import { XP } from '../lib/game';
 import type { Entry, Food } from '../lib/types';
-import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, toast, useGame, useRoute, useToday } from '../components/ui';
+import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, useEatenAt, useGame, useRoute, useToday } from '../components/ui';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 
@@ -42,7 +42,10 @@ export default function Today() {
   const atSchool = isToday && weekday && now.getHours() >= 8 && now.getHours() < 15;
   const need = remaining(T, t);
   const focus = gapFocus(need, T);
-  const gap = isToday ? gapSuggestions(need, T, [...s.favourites, ...FOODS.filter((f) => f.tags)].map((f) => withEdit(f, s.recipeEdits)), { wheyOk: s.settings.wheyOk, atSchool }, 3, round) : [];
+  const hour = now.getHours() + now.getMinutes() / 60;
+  const gap = isToday
+    ? gapSuggestions(need, T, [...s.favourites, ...FOODS.filter((f) => f.tags)].map((f) => withEdit(f, s.recipeEdits)), { wheyOk: s.settings.wheyOk, atSchool, hour }, 3, round)
+    : [];
 
   const addFood = (f: Food) => {
     s.addEntries(date, [{ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty: 1, source: 'db', foodId: f.id }], [f]);
@@ -153,7 +156,7 @@ export default function Today() {
               </button>
             </div>
             <p className="small" style={{ margin: '6px 0 12px' }}>
-              {energy(Math.max(0, kLeft), unit)} {unit} and {fmt(Math.max(0, pLeft))} g protein to go.{focus && <> <b>{FOCUS_LABEL[focus]}</b> is your lowest, so these are picked for it.</>}{atSchool ? ' These are easy to eat at school.' : ''} Tap an idea for the recipe, or + to log it.
+              {energy(Math.max(0, kLeft), unit)} {unit} and {fmt(Math.max(0, pLeft))} g protein to go. Ideas for <b>{MOMENT_LABEL[momentOf(hour)]}</b>{focus && <>, heavy on <b>{FOCUS_LABEL[focus]}</b> because it’s your lowest</>}.{atSchool ? ' These are easy to eat at school.' : ''} Tap an idea for the recipe, or + to log it.
             </p>
             <div className="stack">
               {gap.map((f) => {
@@ -270,6 +273,7 @@ export default function Today() {
 function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClose: () => void }) {
   const s = useStore();
   const [qty, setQty] = useState(entry.qty);
+  const when = useEatenAt(date, entry.at);
   const m = entryMacros({ ...entry, qty });
   const fav = s.favourites.some((f) => f.name.toLowerCase() === entry.name.toLowerCase());
   return (
@@ -280,6 +284,7 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
       </div>
       <Stepper value={qty} onChange={setQty} label="servings" presets={SERVING_PRESETS} />
       <MacroGrid {...m} unit={s.settings.unit} />
+      <TimeField value={when.hhmm} onChange={when.setHhmm} />
       <div className="row">
         <button className="btn danger" onClick={() => { s.removeEntry(date, entry.id); toast(`Removed ${entry.name}`); onClose(); }} aria-label="Delete"><Icon name="trash" size={18} /></button>
         <button
@@ -294,7 +299,7 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
         >
           <Icon name="star" size={18} />
         </button>
-        <button className="btn primary grow" onClick={() => { s.updateEntry(date, entry.id, { qty }); onClose(); }}>Save</button>
+        <button className="btn primary grow" onClick={() => { s.updateEntry(date, entry.id, when.hhmm === hhmmOf(entry.at) ? { qty } : { qty, at: when.at }); onClose(); }}>Save</button>
       </div>
     </Sheet>
   );

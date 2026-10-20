@@ -63,6 +63,7 @@ const log = (name: string, kcal = 300) => {
   tick();
   useStore.getState().addEntries('2026-10-07', [{ name, serving: '', base: { kcal, protein: 10, carbs: 0, fat: 0 }, qty: 1, source: 'db' }]);
 };
+const logAt = (name: string, at: number) => useStore.getState().addEntries('2026-10-07', [{ name, serving: '', base: { kcal: 100, protein: 1, carbs: 0, fat: 0 }, qty: 1, source: 'db' }], [], at);
 const names = () => (useStore.getState().days['2026-10-07']?.entries ?? []).map((e) => e.name).sort();
 const idOf = (name: string) => useStore.getState().days['2026-10-07'].entries.find((e) => e.name === name)!.id;
 const remote = () => parseDoc(gists.get('gist1')!.files['fuel-log-sync.json'].content);
@@ -107,6 +108,20 @@ describe('sync between two devices (fake GitHub)', () => {
     expect(names()).toEqual(['laptop-lunch', 'oats', 'phone-snack']);
   });
 
+  it('keeps the time you said you ate it, and a changed time syncs', async () => {
+    on('phone'); await connect(GOOD);
+    on('laptop'); await connect(GOOD);
+    on('phone');
+    const eaten = new Date('2026-10-07T07:30:00').getTime();
+    tick(); logAt('Poha', eaten); await syncNow();
+    on('laptop'); await syncNow();
+    const e = useStore.getState().days['2026-10-07'].entries.find((x) => x.name === 'Poha')!;
+    expect(e.at).toBe(eaten);
+    tick(); useStore.getState().updateEntry('2026-10-07', e.id, { at: eaten + 3_600_000 }); await syncNow();
+    on('phone'); await syncNow();
+    expect(useStore.getState().days['2026-10-07'].entries.find((x) => x.name === 'Poha')!.at).toBe(eaten + 3_600_000);
+  });
+
   it('keeps a deleted item deleted on both devices', async () => {
     on('phone'); log('oats'); log('mistake'); await connect(GOOD);
     on('laptop'); await connect(GOOD);
@@ -131,17 +146,19 @@ describe('sync between two devices (fake GitHub)', () => {
 
   it('newest change to targets wins, and the AI key and theme stay per device', async () => {
     on('phone'); await connect(GOOD);
-    useStore.getState().setSettings({ aiKey: 'PHONE-KEY', theme: 'dark' });
+    useStore.getState().setSettings({ aiKey: 'PHONE-KEY', geminiKey: 'PHONE-GKEY', aiFirst: 'gemini', theme: 'dark' });
     on('laptop'); await connect(GOOD);
-    useStore.getState().setSettings({ aiKey: 'LAPTOP-KEY', theme: 'light' });
+    useStore.getState().setSettings({ aiKey: 'LAPTOP-KEY', geminiKey: 'LAPTOP-GKEY', theme: 'light' });
     tick(); useStore.getState().setTargets({ kcal: 3300, protein: 120, carbs: 480, fat: 90 }); await syncNow();
     on('phone'); await syncNow();
     expect(useStore.getState().settings.targets.kcal).toBe(3300);
     expect(useStore.getState().settings.aiKey).toBe('PHONE-KEY');
+    expect(useStore.getState().settings.geminiKey).toBe('PHONE-GKEY');
+    expect(useStore.getState().settings.aiFirst).toBe('gemini');
     expect(useStore.getState().settings.theme).toBe('dark');
     // Nothing secret ever reaches the gist.
     const raw = gists.get('gist1')!.files['fuel-log-sync.json'].content;
-    expect(raw).not.toMatch(/KEY|aiKey|ghp_/);
+    expect(raw).not.toMatch(/KEY|aiKey|geminiKey|aiFirst|ghp_/);
   });
 
   it('first sync from pre-sync data (no timestamps) keeps the phone weigh-ins, targets and favourites', async () => {

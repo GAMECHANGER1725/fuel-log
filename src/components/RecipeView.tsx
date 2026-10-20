@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { recipeMacros, type Recipe } from '../lib/recipes';
 import { editRecipe } from '../lib/coach';
-import { friendlyError } from '../lib/ai';
+import { friendlyError, hasAi } from '../lib/ai';
 import { energy } from '../lib/nutrition';
 import { useStore } from '../lib/store';
 import { Icon, go, toast } from './ui';
@@ -53,7 +53,7 @@ function RecipeEditor({ recipe }: { recipe: Recipe }) {
     setBusy(true);
     setError('');
     try {
-      setDraft(await editRecipe(s.settings.aiKey, s.settings.aiModel, recipe, recipeMacros(recipe), ask, s.settings.wheyOk));
+      setDraft(await editRecipe(s.settings, recipe, recipeMacros(recipe), ask, s.settings.wheyOk));
     } catch (e) {
       setError(friendlyError(e));
     } finally {
@@ -69,8 +69,8 @@ function RecipeEditor({ recipe }: { recipe: Recipe }) {
       </div>
     );
 
-  if (!s.settings.aiKey)
-    return <button className="btn sm" onClick={() => go('profile?open=ai')}>Add your TokenHarbor key to edit recipes</button>;
+  if (!hasAi(s.settings))
+    return <button className="btn sm" onClick={() => go('profile?open=ai')}>Add an AI key to edit recipes</button>;
 
   if (draft) {
     const m = recipeMacros(draft.recipe);

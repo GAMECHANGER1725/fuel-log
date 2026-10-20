@@ -8,7 +8,7 @@ A personal, gamified calorie and protein tracker for a vegetarian (eggs and dair
 
 - **Today:** energy and protein rings, carb and fat bars, one running food log with the time each item was logged (every entry stores its exact timestamp for later insights), water, food-quality checks, copy yesterday, and past days.
 - **Close the gap:** suggests foods that cover the kcal and protein you still need. During school hours it only suggests food you can pack. Tap an idea to see its recipe (exact ingredient amounts and method), `+` to log it, or **Refresh** for different ideas. There are 26 vegetarian recipes (`src/lib/recipes.ts`); each dish's calories and macros are worked out from its ingredient amounts, and the recipe also shows in the add-food sheet.
-- **Coach** (needs the TokenHarbor key): its own tab.
+- **Coach** (needs an AI key): its own tab.
   - **Weekly check-in:** once a week, by itself, the coach reads the last two weeks of logs, weigh-ins and meal times (how many times a day you eat, how much before 3 pm, weekdays vs weekends) and sets new kcal, protein, carbs and fat targets with a short explanation and 3 things to focus on, plus a note on your water. The AI suggests the numbers, but code sets the limits (`src/lib/coach.ts`): calories only go up when you're gaining too slowly *and* eating at least 90% of your target, only go down when you're gaining too fast, change by at most 250 kcal, and can change at most once every 7 days. Protein stays at 1.6–2.2 g/kg and fat at 20–35% of energy, and carbs make up the rest. You can undo a change, or turn off auto-apply so the coach only suggests.
   - **What to make now:** six ideas for what's left today, two each that take 5, 10 and 20 minutes, with amounts, method and macros, and `+` to log. Liquid food comes first: both 5-minute ideas are shakes or smoothies, and at least 4 of the 6 are drinks, shakes or soups. Respects whey off and school hours.
   - **Ask your coach:** short answers to questions like "why am I not gaining?", based on your own log.
@@ -37,7 +37,7 @@ Optional. **Profile → Sync between devices** keeps your phone and laptop on th
 1. Create a token with only the **gist** permission: https://github.com/settings/tokens/new?scopes=gist&description=Fuel%20Log%20sync (set Expiration to *No expiration*).
 2. Paste it into the app and tap **Connect**. Repeat on each device with the same token. The second device finds the gist by itself.
 
-It syncs when you open the app, a few seconds after each change, when you switch back to the app, and every minute while it's open. Merging is per item, so food logged on both devices at once is kept, and a deleted item stays deleted. The token, AI key, theme and recents never go into the gist; they stay on each device. To stop syncing, tap Disconnect (your data stays) and delete the gist on GitHub if you want.
+It syncs when you open the app, a few seconds after each change, when you switch back to the app, and every minute while it's open. Merging is per item, so food logged on both devices at once is kept, and a deleted item stays deleted. The token, AI keys, theme and recents never go into the gist; they stay on each device. To stop syncing, tap Disconnect (your data stays) and delete the gist on GitHub if you want.
 
 ## Passcode
 
@@ -45,10 +45,13 @@ The app opens on a passcode screen. You stay signed in until **Profile → Log o
 
 ## AI setup (optional)
 
-1. Sign in at https://tokenharbor.ai and create a key under **API Keys**.
-2. In the app go to **Profile → AI**, paste the key, then tap **Test** and **Save key**.
+You can use DeepSeek (through TokenHarbor), Google Gemini, or both. With both keys the app tries your first choice (**Try first** in Profile → AI) and moves to the other when it hits its limit, is busy or rejects the key.
 
-The key is stored only in your phone's browser and sent only to TokenHarbor. The model is DeepSeek V4.1 Flash (`deepseek-v4.1-flash:free`, free on TokenHarbor), which thinks step by step before it answers. Suggested recipes can be changed with **Edit recipe**; your version is saved, synced, and used from then on (**Reset** brings the original back).
+1. DeepSeek: sign in at https://tokenharbor.ai and create a key under **API Keys**.
+2. Gemini: create a free key at https://aistudio.google.com/apikey.
+3. In the app go to **Profile → AI**, paste each key, then tap **Test** and **Save key**.
+
+Keys are stored only in your phone's browser and sent only to their provider. The DeepSeek model is DeepSeek V4.1 Flash (`deepseek-v4.1-flash:free`, free on TokenHarbor), which thinks step by step before it answers. Suggested recipes can be changed with **Edit recipe**; your version is saved, synced, and used from then on (**Reset** brings the original back).
 
 ## Run it locally
 

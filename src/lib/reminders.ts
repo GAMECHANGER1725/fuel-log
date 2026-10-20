@@ -82,7 +82,7 @@ export function foodReminder(): { title: string; body: string } | null {
   const T = s.settings.targets;
   const need = remaining(T, dayTotals(s.days[todayKey()]));
   const focus = gapFocus(need, T);
-  const [pick] = gapSuggestions(need, T, [...s.favourites, ...FOODS.filter((f) => f.tags)], { wheyOk: s.settings.wheyOk, atSchool: false }, 1);
+  const [pick] = gapSuggestions(need, T, [...s.favourites, ...FOODS.filter((f) => f.tags)], { wheyOk: s.settings.wheyOk, atSchool: false, hour: new Date().getHours() }, 1);
   if (!focus || !pick) return null;
   const left = focus === 'kcal' ? `${Math.round(need.kcal)} kcal` : `${Math.round(need[focus])} g ${FOCUS_LABEL[focus]}`;
   return { title: `Time to eat: ${pick.name}`, body: `${pick.serving} · ${pick.kcal} kcal, ${pick.protein} g protein. You still need ${left} today.` };

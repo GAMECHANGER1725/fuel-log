@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } fr
 import { create } from 'zustand';
 import { useStore, dataOf } from '../lib/store';
 import { computeGame } from '../lib/game';
-import { todayKey } from '../lib/dates';
+import { atOn, hhmmOf, todayKey } from '../lib/dates';
 
 // ----- Icons (inline stroke SVG, inherit colour) -------------------------------
 
@@ -90,6 +90,26 @@ export function Sheet({ onClose, children, label }: { onClose: () => void; child
 }
 
 /** Quick serving sizes shown under a servings Stepper. */
+/** The "when did you eat it" time for a log sheet: starts at the current time, as epoch ms on `date`. */
+export function useEatenAt(date: string, initial = Date.now()) {
+  const [hhmm, setHhmm] = useState(() => hhmmOf(initial));
+  return { hhmm, setHhmm, at: atOn(date, hhmm) };
+}
+
+/** Time picker for when the food was eaten (for logging it later). */
+export function TimeField({ value, onChange }: { value: string; onChange: (hhmm: string) => void }) {
+  const now = hhmmOf(Date.now());
+  return (
+    <label className="field">
+      <span>Time eaten</span>
+      <div className="row">
+        <input className="input" type="time" value={value} onChange={(e) => onChange(e.target.value)} aria-label="Time eaten" style={{ flex: 1 }} />
+        {value !== now && <button className="btn" onClick={() => onChange(now)}>Now</button>}
+      </div>
+    </label>
+  );
+}
+
 export const SERVING_PRESETS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
 /** − / + buttons around a number you can also tap and type (opens the decimal keypad), plus optional presets. */

@@ -29,6 +29,21 @@ export function fmtDate(k: string, opts: Intl.DateTimeFormatOptions = { day: 'nu
   return dateOf(k).toLocaleDateString('en-AU', opts);
 }
 
+/** Clock time of an epoch ms as "HH:mm" (24 h, local), the format of <input type="time">. */
+export const hhmmOf = (ms: number) => {
+  const d = new Date(ms);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+/** Epoch ms of a clock time ("HH:mm") on a date key, local time. Falls back to now for a bad time. */
+export function atOn(k: string, hhmm: string): number {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
+  if (!isKey(k) || !m || +m[1] > 23 || +m[2] > 59) return Date.now();
+  const d = dateOf(k);
+  d.setHours(+m[1], +m[2], 0, 0);
+  return d.getTime();
+}
+
 /** Simple string hash, used to seed daily quests. */
 export function hash(s: string): number {
   let h = 2166136261;

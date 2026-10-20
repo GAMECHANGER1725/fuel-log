@@ -45,7 +45,7 @@ export interface Recipe {
   /** Same as the food's name in the food list, so the two are linked. */
   name: string;
   serving: string;
-  /** p = packs for school, g = good gap-closer, w = whey. */
+  /** p = packs for school, g = good gap-closer, w = whey; when it suits: b breakfast, m main meal, s snack, d drink (see foods.ts). */
   tags: string;
   time: string;
   lines: Line[];
@@ -58,7 +58,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Smoothie: milk, banana, oats, PB',
     serving: '1 large glass (~450 ml)',
-    tags: 'g',
+    tags: 'gd',
     time: '5 min',
     lines: [
       ['milk', 250, '250 ml', 'full cream milk'],
@@ -71,7 +71,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Bulk shake: milk, banana, oats, 2 tbsp PB',
     serving: '1 shaker (~600 ml)',
-    tags: 'g',
+    tags: 'gd',
     time: '5 min',
     lines: [
       ['milk', 350, '350 ml', 'full cream milk'],
@@ -84,7 +84,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Whey shake with milk',
     serving: '1 scoop + 300 ml milk',
-    tags: 'wg',
+    tags: 'wgd',
     time: '2 min',
     lines: [
       ['whey', 30, '1 scoop', 'whey protein (30 g)'],
@@ -95,7 +95,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Oats with milk',
     serving: '80 g oats + 300 ml milk',
-    tags: 'g',
+    tags: 'gb',
     time: '4 min',
     lines: [
       ['oats', 80, '80 g', 'rolled oats (1 cup)'],
@@ -106,7 +106,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Cheese omelette',
     serving: '3 eggs',
-    tags: 'g',
+    tags: 'gb',
     time: '8 min',
     lines: [
       ['egg', 150, '3', 'eggs'],
@@ -119,7 +119,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Boiled eggs',
     serving: '2 eggs',
-    tags: 'pg',
+    tags: 'pgbs',
     time: '12 min',
     lines: [
       ['egg', 100, '2', 'large eggs'],
@@ -130,7 +130,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Egg sandwich',
     serving: '1 sandwich',
-    tags: 'pg',
+    tags: 'pgbm',
     time: '8 min',
     lines: [
       ['bread', 76, '2 slices', 'wholegrain bread'],
@@ -143,7 +143,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Egg and cheese wrap',
     serving: '1 wrap',
-    tags: 'pg',
+    tags: 'pgbm',
     time: '8 min',
     lines: [
       ['tortilla', 60, '1', 'large tortilla wrap'],
@@ -156,7 +156,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Soya chunk curry',
     serving: '1 bowl (~250 g)',
-    tags: 'g',
+    tags: 'gm',
     time: '25 min',
     lines: [
       ['soya', 50, '50 g', 'dry soya chunks'],
@@ -170,7 +170,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Paneer tikka',
     serving: '100 g paneer',
-    tags: 'g',
+    tags: 'gms',
     time: '30 min (includes marinating)',
     lines: [
       ['paneer', 100, '100 g', 'paneer, cut in cubes'],
@@ -183,7 +183,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Peanut butter toast',
     serving: '2 slices + 2 tbsp PB',
-    tags: 'g',
+    tags: 'gbs',
     time: '3 min',
     lines: [
       ['bread', 76, '2 slices', 'wholegrain bread'],
@@ -194,7 +194,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Glass of milk + PB toast',
     serving: '300 ml + 1 slice',
-    tags: 'g',
+    tags: 'gbs',
     time: '3 min',
     lines: [
       ['milk', 300, '300 ml', 'full cream milk'],
@@ -206,7 +206,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Peanut butter sandwich',
     serving: '2 slices + 1 tbsp',
-    tags: 'pg',
+    tags: 'pgsm',
     time: '2 min',
     lines: [
       ['bread', 76, '2 slices', 'wholegrain bread'],
@@ -217,7 +217,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Cheese sandwich',
     serving: '1 sandwich',
-    tags: 'p',
+    tags: 'psm',
     time: '2 min',
     lines: [
       ['bread', 76, '2 slices', 'wholegrain bread'],
@@ -228,7 +228,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Lentil bolognese',
     serving: '1 bowl',
-    tags: 'g',
+    tags: 'gm',
     time: '20 min',
     lines: [
       ['pasta', 75, '75 g', 'dry spaghetti'],
@@ -244,7 +244,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Thepla',
     serving: '1 thepla',
-    tags: 'p',
+    tags: 'pbs',
     time: '15 min',
     lines: [
       ['atta', 25, '25 g', 'whole wheat flour (atta)'],
@@ -259,7 +259,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Paneer bhurji',
     serving: '1 bowl (~150 g)',
-    tags: 'g',
+    tags: 'gbm',
     time: '12 min',
     lines: [
       ['paneer', 100, '100 g', 'paneer, crumbled'],
@@ -273,7 +273,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Paneer tikka wrap',
     serving: '1 wrap',
-    tags: 'pg',
+    tags: 'pgm',
     time: '30 min (includes marinating)',
     lines: [
       ['tortilla', 60, '1', 'large tortilla wrap'],
@@ -288,7 +288,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Trail mix',
     serving: '50 g',
-    tags: 'pg',
+    tags: 'pgs',
     time: '2 min',
     lines: [
       ['nuts', 30, '30 g', 'mixed nuts (almonds, cashews, peanuts)'],
@@ -299,7 +299,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Edamame',
     serving: '1 cup',
-    tags: 'pg',
+    tags: 'pgs',
     time: '5 min',
     lines: [
       ['edamame', 150, '150 g', 'shelled edamame (frozen is fine)'],
@@ -310,7 +310,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Greek yoghurt, honey and nuts',
     serving: '1 bowl',
-    tags: 'pg',
+    tags: 'pgbs',
     time: '2 min',
     lines: [
       ['greekYoghurt', 170, '170 g', 'Greek yoghurt (1 tub)'],
@@ -322,7 +322,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Overnight oats',
     serving: '1 jar',
-    tags: 'g',
+    tags: 'gb',
     time: '5 min + overnight',
     lines: [
       ['oats', 50, '50 g', 'rolled oats (⅔ cup)'],
@@ -336,7 +336,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Peanut butter banana wrap',
     serving: '1 wrap',
-    tags: 'pg',
+    tags: 'pgbs',
     time: '3 min',
     lines: [
       ['tortilla', 60, '1', 'large tortilla wrap'],
@@ -348,7 +348,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Cheese toastie',
     serving: '1 toastie',
-    tags: 'pg',
+    tags: 'pgbs',
     time: '8 min',
     lines: [
       ['bread', 76, '2 slices', 'wholegrain bread'],
@@ -360,7 +360,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Masala egg toast',
     serving: '3 eggs + 2 slices',
-    tags: 'g',
+    tags: 'gb',
     time: '10 min',
     lines: [
       ['egg', 150, '3', 'eggs'],
@@ -375,7 +375,7 @@ export const RECIPES: Recipe[] = [
   {
     name: 'Besan pudla with paneer',
     serving: '2 pudla',
-    tags: 'pg',
+    tags: 'pgbm',
     time: '15 min',
     lines: [
       ['besan', 60, '60 g', 'besan (chickpea flour, ½ cup)'],
