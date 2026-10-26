@@ -156,7 +156,7 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
               <span className="mono mut">{mode === 'label' ? 'AI read the label' : mode === 'text' ? 'AI worked it out' : imgs.length > 1 ? `AI read ${imgs.length} photos` : 'AI read your plate'}</span>
               <h2 className="title">{live.length} food{live.length === 1 ? '' : 's'} found</h2>
             </div>
-            <span className="mono" style={{ padding: '6px 8px', border: '2px solid var(--carb)', color: 'var(--carb)', borderRadius: 4, flex: 'none' }}>{result.confidence} confidence</span>
+            <span className="tag" style={{ color: 'var(--carb)', flex: 'none' }}>{result.confidence} confidence</span>
           </div>
           {result.notes && <p className="small mut">{result.notes}</p>}
           <div>

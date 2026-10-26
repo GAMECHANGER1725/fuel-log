@@ -17,10 +17,10 @@ export default function LevelUp({ level, game, onClose }: { level: number; game:
       <span className="num ghost" aria-hidden="true">{level}</span>
       <span className="mono" style={{ fontWeight: 600 }}>Level up</span>
       <span className="num big" style={{ marginTop: 12 }}>{level}</span>
-      <span className="num" style={{ fontSize: 64, lineHeight: 0.9, textTransform: 'uppercase', marginTop: 8 }}>{rank.name}</span>
+      <span className="num" style={{ fontSize: 64, lineHeight: 0.95, marginTop: 8 }}>{rank.name}</span>
       <p style={{ marginTop: 12, fontSize: 16, maxWidth: 300 }}>{line}</p>
       <div style={{ flex: 1 }} />
-      <div className="rows" style={{ borderTop: '2px solid #0e0f0c' }}>
+      <div className="rows" style={{ borderTop: '1px solid currentColor' }}>
         <div><span>Total XP</span><span className="mono" style={{ fontWeight: 600 }}>{game.xp.toLocaleString('en-AU')}</span></div>
         <div><span>Next rank</span><span className="mono" style={{ fontWeight: 600 }}>{rank.next ? `${rank.next.name} · level ${rank.next.level}` : 'Max rank'}</span></div>
         <div><span>Streak freezes</span><span className="mono" style={{ fontWeight: 600 }}>{game.streak.freezes} banked</span></div>

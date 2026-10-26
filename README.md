@@ -29,6 +29,7 @@ A personal, gamified calorie and protein tracker for a vegetarian (eggs and dair
 
   XP is worked out from your log, so deleting food takes its XP back.
 - **Profile:** targets (with "suggest from my stats"), AI key and model, kcal or kJ, dark, light or auto theme, a whey toggle, backup export and import (including backups from the original Fuel Log artifact), and reset.
+- **Fitness Tracker link:** Profile opens [Fitness Tracker](https://gamechanger1725.github.io/Fitness-Tracker/), the sister app for home workouts, wake-ups and sleep. It reads this log (on the same phone, or through the sync gist) for its Fuel tab and uses the same AI key and passcode. Both apps share one design from Claude Design: Fuel Log is the warm one, Fitness Tracker the cool one.
 
 ## Sync between devices
 

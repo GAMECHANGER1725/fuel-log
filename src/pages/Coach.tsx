@@ -80,13 +80,13 @@ function CheckIn() {
             <p style={{ fontSize: 17, fontWeight: 600 }}>{review.headline}</p>
             {review.summary && <p className="small">{review.summary}</p>}
           </div>
-          <div className="grid4" style={{ padding: '10px 0', background: 'var(--bg)', borderRadius: 6 }}>
+          <div className="grid4" style={{ padding: '10px 0', background: 'var(--s2)', borderRadius: 18 }}>
             <Delta label={unit} from={review.from.kcal} to={review.to.kcal} show={(v) => energy(v, unit)} color="var(--fuel)" />
             <Delta label="protein" from={review.from.protein} to={review.to.protein} color="var(--pro)" />
             <Delta label="carbs" from={review.from.carbs} to={review.to.carbs} />
             <Delta label="fat" from={review.from.fat} to={review.to.fat} />
           </div>
-          <p className="mono dim" style={{ textTransform: 'none', letterSpacing: 0 }}>{review.allowed.why}</p>
+          <p className="small dim">{review.allowed.why}</p>
           {changed ? (
             review.applied ? (
               <div className="row">
@@ -205,7 +205,7 @@ function Ideas() {
             {items.map(([i, idx]) => {
               const isOpen = open === idx;
               return (
-                <div key={idx} className="stack" style={{ gap: 0, border: '2px solid var(--line)', borderRadius: 6, overflow: 'hidden' }}>
+                <div key={idx} className="stack" style={{ gap: 0, background: 'var(--s2)', borderRadius: 18, overflow: 'hidden' }}>
                   <div className="row" style={{ gap: 0 }}>
                     <button className="item-btn" style={{ padding: '10px 12px', minHeight: 56 }} aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : idx)}>
                       <span style={{ fontWeight: 600 }}>{i.name}</span>
@@ -214,7 +214,7 @@ function Ideas() {
                         <span className="mono mut">{energy(i.kcal, unit)} {unit} · {i.protein} g P</span>
                       </span>
                     </button>
-                    <button className="btn icon" style={{ border: 0, borderLeft: '2px solid var(--line)', borderRadius: 0, alignSelf: 'stretch', height: 'auto' }} aria-label={`Log ${i.name}`} onClick={() => log(i)}>+</button>
+                    <button className="btn icon" style={{ borderRadius: 0, background: 'var(--s3)', alignSelf: 'stretch', height: 'auto' }} aria-label={`Log ${i.name}`} onClick={() => log(i)}>+</button>
                   </div>
                   {isOpen && (
                     <div className="stack" style={{ padding: '4px 12px 12px', gap: 10 }}>
