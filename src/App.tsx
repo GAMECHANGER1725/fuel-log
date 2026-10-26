@@ -24,7 +24,7 @@ export default function App() {
     if (theme === 'auto') root.removeAttribute('data-theme');
     else root.setAttribute('data-theme', theme);
     const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg || '#0E0F0C');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg || '#14110E');
   }, [theme]);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function App() {
   return (
     <div className="app">
       {sync.status === 'error' && sync.kind !== 'offline' && sync.kind !== 'rate' && path !== 'profile' && (
-        <a href="#/profile?open=sync" className="card tight" style={{ display: 'block', margin: '12px 16px 0', borderColor: 'var(--danger)', color: 'var(--ink)', textDecoration: 'none' }}>
+        <a href="#/profile?open=sync" className="card tight" style={{ display: 'block', margin: '12px 16px 0', boxShadow: 'inset 0 0 0 1.5px var(--danger)', color: 'var(--ink)', textDecoration: 'none' }}>
           <span className="mono" style={{ color: 'var(--danger)' }}>Sync problem</span>
           <span className="small" style={{ display: 'block' }}>{sync.error} Tap to fix.</span>
         </a>
@@ -81,9 +81,9 @@ export default function App() {
 
 function Nav({ path }: { path: string }) {
   const link = (to: string, icon: string, label: string) => (
-    <a href={`#/${to}`} aria-current={path === to ? 'page' : undefined}>
+    <a href={`#/${to}`} aria-current={path === to ? 'page' : undefined} aria-label={label}>
       <Icon name={icon} />
-      <span className="mono" style={{ fontSize: 10 }}>{label}</span>
+      <span>{label}</span>
     </a>
   );
   return (
@@ -92,7 +92,7 @@ function Nav({ path }: { path: string }) {
         {link('today', 'today', 'Today')}
         {link('coach', 'bolt', 'Coach')}
         <a href="#/food?mode=new" className="fab" aria-label="Add food">
-          <Icon name="plus" size={26} stroke={3} />
+          <Icon name="plus" size={26} stroke={2.6} />
         </a>
         {link('progress', 'trend', 'Progress')}
         {link('profile', 'star', 'Profile')}

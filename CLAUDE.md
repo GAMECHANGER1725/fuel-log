@@ -42,6 +42,8 @@ There is no linter. CI (`.github/workflows/deploy.yml`) runs `npm test` then `np
 
 **PWA.** `vite-plugin-pwa` with `registerType: 'autoUpdate'`; the manifest is in `vite.config.ts`.
 
+**Look and the sister app.** `styles.css` holds the design from the Claude Design canvas shared with Fitness Tracker (`GAMECHANGER1725/Fitness-Tracker`, deployed at `/Fitness-Tracker/` on the same origin): Bricolage Grotesque for numbers and titles, Manrope for text, rounded borderless cards, pill buttons and a floating nav. The "Shared base" section of `styles.css` is identical in both apps (keep them in step); each app keeps its own tokens (Fuel Log: warm cocoa and ember, with `--acc` aliased to `--fuel`) and its own extras. `.mono` is now a sentence-case label, not all-caps mono. Fitness Tracker reads this app's localStorage (`fuel-log-v3`, including the AI keys) and its sync gist read-only, so don't rename those keys or the gist file without updating `fitness-tracker/src/lib/fuel.ts`.
+
 ## Conventions
 
 - Dates are local `yyyy-MM-dd` strings (`dates.ts`), parsed at noon to avoid DST edges. Use those helpers rather than `toISOString()`.

@@ -7,7 +7,7 @@ import { AI_MODELS, GEMINI_MODELS, PROVIDER_NAME, friendlyError, hasAi, testKey,
 import { fmt, KJ } from '../lib/nutrition';
 import { todayKey, fmtDate } from '../lib/dates';
 import type { AppData, Macros } from '../lib/types';
-import { Bar, toast, useGame, useRoute } from '../components/ui';
+import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { remindersOn, remindersSupported, setReminders } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
@@ -30,7 +30,7 @@ export default function ProfilePage() {
         <div className="row" style={{ alignItems: 'flex-end', gap: 14 }}>
           <span className="num fuel" style={{ fontSize: 112, lineHeight: 0.8 }}>{g.level}</span>
           <div className="stack" style={{ gap: 2, paddingBottom: 4 }}>
-            <span className="num" style={{ fontSize: 40, lineHeight: 0.9, textTransform: 'uppercase' }}>{g.rank.name}</span>
+            <span className="num" style={{ fontSize: 40, lineHeight: 1 }}>{g.rank.name}</span>
             <span className="mut small">{g.rank.next ? `Next: ${g.rank.next.name} at level ${g.rank.next.level}` : 'Top rank'}</span>
           </div>
         </div>
@@ -42,6 +42,16 @@ export default function ProfilePage() {
       </section>
 
       <div className="page">
+        <a href="../Fitness-Tracker/" className="card tight" style={{ display: 'flex', alignItems: 'center', gap: 14, color: 'var(--ink)', textDecoration: 'none' }}>
+          <span style={{ width: 44, height: 44, borderRadius: 16, background: '#5be3a6', color: '#04140d', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M6 8v8M18 8v8M3 10v4M21 10v4M6 12h12" /></svg>
+          </span>
+          <span className="grow">
+            <span className="bold" style={{ display: 'block' }}>Fitness Tracker</span>
+            <span className="small mut">Home workouts, wake-ups and sleep. Reads this log for your food.</span>
+          </span>
+          <Icon name="right" />
+        </a>
         <div className="grid3">
           <Tile v={g.streak.current} l="Day streak" />
           <Tile v={g.streak.best} l="Best streak" />
@@ -54,7 +64,7 @@ export default function ProfilePage() {
             <span className="mono" style={{ fontWeight: 600 }}>Weekly boss · {g.boss.daysLeft === 0 ? 'last day' : `${g.boss.daysLeft} day${g.boss.daysLeft === 1 ? '' : 's'} left`}</span>
             <span className="mono" style={{ fontWeight: 600 }}>+{BOSS_XP} XP</span>
           </div>
-          <h2 className="num" style={{ fontSize: 28, lineHeight: 1, textTransform: 'uppercase' }}>{g.boss.title}</h2>
+          <h2 className="num" style={{ fontSize: 26, lineHeight: 1.05 }}>{g.boss.title}</h2>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${g.boss.need}, minmax(0,1fr))`, gap: 4 }}>
             {Array.from({ length: g.boss.need }, (_, i) => (
               <div key={i} style={{ height: 12, background: i < g.boss.have ? 'var(--fuel)' : 'color-mix(in srgb, var(--bg) 18%, transparent)' }} />

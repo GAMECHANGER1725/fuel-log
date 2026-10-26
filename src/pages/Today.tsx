@@ -79,7 +79,7 @@ export default function Today() {
             <span className="num" style={{ fontSize: 20 }}>{g.streak.current}</span>
           </a>
           <a href="#/profile" className="btn sm ink" aria-label={`Level ${g.level}`}>
-            <span className="mono">LV</span>
+            <span className="mono">Lv</span>
             <span className="num" style={{ fontSize: 20 }}>{g.level}</span>
           </a>
         </div>
@@ -180,7 +180,7 @@ export default function Today() {
                       <button className="btn dark icon" aria-label={`Log ${f.name}`} onClick={() => addFood(f)}>+</button>
                     </div>
                     {isOpen && (
-                      <div className="stack" style={{ background: 'var(--bg)', color: 'var(--ink)', borderRadius: 4, padding: 14, gap: 12 }}>
+                      <div className="stack" style={{ background: 'var(--s1)', color: 'var(--ink)', borderRadius: 18, padding: 14, gap: 12 }}>
                         {recipe ? <RecipeView recipe={recipe} editable /> : <p className="small mut">Nothing to make: {f.serving}.</p>}
                         <button className="btn primary block" onClick={() => addFood(f)}>Log it · +{XP.meal} XP</button>
                       </div>
@@ -213,7 +213,7 @@ export default function Today() {
           {log.length > 0 ? (
             <div className="card tight">
               {log.map((e, i) => (
-                <button key={e.id} className="item-btn" style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, borderTop: i ? '2px solid var(--line)' : 0 }} onClick={() => setEditing(e)}>
+                <button key={e.id} className="item-btn" style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, borderTop: i ? '1px solid var(--line)' : 0 }} onClick={() => setEditing(e)}>
                   <span className="mono dim" style={{ width: 64, flex: 'none' }}>{timeOf(e.at)}</span>
                   <span className="grow">{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
                   <span className="mono mut" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)} · {fmt(entryMacros(e).protein)} g</span>

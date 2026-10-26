@@ -35,16 +35,23 @@ export default function Lock() {
   });
 
   const key = (label: string, onClick: () => void, aria?: string) => (
-    <button className="btn" style={{ minHeight: 64, fontSize: 28, fontFamily: 'var(--display)', fontStretch: '68%', fontWeight: 800 }} onClick={onClick} aria-label={aria ?? label}>
+    <button className="btn num" style={{ minHeight: 68, fontSize: 28, borderRadius: 24 }} onClick={onClick} aria-label={aria ?? label}>
       {label}
     </button>
   );
 
   return (
     <main className="app" style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', paddingBottom: 'calc(24px + env(safe-area-inset-bottom))' }}>
-      <section className="stack" style={{ padding: '48px 16px 0', gap: 12 }}>
-        <span className="mono fuel">Calorie + protein tracker</span>
-        <h1 className="num" style={{ fontSize: 88, lineHeight: 0.85, textTransform: 'uppercase' }}>Fuel<br />Log</h1>
+      <section className="stack" style={{ padding: '56px 20px 0', gap: 16 }}>
+        <div style={{ width: 56, height: 56, borderRadius: 20, background: 'var(--acc)', color: 'var(--on-acc)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="flame" size={30} stroke={2.2} />
+        </div>
+        <h1 className="num" style={{ fontSize: 56, lineHeight: 0.95 }}>
+          Fuel
+          <br />
+          Log
+        </h1>
+        <p className="mut">Calories and protein for your bulk.</p>
       </section>
 
       <div style={{ flex: 1 }} />
@@ -52,9 +59,9 @@ export default function Lock() {
       <section className="page" style={{ gap: 20 }}>
         <div className="stack" style={{ alignItems: 'center', gap: 14 }}>
           <span className="mono mut" role="status" style={wrong ? { color: 'var(--danger)' } : undefined}>{wrong ? 'Wrong passcode' : 'Enter passcode'}</span>
-          <div className={wrong ? 'shake' : undefined} style={{ display: 'flex', gap: 14 }} aria-label={`${code.length} of ${CODE_LENGTH} digits entered`}>
+          <div className={wrong ? 'shake' : undefined} style={{ display: 'flex', gap: 16 }} aria-label={`${code.length} of ${CODE_LENGTH} digits entered`}>
             {Array.from({ length: CODE_LENGTH }, (_, i) => (
-              <span key={i} style={{ width: 16, height: 16, borderRadius: 2, background: i < code.length ? (wrong ? 'var(--danger)' : 'var(--fuel)') : 'transparent', border: `2px solid ${i < code.length ? 'transparent' : 'var(--line2)'}` }} />
+              <span key={i} style={{ width: 16, height: 16, borderRadius: 999, background: i < code.length ? (wrong ? 'var(--danger)' : 'var(--acc)') : 'transparent', boxShadow: i < code.length ? 'none' : 'inset 0 0 0 2px var(--line2)' }} />
             ))}
           </div>
         </div>
@@ -62,7 +69,7 @@ export default function Lock() {
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => key(d, () => press(d)))}
           <span />
           {key('0', () => press('0'))}
-          <button className="btn" style={{ minHeight: 64 }} aria-label="Delete digit" onClick={() => setCode(code.slice(0, -1))}>
+          <button className="btn" style={{ minHeight: 68, borderRadius: 24, background: 'transparent' }} aria-label="Delete digit" onClick={() => setCode(code.slice(0, -1))}>
             <Icon name="left" size={24} />
           </button>
         </div>

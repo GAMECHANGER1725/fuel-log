@@ -163,7 +163,7 @@ export function MacroGrid({ kcal, protein, carbs, fat, unit }: { kcal: number; p
     </div>
   );
   return (
-    <div className="grid4" style={{ padding: '12px 0', background: 'var(--bg)', borderRadius: 6 }}>
+    <div className="grid4" style={{ padding: '12px 0', background: 'var(--s2)', borderRadius: 18 }}>
       {cell(Math.round(unit === 'kJ' ? kcal * 4.184 : kcal).toLocaleString('en-AU'), unit, 'var(--fuel)')}
       {cell(String(Math.round(protein * 10) / 10), 'protein', 'var(--pro)')}
       {cell(String(Math.round(carbs)), 'carbs')}

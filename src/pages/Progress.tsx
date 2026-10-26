@@ -168,7 +168,7 @@ function Legend({ color, label }: { color: string; label: string }) {
 }
 
 function WeekRow({ label, cells }: { label: string; cells: string[] }) {
-  const b = { padding: '10px 0', borderTop: '2px solid var(--line)' };
+  const b = { padding: '10px 0', borderTop: '1px solid var(--line)' };
   return (
     <>
       <span style={b}>{label}</span>
@@ -201,14 +201,14 @@ function WeightChart({ line, today, low, high }: { line: { date: string; kg: num
       {ticks.map((v) => (
         <g key={v}>
           <line x1={L} x2={R} y1={y(v)} y2={y(v)} stroke="var(--line)" />
-          <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize="10" fill="var(--mut)" fontFamily="var(--mono)">{v.toFixed(1)}</text>
+          <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize="10" fill="var(--mut)" fontFamily="var(--font)">{v.toFixed(1)}</text>
         </g>
       ))}
       {pts.map((p) => <circle key={p.date} cx={x(p.date)} cy={y(p.kg)} r={2.5} fill="var(--dim)" />)}
       {pts.length > 1 && <polyline points={pts.map((p) => `${x(p.date)},${y(p.trend)}`).join(' ')} fill="none" stroke="var(--ink)" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />}
       <circle cx={x(last.date)} cy={y(last.trend)} r={5} fill="var(--fuel)" stroke="var(--bg)" strokeWidth={2} />
-      <text x={L} y={H - 8} fontSize="10" fill="var(--mut)" fontFamily="var(--mono)">{fmtDate(first.date).toUpperCase()}</text>
-      <text x={R} y={H - 8} textAnchor="end" fontSize="10" fill="var(--mut)" fontFamily="var(--mono)">{dateOf(today).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }).toUpperCase()}</text>
+      <text x={L} y={H - 8} fontSize="10" fill="var(--mut)" fontFamily="var(--font)">{fmtDate(first.date)}</text>
+      <text x={R} y={H - 8} textAnchor="end" fontSize="10" fill="var(--mut)" fontFamily="var(--font)">{dateOf(today).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</text>
     </svg>
   );
 }
