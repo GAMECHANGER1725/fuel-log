@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
+import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -709,6 +709,16 @@ describe('drinkMl', () => {
   it('adds up drinks served in ml or L, not bowls or grams', () => {
     const e = (serving: string, qty = 1): Entry => ({ id: serving, name: 'x', serving, base: { kcal: 100, protein: 1, carbs: 0, fat: 0 }, qty, source: 'db', at: 0 });
     expect(drinkMl([e('300 ml glass'), e('large (~450 ml)', 2), e('1 bowl (250 ml)'), e('100 g'), e('1.5 L bottle'), e('1 glass')])).toBe(300 + 900 + 1500);
+  });
+});
+
+describe('eatenByTime', () => {
+  it('sums a day up to the same clock time', () => {
+    const e = (hhmm: string, kcal: number): Entry => ({ id: hhmm, name: 'x', serving: '', base: { kcal, protein: 0, carbs: 0, fat: 0 }, qty: 1, source: 'db', at: atOn('2026-10-28', hhmm) });
+    const days = { '2026-10-28': { entries: [e('08:00', 500), e('13:00', 700), e('19:00', 900)], water: 0, checks: {} } };
+    expect(eatenByTime(days, '2026-10-28', atOn('2026-10-29', '15:30'))).toBe(1200);
+    expect(eatenByTime(days, '2026-10-28', atOn('2026-10-29', '07:00'))).toBe(0);
+    expect(eatenByTime(days, '2026-10-27', atOn('2026-10-29', '15:30'))).toBeNull();
   });
 });
 
