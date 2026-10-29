@@ -9,7 +9,7 @@ import { todayKey, fmtDate } from '../lib/dates';
 import type { AppData, Macros } from '../lib/types';
 import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
-import { remindersOn, remindersSupported, setReminders } from '../lib/reminders';
+import { FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
 import { ACCENTS, CARDS, SIZES, usePrefs } from '../lib/prefs';
 
@@ -380,6 +380,11 @@ function TodayCards() {
 
 function ReminderToggle() {
   const [on, setOn] = useState(remindersOn);
+  const [times, setTimes] = useState(reminderTimes);
+  const pick = (p: Partial<typeof times>) => {
+    setReminderTimes(p);
+    setTimes({ ...times, ...p });
+  };
   if (!remindersSupported()) return <p className="small mut">This browser can’t show notifications. On iPhone, add the app to your Home Screen first.</p>;
   return (
     <>
@@ -394,8 +399,20 @@ function ReminderToggle() {
             if (e.target.checked && !ok) toast('Notifications are blocked. Allow them for this app in your browser settings.');
           }}
         />
-        Remind me to drink water if I haven’t for 2 hours (8 am to 9 pm), and what to eat at 5 PM
+        Remind me to drink water if I haven’t for {times.waterGapH} hour{times.waterGapH === 1 ? '' : 's'} (8 am to 9 pm), and what to eat at {hourLabel(times.foodHour)}
       </label>
+      {on && (
+        <>
+          <span className="small mut">Water reminder after</span>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            {WATER_GAPS.map((h) => <button key={h} className="chip" aria-pressed={times.waterGapH === h} onClick={() => pick({ waterGapH: h })}>{h} h</button>)}
+          </div>
+          <span className="small mut">Food reminder at</span>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            {FOOD_HOURS.map((h) => <button key={h} className="chip" aria-pressed={times.foodHour === h} onClick={() => pick({ foodHour: h })}>{hourLabel(h)}</button>)}
+          </div>
+        </>
+      )}
       <p className="small mut" style={{ margin: 0 }}>Reminders arrive while the app is open or running in the background. They can’t fire once your phone has fully closed it.</p>
     </>
   );

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dayTotals, energy, forGrams, paceGap, sinceLast } from '../src/lib/nutrition';
-import { foodDue, waterDue } from '../src/lib/reminders';
+import { foodDue, hourLabel, waterDue } from '../src/lib/reminders';
 import { FOODS, browseFoods, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
 import { addDays, atOn, hhmmOf, weekStart } from '../src/lib/dates';
@@ -460,5 +460,22 @@ describe('browse foods', () => {
     expect(browseFoods(FOODS, 'dense').every((f) => f.kcal >= 400)).toBe(true);
     const twice = browseFoods([...FOODS, ...FOODS], 'd');
     expect(new Set(twice.map((f) => f.name)).size).toBe(twice.length);
+  });
+});
+
+describe('reminder times', () => {
+  const at = (h: number, m = 0) => new Date(2026, 9, 29, h, m).getTime();
+  it('uses a chosen water gap', () => {
+    expect(waterDue(at(11), at(10), 0, 2, 8, 3_600_000)).toBe(true);
+    expect(waterDue(at(11), at(10), 0, 2, 8)).toBe(false); // default 2 h
+  });
+  it('uses a chosen food time, for 3 hours', () => {
+    expect(foodDue(at(15, 30), '', 15)).toBe(true);
+    expect(foodDue(at(18, 10), '', 15)).toBe(false);
+    expect(foodDue(at(15, 30), '')).toBe(false); // default 5 PM
+  });
+  it('labels hours', () => {
+    expect(hourLabel(17)).toBe('5 PM');
+    expect(hourLabel(12)).toBe('12 PM');
   });
 });

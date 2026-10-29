@@ -12,19 +12,27 @@ const LS_KEY = 'fuel-log-reminders';
 const HOUR = 3_600_000;
 export const WATER_GAP_MS = 2 * HOUR;
 const AWAKE = [8, 21]; // water reminders only from 8 am until 9 pm
-const FOOD_WINDOW = [17, 20]; // the food reminder is for 5 PM; if the app wakes up later than 8 PM it is skipped
+const FOOD_SPAN = 3; // the food reminder can fire up to 3 h after its time (e.g. 5 to 8 PM), then it is skipped
 
 interface Saved {
   on: boolean;
   lastWaterAt: number;
   lastWaterRemind: number;
   foodDate: string;
+  /** Hours without a drink before a water reminder. */
+  waterGapH: number;
+  /** Hour of the day (24 h) for the food reminder. */
+  foodHour: number;
 }
+const DEFAULTS: Saved = { on: false, lastWaterAt: 0, lastWaterRemind: 0, foodDate: '', waterGapH: 2, foodHour: 17 };
+export const WATER_GAPS = [1, 1.5, 2, 3];
+export const FOOD_HOURS = [15, 16, 17, 18, 19];
 const read = (): Saved => {
   try {
-    return { on: false, lastWaterAt: 0, lastWaterRemind: 0, foodDate: '', ...JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') };
+    const r = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') } as Saved;
+    return { ...r, waterGapH: WATER_GAPS.includes(r.waterGapH) ? r.waterGapH : 2, foodHour: FOOD_HOURS.includes(r.foodHour) ? r.foodHour : 17 };
   } catch {
-    return { on: false, lastWaterAt: 0, lastWaterRemind: 0, foodDate: '' };
+    return DEFAULTS;
   }
 };
 const patch = (p: Partial<Saved>) => {
@@ -38,6 +46,16 @@ const patch = (p: Partial<Saved>) => {
 export const remindersSupported = () => typeof Notification !== 'undefined' && 'serviceWorker' in navigator;
 export const remindersOn = () => remindersSupported() && read().on && Notification.permission === 'granted';
 
+/** The chosen water gap and food time (per device). */
+export const reminderTimes = () => {
+  const r = read();
+  return { waterGapH: r.waterGapH, foodHour: r.foodHour };
+};
+export const setReminderTimes = (p: Partial<Pick<Saved, 'waterGapH' | 'foodHour'>>) => patch(p);
+
+/** "5 PM" for an hour of the day. */
+export const hourLabel = (h: number) => `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}`;
+
 /** Asks for permission (call from a tap). Returns whether reminders are now on. */
 export async function setReminders(on: boolean): Promise<boolean> {
   if (!on) return patch({ on: false }), false;
@@ -49,18 +67,18 @@ export async function setReminders(on: boolean): Promise<boolean> {
 
 // ----- When is a reminder due? (pure, so it can be tested) ---------------------------------
 
-/** Water: awake hours, goal not hit, and 2 h since the last drink, the last reminder, or 8 am. */
-export function waterDue(now: number, lastWaterAt: number, lastRemind: number, glasses: number, goal: number): boolean {
+/** Water: awake hours, goal not hit, and `gapMs` (2 h by default) since the last drink, the last reminder, or 8 am. */
+export function waterDue(now: number, lastWaterAt: number, lastRemind: number, glasses: number, goal: number, gapMs = WATER_GAP_MS): boolean {
   const d = new Date(now);
   if (d.getHours() < AWAKE[0] || d.getHours() >= AWAKE[1] || glasses >= goal) return false;
   const morning = new Date(d.getFullYear(), d.getMonth(), d.getDate(), AWAKE[0]).getTime();
-  return now - Math.max(lastWaterAt, lastRemind, morning) >= WATER_GAP_MS;
+  return now - Math.max(lastWaterAt, lastRemind, morning) >= gapMs;
 }
 
-/** Food: once a day, from 5 PM until 8 PM. */
-export const foodDue = (now: number, lastDate: string): boolean => {
+/** Food: once a day, from `fromHour` (5 PM by default) for 3 hours. */
+export const foodDue = (now: number, lastDate: string, fromHour = 17): boolean => {
   const d = new Date(now);
-  return d.getHours() >= FOOD_WINDOW[0] && d.getHours() < FOOD_WINDOW[1] && keyOf(d) !== lastDate;
+  return d.getHours() >= fromHour && d.getHours() < fromHour + FOOD_SPAN && keyOf(d) !== lastDate;
 };
 
 // ----- Showing them -------------------------------------------------------------------------
@@ -76,7 +94,7 @@ async function notify(title: string, body: string, tag: string) {
   }
 }
 
-/** Text for the 5 PM nudge, based on what is lowest today. null = nothing left to eat. */
+/** Text for the evening food nudge, based on what is lowest today. null = nothing left to eat. */
 export function foodReminder(): { title: string; body: string } | null {
   const s = useStore.getState();
   const T = s.settings.targets;
@@ -94,11 +112,11 @@ function tick() {
   const r = read();
   const s = useStore.getState();
   const glasses = s.days[todayKey()]?.water ?? 0;
-  if (waterDue(now, r.lastWaterAt, r.lastWaterRemind, glasses, Math.round(s.settings.waterL * 4))) {
+  if (waterDue(now, r.lastWaterAt, r.lastWaterRemind, glasses, Math.round(s.settings.waterL * 4), r.waterGapH * HOUR)) {
     patch({ lastWaterRemind: now });
     notify('Drink some water', glasses ? `You've had ${glasses * 250} ml today. Time for a glass.` : 'No water logged yet today. Time for a glass.', 'water');
   }
-  if (foodDue(now, r.foodDate)) {
+  if (foodDue(now, r.foodDate, r.foodHour)) {
     patch({ foodDate: todayKey() });
     const f = foodReminder();
     if (f) notify(f.title, f.body, 'food');
