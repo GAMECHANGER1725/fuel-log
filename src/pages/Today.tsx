@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
-import { SECTION_LABEL, daySummary, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals } from '../lib/meals';
+import { SECTION_LABEL, combineAsFood, daySummary, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals } from '../lib/meals';
 
 export default function Today() {
   const today = useToday();
@@ -21,6 +21,7 @@ export default function Today() {
   const [editing, setEditing] = useState<Entry | null>(null);
   // Select mode on the log: ids of ticked entries, or null when off.
   const [picked, setPicked] = useState<Set<string> | null>(null);
+  const [saving, setSaving] = useState<Entry[] | null>(null);
   useEffect(() => setPicked(null), [date]);
   const [round, setRound] = useState(0); // how many times Close the gap was refreshed
   const [open, setOpen] = useState<string | null>(null); // which idea's recipe is showing
@@ -277,7 +278,7 @@ export default function Today() {
             <p className="empty">Nothing logged {isToday ? 'yet today' : 'this day'}.</p>
           )}
           {picked && (
-            <div className="row" style={{ gap: 6 }}>
+            <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
               <button className="btn sm" onClick={() => setPicked(picked.size === day.entries.length ? new Set() : new Set(day.entries.map((e) => e.id)))}>
                 {picked.size === day.entries.length ? 'None' : 'All'}
               </button>
@@ -292,6 +293,9 @@ export default function Today() {
                 }}
               >
                 <Icon name="trash" size={16} /> Delete {picked.size || ''}
+              </button>
+              <button className="btn sm grow" disabled={picked.size < 2} title="Save the picked foods as one favourite" onClick={() => setSaving(day.entries.filter((e) => picked.has(e.id)))}>
+                <Icon name="star" size={16} /> Save as meal
               </button>
               {!isToday && (
                 <button
@@ -512,6 +516,7 @@ export default function Today() {
       </div>
 
       {editing && <EditSheet date={date} entry={editing} onClose={() => setEditing(null)} />}
+      {saving && <SaveMealSheet entries={saving} onClose={() => setSaving(null)} onSaved={() => { setSaving(null); setPicked(null); }} />}
     </>
   );
 }
@@ -745,6 +750,38 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
       >
         <Icon name="copy" size={16} /> Have it again now
       </button>
+    </Sheet>
+  );
+}
+
+/** Name the picked foods and save them as one favourite, so the whole meal logs in a tap. */
+function SaveMealSheet({ entries, onClose, onSaved }: { entries: Entry[]; onClose: () => void; onSaved: () => void }) {
+  const favourites = useStore((s) => s.favourites);
+  const unit = useStore((s) => s.settings.unit);
+  const first = new Date(Math.min(...entries.map((e) => e.at)));
+  const [name, setName] = useState(`My ${SECTION_LABEL[momentOf(first.getHours() + first.getMinutes() / 60)].toLowerCase()}`);
+  const food = combineAsFood(entries, name);
+  const taken = favourites.some((f) => f.name.toLowerCase() === food.name.toLowerCase());
+  const save = () => {
+    if (!food.name || taken) return;
+    useStore.getState().toggleFavourite(food);
+    toast(`Saved ${food.name} to favourites. It’s in Quick log now.`);
+    onSaved();
+  };
+  return (
+    <Sheet onClose={onClose} label="Save as meal">
+      <div className="stack" style={{ gap: 2 }}>
+        <span className="mono mut">{entries.length} foods as one favourite</span>
+        <h2 className="h2" style={{ fontSize: 26 }}>Save as meal</h2>
+      </div>
+      <label className="field">
+        <span>Name</span>
+        <input className="input" value={name} maxLength={40} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
+      </label>
+      {taken && <span className="small" style={{ color: 'var(--warn)' }}>You already have a favourite called {food.name}.</span>}
+      <p className="small mut" style={{ margin: 0 }}>{food.serving}</p>
+      <MacroGrid kcal={food.kcal} protein={food.protein} carbs={food.carbs} fat={food.fat} unit={unit} />
+      <button className="btn primary block" disabled={!food.name || taken} onClick={save}>Save to favourites</button>
     </Sheet>
   );
 }

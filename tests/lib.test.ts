@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
+import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -637,6 +637,14 @@ describe('protein per meal', () => {
     const e = (hhmm: string, protein: number): Entry => ({ id: hhmm, name: 'x', serving: '', base: { kcal: 100, protein, carbs: 0, fat: 0 }, qty: 1, source: 'db', at: atOn('2026-10-29', hhmm) });
     const secs = logSections([e('07:00', 15), e('07:10', 12), e('13:00', 20), e('19:00', 30)]);
     expect(proteinMeals(secs, 25)).toBe(2);
+  });
+});
+
+describe('combineAsFood', () => {
+  it('sums the foods into one serving and lists them', () => {
+    const e = (name: string, kcal: number, protein: number, qty = 1): Entry => ({ id: name, name, serving: '', base: { kcal, protein, carbs: 10, fat: 2.25 }, qty, source: 'db', at: 0 });
+    const f = combineAsFood([e('Oats', 300, 10), e('Banana ', 105, 1.3, 2)], ' My breakfast ');
+    expect(f).toMatchObject({ name: 'My breakfast', serving: '1 meal: Oats, 2× Banana', kcal: 510, protein: 12.6, carbs: 30, fat: 6.8 });
   });
 });
 

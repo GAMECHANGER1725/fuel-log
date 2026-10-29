@@ -1,9 +1,9 @@
 // "Usual meals": groups of foods you tend to log together, found from the log itself (nothing stored).
 // A group is two or more entries on one day each within `gapMin` minutes of the one before.
 
-import type { DayLog, Entry } from './types';
+import type { DayLog, Entry, Food } from './types';
 import { addDays } from './dates';
-import { energy, sumEntries } from './nutrition';
+import { energy, roundMacros, sumEntries } from './nutrition';
 import { momentOf, type Moment } from './foods';
 
 /**
@@ -273,3 +273,12 @@ export const mealProteinGoal = (weightKg: number): number => Math.min(40, Math.m
 
 /** How many parts of the day reached `goal` grams of protein. */
 export const proteinMeals = (sections: LogSection[], goal: number): number => sections.filter((s) => s.protein >= goal).length;
+
+/**
+ * Several logged foods as one food (e.g. "My breakfast"), with their totals as one serving, to save as
+ * a favourite. The serving lists what's in it. The store gives it a favourite id.
+ */
+export function combineAsFood(entries: Entry[], name: string): Food {
+  const parts = entries.map((e) => `${e.qty !== 1 ? `${e.qty}× ` : ''}${e.name.trim()}`).join(', ');
+  return { id: 'meal', name: name.trim(), serving: `1 meal: ${parts.length > 80 ? `${parts.slice(0, 79)}…` : parts}`, ...roundMacros(sumEntries(entries)) };
+}
