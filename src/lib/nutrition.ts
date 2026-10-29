@@ -43,6 +43,19 @@ export function energy(kcal: number, unit: 'kcal' | 'kJ'): string {
 
 export const fmt = (n: number) => Math.round(n).toLocaleString('en-AU');
 
+/**
+ * What a portion does to what's left of the day's targets: the share of the remaining energy and
+ * protein it covers (whole percents, capped at 100), and whether it goes past either target.
+ */
+export function coverage(portion: Macros, eaten: Macros, target: Macros) {
+  const pct = (part: number, left: number) => (left <= 0 ? null : Math.min(100, Math.round((part / left) * 100)));
+  return {
+    kcal: pct(portion.kcal, target.kcal - eaten.kcal),
+    protein: pct(portion.protein, target.protein - eaten.protein),
+    overKcal: eaten.kcal < target.kcal && eaten.kcal + portion.kcal > target.kcal * 1.1,
+  };
+}
+
 /** Which daily targets a change just pushed past (was under, now at or over). */
 export function targetsCrossed(before: Macros, after: Macros, target: Macros): { kcal: boolean; protein: boolean } {
   return { kcal: before.kcal < target.kcal && after.kcal >= target.kcal, protein: before.protein < target.protein && after.protein >= target.protein };
