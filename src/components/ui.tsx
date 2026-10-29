@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type TouchEvent } from 'react';
 import { create } from 'zustand';
 import { useStore, dataOf } from '../lib/store';
 import { computeGame } from '../lib/game';
@@ -233,6 +233,29 @@ export function useToday(): string {
     return () => clearInterval(t);
   }, []);
   return k;
+}
+
+/** Touch handlers for a quick horizontal swipe (mostly sideways, at least 70 px, under 600 ms). */
+export function useSwipe(onLeft: () => void, onRight: () => void) {
+  const start = useRef<{ x: number; y: number; t: number } | null>(null);
+  return {
+    onTouchStart: (e: TouchEvent) => {
+      const t = e.touches[0];
+      // Leave sideways gestures in inputs alone.
+      start.current = e.touches.length === 1 && !(e.target as HTMLElement).closest('input, textarea, select') ? { x: t.clientX, y: t.clientY, t: Date.now() } : null;
+    },
+    onTouchEnd: (e: TouchEvent) => {
+      const s = start.current;
+      start.current = null;
+      if (!s) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - s.x;
+      const dy = t.clientY - s.y;
+      if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6 || Date.now() - s.t > 600) return;
+      if (dx < 0) onLeft();
+      else onRight();
+    },
+  };
 }
 
 /** The current time, refreshed each minute, for "x min ago" text. */

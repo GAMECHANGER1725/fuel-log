@@ -5,7 +5,7 @@ import { searchProducts } from '../lib/off';
 import { energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
 import type { Food, Source } from '../lib/types';
-import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toastAdded, useEatenAt, useRoute, useToday } from '../components/ui';
+import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, toastAdded, useEatenAt, useRoute, useToday } from '../components/ui';
 import Scanner from '../components/Scanner';
 import AiSheet from '../components/AiSheet';
 import type { AiMode } from '../lib/ai';
@@ -20,6 +20,7 @@ export default function FoodPage() {
   const { params } = useRoute();
   const date = params.get('d') ?? today;
   const [q, setQ] = useState('');
+  const [tidy, setTidy] = useState<'fav' | 'recent' | null>(null); // which list shows remove buttons
   const [picked, setPicked] = useState<Picked | null>(null);
   // #/food?open=scan comes from the app-icon shortcut.
   const [sheet, setSheet] = useState<'scan' | 'manual' | AiMode | null>(params.get('open') === 'scan' ? 'scan' : null);
@@ -63,13 +64,23 @@ export default function FoodPage() {
     const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: foodMacros(f), qty: 1, source, foodId: f.id }], [f]);
     toastAdded(`Added ${f.name}`, XP.meal + (source === 'scan' ? XP.scan : 0), date, ids);
   };
-  const row = (f: Food, source: Source) => (
+  const row = (f: Food, source: Source, remove?: () => void) => (
     <div key={`${source}-${f.id}`} className="item">
       <button className="item-btn" onClick={() => setPicked({ food: f, source })}>
         <span>{f.name}</span>
         <span className="mono mut">{f.serving} · {energy(f.kcal, unit)} {unit} · {f.protein} g P{recipeFor(f, s.recipeEdits) ? ' · recipe' : ''}</span>
       </button>
-      <button className="btn icon" aria-label={`Add one ${f.name} now`} onClick={() => quickAdd(f, source)}>+</button>
+      {remove ? (
+        <button className="btn icon danger" aria-label={`Remove ${f.name} from this list`} onClick={remove}><Icon name="close" size={18} /></button>
+      ) : (
+        <button className="btn icon" aria-label={`Add one ${f.name} now`} onClick={() => quickAdd(f, source)}>+</button>
+      )}
+    </div>
+  );
+  const listHead = (title: string, list: 'fav' | 'recent') => (
+    <div className="between" style={{ marginBottom: 6, alignItems: 'center' }}>
+      <h2 className="h2">{title}</h2>
+      <button className="btn sm" aria-pressed={tidy === list} onClick={() => setTidy(tidy === list ? null : list)}>{tidy === list ? 'Done' : 'Edit'}</button>
     </div>
   );
 
@@ -144,13 +155,13 @@ export default function FoodPage() {
             )}
             {s.favourites.length > 0 && (
               <section>
-                <h2 className="h2" style={{ marginBottom: 6 }}>Favourites</h2>
-                {s.favourites.map((f) => row(f, f.barcode ? 'off' : 'db'))}
+                {listHead('Favourites', 'fav')}
+                {s.favourites.map((f) => row(f, f.barcode ? 'off' : 'db', tidy === 'fav' ? () => { s.toggleFavourite(f); toast(`Removed ${f.name} from favourites`, 0, { label: 'Undo', run: () => useStore.getState().toggleFavourite(f) }); } : undefined))}
               </section>
             )}
             <section>
-              <h2 className="h2" style={{ marginBottom: 6 }}>Recent</h2>
-              {s.recents.length ? s.recents.slice(0, 12).map((f) => row(f, f.barcode ? 'off' : 'db')) : <p className="empty">Foods you log show up here for one-tap adding.</p>}
+              {s.recents.length ? listHead('Recent', 'recent') : <h2 className="h2" style={{ marginBottom: 6 }}>Recent</h2>}
+              {s.recents.length ? s.recents.slice(0, 12).map((f) => row(f, f.barcode ? 'off' : 'db', tidy === 'recent' ? () => s.removeRecent(f.name) : undefined)) : <p className="empty">Foods you log show up here for one-tap adding.</p>}
             </section>
           </>
         )}

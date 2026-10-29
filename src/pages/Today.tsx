@@ -5,7 +5,7 @@ import { KJ, dayTotals, energy, entryMacros, fmt, paceGap, sinceLast, timeOf } f
 import { FOCUS_LABEL, FOODS, MOMENT_LABEL, gapFocus, gapSuggestions, momentOf, remaining } from '../lib/foods';
 import { XP } from '../lib/game';
 import type { Entry, Food } from '../lib/types';
-import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, toastAdded, useEatenAt, useGame, useNow, useRoute, useToday } from '../components/ui';
+import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, toastAdded, useEatenAt, useGame, useNow, useRoute, useSwipe, useToday } from '../components/ui';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card } from '../lib/prefs';
@@ -41,6 +41,8 @@ export default function Today() {
   const dayXp = g.byDate.get(date)?.xp ?? 0;
 
   const setDate = (k: string) => (window.location.hash = k === today ? '/today' : `/today?d=${k}`);
+  // Swipe right for the day before, left for the day after (not past today).
+  const swipe = useSwipe(() => !isToday && setDate(addDays(date, 1)), () => setDate(addDays(date, -1)));
   const now = new Date(useNow());
   const weekday = now.getDay() >= 1 && now.getDay() <= 5;
   const atSchool = isToday && weekday && now.getHours() >= 8 && now.getHours() < 15;
@@ -106,7 +108,7 @@ export default function Today() {
         </div>
       </header>
 
-      <div className="page">
+      <div className="page" {...swipe}>
         <div className="stack" style={{ gap: 6, marginTop: -2 }}>
           <div className="between">
             <span className="mono mut">{g.rank.name} · {fmt(g.into)} / {fmt(g.need)} XP</span>
