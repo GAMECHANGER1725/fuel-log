@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, lastQty, logSections, mealGroups } from '../src/lib/meals';
+import { daySummary, lastQty, logSections, mealGroups, weekStats } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -550,5 +550,26 @@ describe('usual amount and targets crossed', () => {
     const T = { kcal: 3000, protein: 115, carbs: 0, fat: 0 };
     expect(targetsCrossed({ kcal: 2900, protein: 100, carbs: 0, fat: 0 }, { kcal: 3100, protein: 110, carbs: 0, fat: 0 }, T)).toEqual({ kcal: true, protein: false });
     expect(targetsCrossed({ kcal: 3100, protein: 120, carbs: 0, fat: 0 }, { kcal: 3300, protein: 130, carbs: 0, fat: 0 }, T)).toEqual({ kcal: false, protein: false });
+  });
+});
+
+describe('your foods first and week stats', () => {
+  it('ranks your foods first among equal matches', () => {
+    const plain = searchFoods(FOODS, 'milk').map((f) => f.name);
+    const mine = searchFoods(FOODS, 'milk', 30, new Set(['soy milk'])).map((f) => f.name);
+    expect(plain[0]).not.toBe('Soy milk');
+    expect(mine.indexOf('Soy milk')).toBeLessThan(plain.indexOf('Soy milk'));
+    expect(mine[0]).toMatch(/^Milk/); // names that start with the query still come first
+  });
+  it('averages logged days and counts days on target', () => {
+    const start = '2026-10-26';
+    const e = (k: string, kcal: number, protein: number): Entry => ({ id: k, name: 'x', serving: '', base: { kcal, protein, carbs: 0, fat: 0 }, qty: 1, source: 'db', at: atOn(k, '12:00') });
+    const days = {
+      '2026-10-26': { entries: [e('2026-10-26', 3000, 120)], water: 0, checks: {} },
+      '2026-10-27': { entries: [e('2026-10-27', 2000, 80)], water: 0, checks: {} },
+      '2026-10-30': { entries: [e('2026-10-30', 3000, 120)], water: 0, checks: {} },
+    };
+    expect(weekStats(days, start, '2026-10-29', { kcal: 3000, protein: 115 })).toEqual({ logged: 2, hit: 1, kcal: 2500, protein: 100 });
+    expect(weekStats({}, start, '2026-10-29', { kcal: 3000, protein: 115 }).kcal).toBeNull();
   });
 });
