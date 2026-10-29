@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useStore } from '../lib/store';
-import { todayKey } from '../lib/dates';
+import { fmtDate, todayKey } from '../lib/dates';
 import { BROWSE, FOODS, browseFoods, foodMacros, searchFoods, type Browse } from '../lib/foods';
 import { searchProducts } from '../lib/off';
 import { coverage, dayTargets, dayTotals, energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
@@ -132,8 +132,9 @@ export default function FoodPage() {
     <>
       <header className="head">
         <div className="stack" style={{ gap: 2 }}>
-          <span className="mono mut">{date === today ? 'Logging now' : `Adding to ${date}`}</span>
+          <span className="mono mut">{date === today ? 'Logging now' : `Adding to ${fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short' })}`}</span>
           <h1 className="title">Add food</h1>
+          <StillToGo date={date} />
         </div>
         <button className="btn" onClick={back}>Done</button>
       </header>
@@ -427,5 +428,21 @@ function Coverage({ m, date }: { m: Macros; date: string }) {
     <p className="small" style={{ margin: 0, color: c.overKcal ? 'var(--warn)' : 'var(--mut)' }}>
       {c.overKcal ? 'This takes you well past your energy target for the day.' : `Covers ${parts} you still need.`}
     </p>
+  );
+}
+
+/** What's left of the day's targets (with a training-day boost), under the Add food title. */
+function StillToGo({ date }: { date: string }) {
+  const d = useStore((s) => s.days[date]);
+  const T = dayTargets(useStore((s) => s.settings.targets), d);
+  const unit = useStore((s) => s.settings.unit);
+  const t = dayTotals(d);
+  const k = T.kcal - t.kcal;
+  const p = T.protein - t.protein;
+  if (k <= 0 && p <= 0) return <span className="small fuel">Both targets hit</span>;
+  return (
+    <span className="small mut">
+      {[k > 0 && `${energy(k, unit)} ${unit}`, p > 0 && `${fmt(p)} g protein`].filter(Boolean).join(' · ')} to go
+    </span>
   );
 }
