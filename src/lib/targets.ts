@@ -96,6 +96,12 @@ export function weeklyNudge(d: AppData, today: string): Nudge | null {
 }
 
 /** Date you'd reach the goal weight at the current rate, or null. */
+/** How far from the start weight to the goal you are (0 to 1), or null without a goal above the start. */
+export function goalProgress(startKg: number, nowKg: number, goalKg: number | null): number | null {
+  if (!goalKg || goalKg <= startKg) return null;
+  return Math.max(0, Math.min(1, (nowKg - startKg) / (goalKg - startKg)));
+}
+
 export function projectedDate(currentKg: number, goalKg: number | null, rate: number | null, today: string): string | null {
   if (!goalKg || !rate || rate <= 0 || goalKg <= currentKg) return null;
   const weeks = (goalKg - currentKg) / rate;
