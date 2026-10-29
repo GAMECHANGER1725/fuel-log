@@ -282,3 +282,18 @@ export function combineAsFood(entries: Entry[], name: string): Food {
   const parts = entries.map((e) => `${e.qty !== 1 ? `${e.qty}× ` : ''}${e.name.trim()}`).join(', ');
   return { id: 'meal', name: name.trim(), serving: `1 meal: ${parts.length > 80 ? `${parts.slice(0, 79)}…` : parts}`, ...roundMacros(sumEntries(entries)) };
 }
+
+/**
+ * Roughly how much fluid the day's drinks added, in ml: any entry whose serving is in ml or L (milk, lassi,
+ * juice, shakes), times the amount. Bowls (dal, kadhi, soups) don't count.
+ * ponytail: reads the serving text, so a drink entered as "1 glass" isn't counted.
+ */
+export function drinkMl(entries: Entry[]): number {
+  let ml = 0;
+  for (const e of entries) {
+    const m = /(\d+(?:\.\d+)?)\s*(ml|l)\b/i.exec(e.serving);
+    if (!m || /bowl/i.test(e.serving)) continue;
+    ml += Number(m[1]) * (m[2].toLowerCase() === 'l' ? 1000 : 1) * e.qty;
+  }
+  return Math.round(ml);
+}

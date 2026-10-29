@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
-import { SECTION_LABEL, combineAsFood, daySummary, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals } from '../lib/meals';
+import { SECTION_LABEL, combineAsFood, daySummary, drinkMl, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals } from '../lib/meals';
 
 export default function Today() {
   const today = useToday();
@@ -404,6 +404,7 @@ export default function Today() {
             </button>
           ))}
         </div>
+        {drinkMl(day.entries) >= 100 && <p className="small mut" style={{ margin: '8px 0 0' }}>Plus about {(drinkMl(day.entries) / 1000).toFixed(1)} L from drinks you logged (milk, lassi, juice).</p>}
       </section>
     ),
     quality: (

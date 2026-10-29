@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
+import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -702,6 +702,13 @@ describe('planRest', () => {
   it('respects no-whey and stops when little is left', () => {
     expect(planRest(need, pool, { wheyOk: false })!.foods.map((x) => x.name)).not.toContain('Whey');
     expect(planRest({ kcal: 200, protein: 10, carbs: 0, fat: 0 }, pool, { wheyOk: true })).toBeNull();
+  });
+});
+
+describe('drinkMl', () => {
+  it('adds up drinks served in ml or L, not bowls or grams', () => {
+    const e = (serving: string, qty = 1): Entry => ({ id: serving, name: 'x', serving, base: { kcal: 100, protein: 1, carbs: 0, fat: 0 }, qty, source: 'db', at: 0 });
+    expect(drinkMl([e('300 ml glass'), e('large (~450 ml)', 2), e('1 bowl (250 ml)'), e('100 g'), e('1.5 L bottle'), e('1 glass')])).toBe(300 + 900 + 1500);
   });
 });
 
