@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29ze';
+export const NEWS_ID = '2026-10-29zf';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Fold a meal', 'Tap Breakfast, Lunch or any meal heading in the log to fold it away; its totals stay. Tap again to open it.'],
   ['Notes in Share this day', 'Sharing a day now includes the day note and any notes on foods.'],
   ['Choose your Progress cards', 'Hide the Progress cards you don’t use: tap Customise this page at the bottom of Progress.', '#/profile?open=progress'],
   ['Quick log your way', 'Show 6, 10 or 16 of your foods in Quick log, in one scrolling row or all at once.', '#/profile?open=today'],
