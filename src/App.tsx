@@ -15,7 +15,7 @@ import { startSync, useSync } from './lib/sync';
 import { autoDue, checkIn, useCoach } from './lib/coach';
 import { startReminders } from './lib/reminders';
 import { usePrefs } from './lib/prefs';
-import { dayTargets, dayTotals, targetsCrossed } from './lib/nutrition';
+import { badgeCount, dayTargets, dayTotals, targetsCrossed } from './lib/nutrition';
 
 export default function App() {
   const theme = useStore((s) => s.settings.theme);
@@ -72,6 +72,16 @@ export default function App() {
     }, 3000);
     return () => clearTimeout(t);
   }, [unlocked, hasKey, synced, auto, today]);
+
+  // What's left today on the home-screen icon, where the phone supports app badges (installed PWA).
+  // ponytail: set only while the app runs, so after midnight it shows yesterday's number until it's opened.
+  const badge = usePrefs((p) => p.badge);
+  const badgeNum = useStore((s) => badgeCount(badge, dayTargets(s.settings.targets, s.days[today]), dayTotals(s.days[today]), s.settings.unit));
+  useEffect(() => {
+    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    if (!nav.setAppBadge) return;
+    (unlocked && badgeNum ? nav.setAppBadge(badgeNum) : nav.clearAppBadge?.())?.catch(() => {});
+  }, [unlocked, badgeNum]);
 
   const online = useOnline();
   if (!unlocked) return <Lock />;

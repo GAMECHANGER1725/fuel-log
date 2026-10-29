@@ -4,6 +4,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { FOOD_SORTS, type FoodSort } from './foods';
+import type { BadgeMode } from './nutrition';
 
 export const CARDS = [
   ['train', 'Training day button'],
@@ -110,6 +111,9 @@ interface Prefs {
   /** Size of the water card's bottle button, in ml. */
   bottleMl: number;
   setBottleMl: (ml: number) => void;
+  /** What the home-screen icon's badge shows. */
+  badge: BadgeMode;
+  setBadge: (b: BadgeMode) => void;
   /** Lower-case names Close the gap shouldn't suggest. ponytail: per device, not synced. */
   noSuggest: string[];
   toggleSuggest: (name: string) => void;
@@ -137,6 +141,8 @@ export const usePrefs = create<Prefs>()(
       boostKcal: 300,
       noSuggest: [],
       bottleMl: 500,
+      badge: 'off',
+      setBadge: (badge) => set({ badge }),
       foodSort: 'match',
       setFoodSort: (foodSort) => set({ foodSort }),
       setBottleMl: (bottleMl) => set({ bottleMl }),
@@ -156,9 +162,9 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown };
         return {
           ...cur,
           hidden: cleanHidden(saved.hidden),
@@ -169,6 +175,7 @@ export const usePrefs = create<Prefs>()(
           ring: saved.ring === 'eaten' ? 'eaten' : 'left',
           boostKcal: BOOSTS.includes(saved.boostKcal as number) ? (saved.boostKcal as number) : 300,
           foodSort: cleanSort(saved.foodSort),
+          badge: saved.badge === 'protein' || saved.badge === 'kcal' ? saved.badge : 'off',
           bottleMl: BOTTLES.includes(saved.bottleMl as number) ? (saved.bottleMl as number) : 500,
           noSuggest: Array.isArray(saved.noSuggest) ? saved.noSuggest.filter((x): x is string => typeof x === 'string').map((x) => x.slice(0, 80)).slice(-200) : [],
         };

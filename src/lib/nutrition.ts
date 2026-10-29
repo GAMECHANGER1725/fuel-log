@@ -62,6 +62,16 @@ export function targetsCrossed(before: Macros, after: Macros, target: Macros): {
 }
 
 /** A day's targets: the usual ones plus that day's training-day boost on energy. */
+/** What the app icon's badge counts: nothing, grams of protein still to eat, or energy still to eat. */
+export type BadgeMode = 'off' | 'protein' | 'kcal';
+
+/** The badge number for what's left today (0 clears the badge). Energy is in the display unit. */
+export function badgeCount(mode: BadgeMode, target: Macros, eaten: Macros, unit: 'kcal' | 'kJ'): number {
+  if (mode === 'protein') return Math.max(0, Math.ceil(target.protein - eaten.protein));
+  if (mode === 'kcal') return Math.max(0, Math.round((target.kcal - eaten.kcal) * (unit === 'kJ' ? KJ : 1)));
+  return 0;
+}
+
 export const dayTargets = (targets: Macros, d: DayLog | undefined): Macros => (d?.boost ? { ...targets, kcal: targets.kcal + d.boost } : targets);
 
 /** Share of energy from protein, carbs and fat (4/4/9 kcal per g), as whole percents; null with nothing eaten. */

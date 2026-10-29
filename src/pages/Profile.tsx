@@ -4,7 +4,7 @@ import { RANKS, BOSS_XP, computeGame } from '../lib/game';
 import { suggestTargets } from '../lib/targets';
 import { DEFAULT_CHECKS, MAX_CHECKS, exportCsv, exportText, parseBackup } from '../lib/backup';
 import { AI_MODELS, GEMINI_MODELS, PROVIDER_NAME, friendlyError, hasAi, testKey, type Provider } from '../lib/ai';
-import { fmt, KJ } from '../lib/nutrition';
+import { fmt, KJ, type BadgeMode } from '../lib/nutrition';
 import { todayKey, fmtDate } from '../lib/dates';
 import type { AppData, Macros } from '../lib/types';
 import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
@@ -352,6 +352,12 @@ function DisplayForm() {
       <HiddenSuggestions />
       <span className="mono mut">Reminders</span>
       <ReminderToggle />
+      {'setAppBadge' in navigator && (
+        <>
+          <span className="mono mut">App icon badge (this device)</span>
+          <BadgePicker />
+        </>
+      )}
     </>
   );
 }
@@ -410,6 +416,20 @@ function ChecksForm() {
         {rows.length < MAX_CHECKS && <button className="btn sm" onClick={() => setRows([...rows, [newKey(), '']])}><Icon name="plus" size={14} /> Add a check</button>}
         <button className="btn sm" onClick={() => save(DEFAULT_CHECKS)}>Reset to default</button>
       </div>
+    </>
+  );
+}
+
+function BadgePicker() {
+  const { badge, setBadge } = usePrefs();
+  const unit = useStore((s) => s.settings.unit);
+  const items: [BadgeMode, string][] = [['off', 'Off'], ['protein', 'Protein left (g)'], ['kcal', `Energy left (${unit})`]];
+  return (
+    <>
+      <div className="row" style={{ flexWrap: 'wrap' }} role="group" aria-label="App icon badge">
+        {items.map(([id, label]) => <button key={id} className="chip" aria-pressed={badge === id} onClick={() => setBadge(id)}>{label}</button>)}
+      </div>
+      <span className="small mut">Shows on the home-screen icon while the app is installed. It updates when you open the app.</span>
     </>
   );
 }

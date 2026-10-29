@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coverage, dayTargets, dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCrossed } from '../src/lib/nutrition';
+import { badgeCount, coverage, dayTargets, dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCrossed } from '../src/lib/nutrition';
 import { foodDue, hourLabel, waterDue, wrapDue, wrapText } from '../src/lib/reminders';
 import { FOODS, browseFoods, planRest, proteinPer100kcal, sortFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
@@ -581,6 +581,18 @@ describe('usual amount and targets crossed', () => {
     const T = { kcal: 3000, protein: 115, carbs: 0, fat: 0 };
     expect(targetsCrossed({ kcal: 2900, protein: 100, carbs: 0, fat: 0 }, { kcal: 3100, protein: 110, carbs: 0, fat: 0 }, T)).toEqual({ kcal: true, protein: false });
     expect(targetsCrossed({ kcal: 3100, protein: 120, carbs: 0, fat: 0 }, { kcal: 3300, protein: 130, carbs: 0, fat: 0 }, T)).toEqual({ kcal: false, protein: false });
+  });
+});
+
+describe('app badge', () => {
+  it('counts what is left today, never below zero', () => {
+    const T = { kcal: 3000, protein: 115, carbs: 0, fat: 0 };
+    const eaten = { kcal: 2000, protein: 80.4, carbs: 0, fat: 0 };
+    expect(badgeCount('protein', T, eaten, 'kcal')).toBe(35);
+    expect(badgeCount('kcal', T, eaten, 'kcal')).toBe(1000);
+    expect(badgeCount('kcal', T, eaten, 'kJ')).toBe(4184);
+    expect(badgeCount('protein', T, { ...eaten, protein: 130 }, 'kcal')).toBe(0);
+    expect(badgeCount('off', T, eaten, 'kcal')).toBe(0);
   });
 });
 
