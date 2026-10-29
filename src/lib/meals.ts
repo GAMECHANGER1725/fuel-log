@@ -210,3 +210,38 @@ export function weekSummary(title: string, w: WeekStats, last: WeekStats, kgChan
   if (kgChange !== null) lines.push(`Weight trend: ${kgChange >= 0 ? '+' : ''}${kgChange.toFixed(2)} kg a week`);
   return lines.join('\n');
 }
+
+export interface TopFood {
+  name: string;
+  /** Times logged in the window. */
+  times: number;
+  /** Total protein (g) or energy (kcal) from it. */
+  value: number;
+  /** Share of everything eaten in the window, 0 to 1. */
+  share: number;
+}
+
+/**
+ * The foods that gave you the most protein or energy over the last `lookback` days (today included),
+ * grouped by name whatever the serving. Biggest first.
+ */
+export function topFoods(days: Record<string, DayLog>, today: string, by: 'protein' | 'kcal', lookback = 14, max = 5): TopFood[] {
+  const m = new Map<string, TopFood>();
+  let all = 0;
+  for (let i = 0; i < lookback; i++) {
+    for (const e of days[addDays(today, -i)]?.entries ?? []) {
+      const v = sumEntries([e])[by];
+      if (v <= 0) continue;
+      all += v;
+      const k = e.name.trim().toLowerCase();
+      const f = m.get(k) ?? { name: e.name.trim(), times: 0, value: 0, share: 0 };
+      f.times++;
+      f.value += v;
+      m.set(k, f);
+    }
+  }
+  return [...m.values()]
+    .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
+    .slice(0, max)
+    .map((f) => ({ ...f, share: f.value / all }));
+}

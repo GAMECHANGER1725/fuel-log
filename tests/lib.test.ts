@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary } from '../src/lib/meals';
+import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -593,6 +593,22 @@ describe('records', () => {
     };
     expect(records(days)).toEqual({ kcal: { date: '2026-10-20', value: 3400 }, protein: { date: '2026-10-21', value: 140 }, water: { date: '2026-10-21', value: 9 } });
     expect(records({})).toEqual({ kcal: null, protein: null, water: null });
+  });
+});
+
+describe('topFoods', () => {
+  it('ranks foods by what they gave over the window, grouped by name', () => {
+    const e = (k: string, name: string, kcal: number, protein: number, qty = 1): Entry => ({ id: k + name + qty, name, serving: '', base: { kcal, protein, carbs: 0, fat: 0 }, qty, source: 'db', at: atOn(k, '12:00') });
+    const days = {
+      '2026-10-29': { entries: [e('2026-10-29', 'Milk', 150, 8), e('2026-10-29', 'Paneer', 300, 20)], water: 0, checks: {} },
+      '2026-10-28': { entries: [e('2026-10-28', 'milk ', 150, 8, 2), e('2026-10-28', 'Water', 0, 0)], water: 0, checks: {} },
+      '2026-10-01': { entries: [e('2026-10-01', 'Whey', 120, 24)], water: 0, checks: {} }, // outside 14 days
+    };
+    const p = topFoods(days, '2026-10-29', 'protein');
+    expect(p.map((f) => [f.name, f.times, f.value])).toEqual([['Milk', 2, 24], ['Paneer', 1, 20]]);
+    expect(p[0].share).toBeCloseTo(24 / 44);
+    expect(topFoods(days, '2026-10-29', 'kcal')[0]).toMatchObject({ name: 'Milk', value: 450 });
+    expect(topFoods({}, '2026-10-29', 'kcal')).toEqual([]);
   });
 });
 
