@@ -501,7 +501,7 @@ export default function Today() {
                 )}
                 {yesterdayByNow !== null && (
                   <span className="mono dim" title="Energy eaten yesterday up to this time">
-                    {Math.abs(t.kcal - yesterdayByNow) < 50 ? 'Same as yesterday by now' : `${energy(Math.abs(t.kcal - yesterdayByNow), unit)} ${t.kcal > yesterdayByNow ? 'more' : 'less'} than yesterday by now`}
+                    {Math.abs(t.kcal - yesterdayByNow) < 50 ? 'Same as yesterday by now' : `${energy(Math.abs(t.kcal - yesterdayByNow), unit)} ${unit} ${t.kcal > yesterdayByNow ? 'more' : 'less'} than yesterday by now`}
                   </span>
                 )}
               </div>
