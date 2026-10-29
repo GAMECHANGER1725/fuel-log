@@ -31,7 +31,10 @@ export default function FoodPage() {
   const s = useStore();
   const unit = s.settings.unit;
 
-  const local = useMemo(() => searchFoods([...s.favourites, ...FOODS.map((f) => withEdit(f, s.recipeEdits))], q), [q, s.favourites, s.recipeEdits]);
+  const local = useMemo(() => {
+    const mine = new Set([...s.favourites, ...s.recents].map((f) => f.name.toLowerCase()));
+    return searchFoods([...s.favourites, ...FOODS.map((f) => withEdit(f, s.recipeEdits))], q, 30, mine);
+  }, [q, s.favourites, s.recents, s.recipeEdits]);
 
   // Open Food Facts search, debounced, only when online and the query is real.
   useEffect(() => {

@@ -6,6 +6,7 @@ import { projectedDate, trendLine, weeklyNudge, weeklyRate, withKcal } from '../
 
 import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
+import { weekStats } from '../lib/meals';
 import { hasAi } from '../lib/ai';
 import { Icon, Sheet, toast, useGame, useToday } from '../components/ui';
 
@@ -119,6 +120,8 @@ export default function Progress() {
           </div>
         </section>
 
+        <WeekCompare today={today} />
+
         <DailyChart today={today} />
 
         <section className="card">
@@ -165,6 +168,41 @@ export default function Progress() {
 
       {weighing && <WeighSheet today={today} onClose={() => setWeighing(false)} />}
     </>
+  );
+}
+
+/** This week so far next to last week: averages, days logged and days on target. */
+function WeekCompare({ today }: { today: string }) {
+  const days = useStore((s) => s.days);
+  const T = useStore((s) => s.settings.targets);
+  const unit = useStore((s) => s.settings.unit);
+  const thisWk = weekStats(days, weekStart(today), today, T);
+  const lastWk = weekStats(days, addDays(weekStart(today), -7), today, T);
+  if (!thisWk.logged && !lastWk.logged) return null;
+  const row = (label: string, a: number | null, b: number | null, show: (v: number) => string) => {
+    const diff = a !== null && b !== null ? a - b : null;
+    return (
+      <div className="item" style={{ padding: '8px 0' }}>
+        <span className="grow">{label}</span>
+        <span className="mono mut" style={{ width: 84, textAlign: 'right' }}>{b === null ? '–' : show(b)}</span>
+        <span className="num" style={{ width: 92, textAlign: 'right', fontSize: 18 }}>{a === null ? '–' : show(a)}</span>
+        <span className="mono" style={{ width: 22, textAlign: 'right', color: diff === null || Math.abs(diff) < 1e-9 ? 'var(--mut)' : diff > 0 ? 'var(--fuel)' : 'var(--warn)' }}>
+          {diff === null || Math.abs(diff) < 1e-9 ? '' : diff > 0 ? '▲' : '▼'}
+        </span>
+      </div>
+    );
+  };
+  return (
+    <section className="card">
+      <div className="between" style={{ marginBottom: 4 }}>
+        <h2 className="h2">This week vs last</h2>
+        <span className="mono dim">Last · This</span>
+      </div>
+      {row('Avg energy', thisWk.kcal, lastWk.kcal, (v) => `${energy(v, unit)}`)}
+      {row('Avg protein', thisWk.protein, lastWk.protein, (v) => `${fmt(v)} g`)}
+      {row('Days logged', thisWk.logged, lastWk.logged, (v) => String(v))}
+      {row('Days on target', thisWk.hit, lastWk.hit, (v) => String(v))}
+    </section>
   );
 }
 

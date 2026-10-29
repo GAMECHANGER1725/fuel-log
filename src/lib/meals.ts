@@ -111,3 +111,27 @@ export function daySummary(title: string, entries: Entry[], target: { kcal: numb
   }
   return lines.join('\n');
 }
+
+export interface WeekStats {
+  /** Days in the week with something logged (up to today). */
+  logged: number;
+  /** Logged days that reached both energy and protein targets. */
+  hit: number;
+  /** Averages over logged days; null with none. */
+  kcal: number | null;
+  protein: number | null;
+}
+
+/** Monday-to-Sunday stats from `start`, counting only days up to `today`. */
+export function weekStats(days: Record<string, DayLog>, start: string, today: string, target: { kcal: number; protein: number }): WeekStats {
+  const totals = Array.from({ length: 7 }, (_, i) => addDays(start, i))
+    .filter((k) => k <= today && days[k]?.entries.length)
+    .map((k) => sumEntries(days[k].entries));
+  const avg = (f: (t: (typeof totals)[number]) => number) => (totals.length ? totals.reduce((a, t) => a + f(t), 0) / totals.length : null);
+  return {
+    logged: totals.length,
+    hit: totals.filter((t) => t.kcal >= target.kcal && t.protein >= target.protein).length,
+    kcal: avg((t) => t.kcal),
+    protein: avg((t) => t.protein),
+  };
+}

@@ -201,7 +201,8 @@ export function wordForms(w: string): string[] {
   return [...new Set([w, one, ...(ALIASES[w] ?? []), ...(ALIASES[one] ?? [])])];
 }
 
-export function searchFoods(list: Food[], query: string, limit = 30): Food[] {
+/** `mine`: lower-case names of your favourites and recent foods, ranked first after exact-start matches. */
+export function searchFoods(list: Food[], query: string, limit = 30, mine: Set<string> = new Set()): Food[] {
   const words = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
   if (!words.length) return [];
   const q = words.join(' ');
@@ -211,7 +212,11 @@ export function searchFoods(list: Food[], query: string, limit = 30): Food[] {
       const hay = `${f.name} ${f.serving}`.toLowerCase();
       return forms.every((alts) => alts.some((a) => hay.includes(a)));
     })
-    .sort((a, b) => Number(b.name.toLowerCase().startsWith(q)) - Number(a.name.toLowerCase().startsWith(q)))
+    .sort(
+      (a, b) =>
+        Number(b.name.toLowerCase().startsWith(q)) - Number(a.name.toLowerCase().startsWith(q)) ||
+        Number(mine.has(b.name.toLowerCase())) - Number(mine.has(a.name.toLowerCase())),
+    )
     .slice(0, limit);
 }
 
