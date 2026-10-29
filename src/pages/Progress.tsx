@@ -23,6 +23,7 @@ export default function Progress() {
   const progressHidden = usePrefs((p) => p.progressHidden);
   const on = (c: ProgressCard) => !progressHidden.includes(c);
   const progressOrder = usePrefs((p) => p.progressOrder);
+  const weekGoal = usePrefs((p) => p.weekGoal);
 
   const line = trendLine(s.weighIns);
   const latest = line[line.length - 1];
@@ -135,13 +136,14 @@ export default function Progress() {
     ),
     averages: on('averages') && (
       <section className="card">
-        <h2 className="h2" style={{ marginBottom: 8 }}>Weekly averages</h2>
+        <h2 className="h2" style={{ marginBottom: weekGoal ? 2 : 8 }}>Weekly averages</h2>
+        {weekGoal > 0 && <p className="small mut" style={{ margin: '0 0 6px' }}>✓ = weekly goal met ({weekGoal} days on both targets)</p>}
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr .8fr .7fr', fontSize: 14 }}>
           {['Week of', unit, 'Protein', 'Water', 'Days'].map((h, i) => (
             <span key={h} className="mono dim" style={{ padding: '8px 0', fontSize: 10, textAlign: i ? 'right' : 'left' }}>{h}</span>
           ))}
           {weeks.map((w) => (
-            <WeekRow key={w.w} label={w.w === weekStart(today) ? 'This week' : fmtDate(w.w)} cells={[w.kcal === null ? '–' : energy(w.kcal, unit), w.protein === null ? '–' : `${fmt(w.protein)} g`, w.water === null ? '–' : `${w.water.toFixed(1)} L`, `${w.n}/7`]} />
+            <WeekRow key={w.w} label={`${w.w === weekStart(today) ? 'This week' : fmtDate(w.w)}${weekGoal && weekStats(s.days, w.w, today, s.settings.targets).hit >= weekGoal ? ' ✓' : ''}`} cells={[w.kcal === null ? '–' : energy(w.kcal, unit), w.protein === null ? '–' : `${fmt(w.protein)} g`, w.water === null ? '–' : `${w.water.toFixed(1)} L`, `${w.n}/7`]} />
           ))}
         </div>
       </section>
