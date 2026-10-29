@@ -245,3 +245,22 @@ export function topFoods(days: Record<string, DayLog>, today: string, by: 'prote
     .slice(0, max)
     .map((f) => ({ ...f, share: f.value / all }));
 }
+
+/**
+ * The most recent earlier day's foods for one part of the day (e.g. breakfast), so it can be logged
+ * again in a tap. null when today already has something then, or nothing turns up in `lookback` days.
+ */
+export function lastSection(days: Record<string, DayLog>, today: string, moment: Moment, lookback = 7): { date: string; entries: Entry[]; kcal: number; protein: number } | null {
+  const pick = (k: string) => logSections(days[k]?.entries ?? []).filter((s) => s.moment === moment);
+  if (pick(today).length) return null;
+  for (let i = 1; i <= lookback; i++) {
+    const date = addDays(today, -i);
+    const found = pick(date);
+    if (found.length) {
+      const entries = found.flatMap((s) => s.entries);
+      const t = sumEntries(entries);
+      return { date, entries, kcal: t.kcal, protein: t.protein };
+    }
+  }
+  return null;
+}

@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, topFoods } from '../src/lib/meals';
+import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, lastSection, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -609,6 +609,21 @@ describe('topFoods', () => {
     expect(p[0].share).toBeCloseTo(24 / 44);
     expect(topFoods(days, '2026-10-29', 'kcal')[0]).toMatchObject({ name: 'Milk', value: 450 });
     expect(topFoods({}, '2026-10-29', 'kcal')).toEqual([]);
+  });
+});
+
+describe('lastSection', () => {
+  it('finds the latest earlier day with food at that part of the day', () => {
+    const e = (k: string, hhmm: string, kcal: number): Entry => ({ id: k + hhmm, name: 'x', serving: '', base: { kcal, protein: 10, carbs: 0, fat: 0 }, qty: 1, source: 'db', at: atOn(k, hhmm) });
+    const days = {
+      '2026-10-29': { entries: [e('2026-10-29', '13:00', 500)], water: 0, checks: {} },
+      '2026-10-28': { entries: [e('2026-10-28', '19:00', 700)], water: 0, checks: {} },
+      '2026-10-27': { entries: [e('2026-10-27', '07:30', 400), e('2026-10-27', '08:00', 200), e('2026-10-27', '19:00', 900)], water: 0, checks: {} },
+    };
+    expect(lastSection(days, '2026-10-29', 'breakfast')).toMatchObject({ date: '2026-10-27', kcal: 600, protein: 20 });
+    expect(lastSection(days, '2026-10-29', 'dinner')).toMatchObject({ date: '2026-10-28', kcal: 700 });
+    expect(lastSection(days, '2026-10-29', 'lunch')).toBeNull(); // already had lunch today
+    expect(lastSection(days, '2026-10-29', 'late')).toBeNull();
   });
 });
 

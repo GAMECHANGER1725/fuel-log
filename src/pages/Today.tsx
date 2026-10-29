@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
-import { SECTION_LABEL, daySummary, lastQty, logSections } from '../lib/meals';
+import { SECTION_LABEL, daySummary, lastQty, lastSection, logSections } from '../lib/meals';
 
 export default function Today() {
   const today = useToday();
@@ -557,7 +557,11 @@ function QuickLog({ date }: { date: string }) {
   const seen = new Set<string>();
   const foods = [...favourites, ...recents].filter((f) => !seen.has(f.name.toLowerCase()) && seen.add(f.name.toLowerCase())).slice(0, 10);
   const today = useToday();
+  const now = useNow();
   const link = (open: string) => `#/food?open=${open}${date === today ? '' : `&d=${date}`}`;
+  const hour = new Date(now).getHours() + new Date(now).getMinutes() / 60;
+  const days = useStore((s) => s.days);
+  const again = date === today ? lastSection(days, today, momentOf(hour)) : null;
   return (
     <section className="stack" style={{ gap: 6 }}>
       <span className="mono mut">Quick log{foods.length ? ' · tap a food to add your usual amount' : ''}</span>
@@ -565,6 +569,20 @@ function QuickLog({ date }: { date: string }) {
         <a className="chip" href={link('scan')}><Icon name="barcode" size={16} /> Scan</a>
         <a className="chip" href={link('photo')}><Icon name="camera" size={16} /> Snap meal</a>
         <a className="chip" href={link('manual')}><Icon name="pencil" size={16} /> Numbers</a>
+        {again && (
+          <button
+            className="chip"
+            title={again.entries.map((e) => e.name).join(', ')}
+            onClick={() => {
+              const items = again.entries.map(({ name, serving, base, qty, source, foodId }) => ({ name, serving, base, qty, source, foodId }));
+              const ids = addEntries(date, items);
+              toastAdded(`Added ${SECTION_LABEL[momentOf(hour)].toLowerCase()} again (${items.length} food${items.length === 1 ? '' : 's'})`, Math.min(items.length, XP.mealCap) * XP.meal, date, ids);
+            }}
+          >
+            <Icon name="copy" size={16} /> {date === today && again.date === addDays(today, -1) ? 'Yesterday’s' : 'Last'} {SECTION_LABEL[momentOf(hour)].toLowerCase()}
+            <span className="mono fuel" style={{ fontSize: 11 }}>{energy(again.kcal, unit)}</span>
+          </button>
+        )}
         {foods.map((f) => (
           <button
             key={f.id + f.name}
