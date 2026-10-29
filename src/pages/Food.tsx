@@ -194,6 +194,7 @@ export default function FoodPage() {
               {tile('text', 'chat', 'Describe it', 'Type what you ate')}
             </div>
             <button className="btn dashed" onClick={() => setSheet('manual')}><Icon name="pencil" size={16} /> Enter numbers yourself</button>
+            <ShoppingList open={params.get('list') === '1'} />
             <div className="stack" style={{ gap: 6 }}>
               <span className="mono mut">Browse</span>
               <div className="quick" role="group" aria-label="Browse foods">
@@ -496,5 +497,47 @@ function StillToGo({ date }: { date: string }) {
     <span className="small mut">
       {[k > 0 && `${energy(k, unit)} ${unit}`, p > 0 && `${fmt(p)} g protein`].filter(Boolean).join(' · ')} to go
     </span>
+  );
+}
+
+/** Ingredients added from recipes; tap to tick off, then clear the ticked ones. Hidden while empty. */
+function ShoppingList({ open }: { open: boolean }) {
+  const list = usePrefs((p) => p.shopping);
+  const setList = usePrefs((p) => p.setShopping);
+  if (!list.length) return null;
+  const done = list.filter((x) => x.done).length;
+  return (
+    <details className="card tight" open={open || undefined}>
+      <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontWeight: 600 }}>
+        Shopping list <span className="mono mut">{done} / {list.length}</span>
+      </summary>
+      <div className="stack" style={{ gap: 0, paddingBottom: 6 }}>
+        {list.map((x, i) => (
+          <button
+            key={x.item}
+            className="item-btn"
+            aria-pressed={x.done}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, borderTop: i ? '1px solid var(--line)' : 0 }}
+            onClick={() => setList(list.map((y) => (y === x ? { ...y, done: !y.done } : y)))}
+          >
+            <span className={`check${x.done ? ' on' : ''}`}>{x.done && <Icon name="check" size={14} stroke={3.5} />}</span>
+            <span className="grow" style={x.done ? { color: 'var(--mut)', textDecoration: 'line-through' } : undefined}>{x.item}</span>
+            <span className="mono dim" style={{ maxWidth: '55%', textAlign: 'right' }}>{x.amounts.join(' + ')}</span>
+          </button>
+        ))}
+        <div className="row" style={{ marginTop: 8 }}>
+          <button className="btn sm grow" disabled={!done} onClick={() => setList(list.filter((x) => !x.done))}>Clear ticked</button>
+          <button
+            className="btn sm danger"
+            onClick={() => {
+              setList([]);
+              toast('Shopping list cleared', 0, { label: 'Undo', run: () => usePrefs.getState().setShopping(list) });
+            }}
+          >
+            Clear all
+          </button>
+        </div>
+      </div>
+    </details>
   );
 }

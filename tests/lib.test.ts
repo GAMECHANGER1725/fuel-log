@@ -11,7 +11,7 @@ import { findByBarcode, parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
-import { ORDER, cleanTags, pushSearch, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
+import { ORDER, addShopping, cleanShopping, cleanTags, pushSearch, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
 import { daySummary, rangeStats, usualNow, waterWeek, foodHistory, hasTag, searchLog, weekBalance, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
@@ -595,6 +595,23 @@ describe('note tags', () => {
     expect(toggleTag('felt great, gym ', 'Gym')).toBe('felt great');
     expect(hasTag('Rest day, tired', 'rest day')).toBe(true);
     expect(hasTag('Gymnastics', 'Gym')).toBe(false);
+  });
+});
+
+describe('shopping list', () => {
+  it('adds ingredients, merging repeats and unticking them', () => {
+    let l = addShopping([], [['200 g', 'Paneer'], ['1 cup', 'Milk']]);
+    l = l.map((x) => (x.item === 'Milk' ? { ...x, done: true } : x));
+    l = addShopping(l, [['250 ml', 'milk'], ['', '  '], ['40 g', 'rolled oats (½ cup)'], ['50 g', 'Rolled oats (⅔ cup)']]);
+    expect(l).toEqual([
+      { item: 'Paneer', amounts: ['200 g'], done: false },
+      { item: 'Milk', amounts: ['1 cup', '250 ml'], done: false },
+      { item: 'rolled oats', amounts: ['40 g (½ cup)', '50 g (⅔ cup)'], done: false },
+    ]);
+  });
+  it('cleans a saved list', () => {
+    expect(cleanShopping([{ item: 'Oats', amounts: ['50 g', 3], done: 1 }, { item: '' }, null, 'x'])).toEqual([{ item: 'Oats', amounts: ['50 g'], done: false }]);
+    expect(cleanShopping('nope')).toEqual([]);
   });
 });
 

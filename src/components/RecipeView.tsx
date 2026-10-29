@@ -5,6 +5,7 @@ import { friendlyError, hasAi } from '../lib/ai';
 import { energy } from '../lib/nutrition';
 import { useStore } from '../lib/store';
 import { Icon, go, toast } from './ui';
+import { addShopping, usePrefs } from '../lib/prefs';
 
 /** Ingredients with exact amounts, then numbered steps. For one serving. `editable` adds "Edit with AI". */
 export default function RecipeView({ recipe, editable = false }: { recipe: Recipe; editable?: boolean }) {
@@ -24,6 +25,17 @@ export default function RecipeView({ recipe, editable = false }: { recipe: Recip
             </li>
           ))}
         </ul>
+        <button
+          className="btn sm"
+          style={{ marginTop: 6 }}
+          onClick={() => {
+            const p = usePrefs.getState();
+            p.setShopping(addShopping(p.shopping, recipe.lines.map(([, , amount, item]) => [amount, item])));
+            toast(`Added ${recipe.lines.length} ingredient${recipe.lines.length === 1 ? '' : 's'} to your shopping list`, 0, { label: 'View', run: () => go('food?list=1') });
+          }}
+        >
+          <Icon name="plus" size={14} /> Shopping list
+        </button>
       </div>
       <div>
         <span className="mono fuel">Method</span>

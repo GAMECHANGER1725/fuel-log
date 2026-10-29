@@ -119,6 +119,42 @@ export function pushSearch(list: string[], q: string, max = 6): string[] {
   return [t, ...list.filter((x) => x.toLowerCase() !== t.toLowerCase())].slice(0, max);
 }
 
+/** A shopping list line: one ingredient, with the amount each added recipe needs. */
+export interface ShopItem {
+  item: string;
+  amounts: string[];
+  done: boolean;
+}
+
+/**
+ * Add recipe ingredients ([amount, item]) to the list; an item already there gets the amount added and is unticked.
+ * A trailing note in brackets ("rolled oats (½ cup)") moves to the amount, so the same ingredient merges.
+ */
+export function addShopping(list: ShopItem[], lines: [amount: string, item: string][]): ShopItem[] {
+  const out = list.map((x) => ({ ...x, amounts: [...x.amounts] }));
+  for (const [rawAmount, raw] of lines) {
+    const m = /^(.*?)\s*\(([^()]*)\)\s*$/.exec(raw.trim());
+    const item = (m ? m[1] : raw).trim().slice(0, 60);
+    if (!item) continue;
+    const amount = [rawAmount.trim(), m ? `(${m[2].trim()})` : ''].filter(Boolean).join(' ').slice(0, 30);
+    const have = out.find((x) => x.item.toLowerCase() === item.toLowerCase());
+    if (have) {
+      have.amounts = [...have.amounts, amount].filter(Boolean).slice(-6);
+      have.done = false;
+    } else out.push({ item, amounts: [amount].filter(Boolean), done: false });
+  }
+  return out.slice(-60);
+}
+
+/** Saved list (untrusted): known shape only. */
+export const cleanShopping = (v: unknown): ShopItem[] =>
+  Array.isArray(v)
+    ? v
+        .filter((x): x is ShopItem => !!x && typeof x.item === 'string' && x.item.trim() !== '' && Array.isArray(x.amounts))
+        .map((x) => ({ item: x.item.slice(0, 60), amounts: x.amounts.filter((a): a is string => typeof a === 'string').slice(-6), done: x.done === true }))
+        .slice(-60)
+    : [];
+
 export const cleanSort = (v: unknown): FoodSort => FOOD_SORTS.find(([id]) => id === v)?.[0] ?? 'match';
 
 export const cleanAccent = (v: unknown): Accent => ACCENTS.find(([id]) => id === v)?.[0] ?? 'ember';
@@ -149,6 +185,9 @@ interface Prefs {
   /** Days after a weigh-in before Today asks for the next. */
   weighEvery: number;
   setWeighEvery: (d: number) => void;
+  /** Recipe ingredients to buy. ponytail: per device, not synced. */
+  shopping: ShopItem[];
+  setShopping: (l: ShopItem[]) => void;
   /** Page the app opens on when launched without one (e.g. from the home-screen icon). */
   start: Start;
   setStart: (s: Start) => void;
@@ -189,6 +228,8 @@ export const usePrefs = create<Prefs>()(
       badge: 'off',
       weighEvery: 7,
       start: 'today',
+      shopping: [],
+      setShopping: (shopping) => set({ shopping }),
       setStart: (start) => set({ start }),
       setWeighEvery: (weighEvery) => set({ weighEvery }),
       tags: [...NOTE_TAGS],
@@ -216,9 +257,9 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches, weighEvery: s.weighEvery, start: s.start }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches, weighEvery: s.weighEvery, start: s.start, shopping: s.shopping }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown; weighEvery?: unknown; start?: unknown };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown; weighEvery?: unknown; start?: unknown; shopping?: unknown };
         return {
           ...cur,
           hidden: cleanHidden(saved.hidden),
@@ -230,6 +271,7 @@ export const usePrefs = create<Prefs>()(
           boostKcal: BOOSTS.includes(saved.boostKcal as number) ? (saved.boostKcal as number) : 300,
           foodSort: cleanSort(saved.foodSort),
           tags: cleanTags(saved.tags),
+          shopping: cleanShopping(saved.shopping),
           start: STARTS.find(([id]) => id === saved.start)?.[0] ?? 'today',
           weighEvery: WEIGH_EVERY.includes(saved.weighEvery as number) ? (saved.weighEvery as number) : 7,
           searches: Array.isArray(saved.searches) ? saved.searches.filter((x): x is string => typeof x === 'string').reduceRight((a: string[], x) => pushSearch(a, x), []) : [],
