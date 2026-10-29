@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useStore } from '../lib/store';
 import { addDays, fmtDate, hhmmOf, weekStart } from '../lib/dates';
 import { KJ, dayTotals, energy, energySplit, entryMacros, fmt, paceGap, sinceLast, timeOf } from '../lib/nutrition';
@@ -8,7 +8,7 @@ import type { Entry, Food } from '../lib/types';
 import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, toastAdded, useEatenAt, useGame, useNow, useRoute, useSwipe, useToday } from '../components/ui';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
-import { usePrefs, type Card } from '../lib/prefs';
+import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
 import { SECTION_LABEL, daySummary, logSections } from '../lib/meals';
 
 const CHECKS: [string, string][] = [
@@ -29,6 +29,7 @@ export default function Today() {
   const [round, setRound] = useState(0); // how many times Close the gap was refreshed
   const [open, setOpen] = useState<string | null>(null); // which idea's recipe is showing
   const hidden = usePrefs((p) => p.hidden);
+  const order = usePrefs((p) => p.order);
   const show = (c: Card) => !hidden.includes(c);
 
   const day = s.days[date] ?? { entries: [], water: 0, checks: {} };
@@ -76,6 +77,210 @@ export default function Today() {
     if (day.water < waterGoal && day.water + n >= waterGoal) toast('Water goal hit', XP.water);
   };
   const addHref = `#/food${isToday ? '' : `?d=${date}`}`;
+
+  // Today's movable cards, keyed by id; their order and visibility come from per-device prefs.
+  const cards: Record<OrderCard, ReactNode> = {
+    quick: show('quick') && <QuickLog date={date} />,
+    week: show('week') && <WeekStrip date={date} today={today} onPick={setDate} />,
+    quests: (
+      isToday && show('quests') && (
+        <section className="card">
+          <div className="between" style={{ marginBottom: 10 }}>
+            <h2 className="h2">Daily quests</h2>
+            <span className="mono mut">{g.quests.filter((q) => q.isDone).length} / 3 done</span>
+          </div>
+          {g.quests.map((q) => (
+            <div key={q.id} className="item" style={{ padding: '10px 0' }}>
+              <span className={`check${q.isDone ? ' on' : ''}`}>{q.isDone && <Icon name="check" size={14} stroke={3.5} />}</span>
+              <span className="grow" style={q.isDone ? { color: 'var(--mut)', textDecoration: 'line-through' } : undefined}>{q.title}</span>
+              <span className={`mono ${q.isDone ? 'fuel' : 'mut'}`}>+{q.xp} XP</span>
+            </div>
+          ))}
+        </section>
+      )
+    ),
+    gap: (
+      gap.length > 0 && (
+        <section className="card hot">
+          <div className="between" style={{ alignItems: 'center' }}>
+            <h2 className="h2">Close the gap</h2>
+            <button
+              className="btn dark sm"
+              aria-label="Show different ideas"
+              onClick={() => {
+                setRound(round + 1);
+                setOpen(null);
+              }}
+            >
+              <Icon name="refresh" size={16} /> Refresh
+            </button>
+          </div>
+          <p className="small" style={{ margin: '6px 0 12px' }}>
+            {energy(Math.max(0, kLeft), unit)} {unit} and {fmt(Math.max(0, pLeft))} g protein to go. Ideas for <b>{MOMENT_LABEL[momentOf(hour)]}</b>{focus && <>, heavy on <b>{FOCUS_LABEL[focus]}</b> because it’s your lowest</>}.{atSchool ? ' These are easy to eat at school.' : ''} Tap an idea for the recipe, or + to log it.
+          </p>
+          <div className="stack">
+            {gap.map((f) => {
+              const recipe = recipeFor(f, s.recipeEdits);
+              const isOpen = open === f.id;
+              return (
+                <div key={f.id} className="stack" style={{ gap: 6 }}>
+                  <div className="row" style={{ gap: 6 }}>
+                    <button
+                      className="btn dark grow"
+                      aria-expanded={isOpen}
+                      style={{ justifyContent: 'space-between', minHeight: 48, fontWeight: 500, whiteSpace: 'normal', textAlign: 'left', gap: 8 }}
+                      onClick={() => setOpen(isOpen ? null : f.id)}
+                    >
+                      <span>{f.name}</span>
+                      <span className="row" style={{ gap: 8, flex: 'none' }}>
+                        <span className="mono fuel">{energy(f.kcal, unit)} · {f.protein} g</span>
+                        <span style={{ display: 'flex', transform: isOpen ? 'rotate(90deg)' : undefined, transition: 'transform .15s' }}><Icon name="right" size={16} /></span>
+                      </span>
+                    </button>
+                    <button className="btn dark icon" aria-label={`Log ${f.name}`} onClick={() => addFood(f)}>+</button>
+                  </div>
+                  {isOpen && (
+                    <div className="stack" style={{ background: 'var(--s1)', color: 'var(--ink)', borderRadius: 18, padding: 14, gap: 12 }}>
+                      {recipe ? <RecipeView recipe={recipe} editable /> : <p className="small mut">Nothing to make: {f.serving}.</p>}
+                      <button className="btn primary block" onClick={() => addFood(f)}>Log it · +{XP.meal} XP</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <a href="#/coach" className="btn dark block" style={{ marginTop: 10 }}>
+            <Icon name="bolt" size={18} /> 5, 10 and 20 min ideas from your coach
+          </a>
+        </section>
+      )
+    ),
+    log: (
+      <>
+        <section className="stack" style={{ marginTop: 8 }}>
+          <div className="between" style={{ alignItems: 'center' }}>
+            <div className="stack" style={{ gap: 0 }}>
+              <h2 className="h2">Log</h2>
+              {ago && <span className="mono mut">Last ate {ago}{ago === 'just now' ? '' : ' ago'}</span>}
+            </div>
+            <div className="row" style={{ gap: 6 }}>
+            <label className="btn sm date-pick">
+              <Icon name="copy" size={16} /> Copy from…
+              <input
+                type="date"
+                aria-label="Copy everything from another day"
+                max={addDays(date, -1)}
+                value=""
+                onChange={(e) => {
+                  const from = e.target.value;
+                  if (!from || from >= date) return;
+                  const n = s.copyDay(from, date);
+                  toast(n ? `Copied ${n} item${n === 1 ? '' : 's'} from ${fmtDate(from, { weekday: 'short', day: 'numeric', month: 'short' })}` : 'Nothing logged that day', Math.min(n, XP.mealCap) * XP.meal);
+                }}
+              />
+            </label>
+            {(s.days[addDays(date, -1)]?.entries.length ?? 0) > 0 && (
+              <button
+                className="btn sm"
+                onClick={() => {
+                  const n = s.copyDay(addDays(date, -1), date);
+                  toast(`Copied ${n} item${n === 1 ? '' : 's'} from the day before`, Math.min(n, XP.mealCap) * XP.meal);
+                }}
+              >
+                Yesterday
+              </button>
+            )}
+            </div>
+          </div>
+          {sections.length > 0 ? (
+            <div className="card tight">
+              {sections.map((sec, si) => (
+                <div key={sec.entries[0].id} style={si ? { borderTop: '1px solid var(--line2)', marginTop: 4, paddingTop: 4 } : undefined}>
+                  <div className="between" style={{ padding: '8px 0 2px' }}>
+                    <span className="mono fuel">{SECTION_LABEL[sec.moment]}</span>
+                    <span className="mono dim">{energy(sec.kcal, unit)} {unit} · {fmt(sec.protein)} g</span>
+                  </div>
+                  {sec.entries.map((e, i) => (
+                    <button key={e.id} className="item-btn" style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, borderTop: i ? '1px solid var(--line)' : 0 }} onClick={() => setEditing(e)}>
+                      <span className="mono dim" style={{ width: 64, flex: 'none' }}>{timeOf(e.at)}</span>
+                      <span className="grow">{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
+                      <span className="mono mut" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)} · {fmt(entryMacros(e).protein)} g</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="empty">Nothing logged {isToday ? 'yet today' : 'this day'}.</p>
+          )}
+          <a href={addHref} className="btn primary block"><Icon name="plus" size={18} stroke={3} /> Add food</a>
+          {sections.length > 0 && (
+            <button
+              className="btn sm"
+              style={{ alignSelf: 'center' }}
+              onClick={async () => {
+                const text = daySummary(fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long' }), day.entries, T, unit, timeOf);
+                try {
+                  if (navigator.share) await navigator.share({ text });
+                  else {
+                    await navigator.clipboard.writeText(text);
+                    toast('Day summary copied');
+                  }
+                } catch (e) {
+                  if ((e as Error).name !== 'AbortError') toast('Could not share. Try again.');
+                }
+              }}
+            >
+              <Icon name="copy" size={14} /> Share this day
+            </button>
+          )}
+        </section>
+      </>
+    ),
+    note: show('note') && <DayNote date={date} note={day.note ?? ''} />,
+    water: (
+      show('water') && <section className="card">
+        <div className="between" style={{ alignItems: 'center' }}>
+          <div className="stack" style={{ gap: 2 }}>
+            <span className="mono mut">Water</span>
+            <span><span className="num" style={{ fontSize: 24 }}>{(day.water * 0.25).toFixed(2).replace(/0$/, '')}</span><span className="mut small"> / {s.settings.waterL} L</span></span>
+          </div>
+          <div className="row">
+            <button className="btn icon" aria-label="Remove a glass" onClick={() => s.setWater(date, day.water - 1)}>−</button>
+            <button className="btn sm" aria-label="Add a 500 ml bottle" onClick={() => addWater(2)}>+500 ml</button>
+            <button className="btn icon ink" aria-label="Add a 250 ml glass" onClick={() => addWater(1)}>+</button>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(waterGoal, day.water)}, minmax(0,1fr))`, gap: 4, marginTop: 12 }}>
+          {Array.from({ length: Math.max(waterGoal, day.water) }, (_, i) => (
+            <div key={i} style={{ height: 10, background: i < day.water ? 'var(--pro)' : 'var(--track)' }} />
+          ))}
+        </div>
+      </section>
+    ),
+    quality: (
+      show('quality') && <section className="card">
+        <span className="mono mut">Food quality · +5 XP each</span>
+        <div className="row" style={{ flexWrap: 'wrap', marginTop: 10 }}>
+          {CHECKS.map(([k, label]) => (
+            <button key={k} className="chip" aria-pressed={!!day.checks[k]} onClick={() => s.toggleCheck(date, k)}>{label}</button>
+          ))}
+        </div>
+      </section>
+    ),
+    tips: (
+      show('tips') && <details className="card">
+        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Ways to eat more without feeling stuffed</summary>
+        <ul className="small mut" style={{ paddingLeft: 18, margin: '10px 0 0', display: 'grid', gap: 6 }}>
+          <li>Add a snack or a drink before making meals bigger. Three meals plus two or three snacks is easier than three huge meals.</li>
+          <li>Drink some calories: a milk, banana, oats and peanut butter smoothie is about 540 kcal.</li>
+          <li>Put energy-dense foods on what you already eat: ghee on rotli, peanut butter on toast, cheese and avocado in sandwiches.</li>
+          <li>Keep a snack in your school bag so recess and after school never get skipped.</li>
+          <li>Build up over 2 to 3 weeks. Jumping to a big target overnight usually backfires.</li>
+        </ul>
+      </details>
+    ),
+  };
 
   return (
     <>
@@ -173,200 +378,7 @@ export default function Today() {
           </a>
         )}
 
-        {show('quick') && <QuickLog date={date} />}
-
-        {show('week') && <WeekStrip date={date} today={today} onPick={setDate} />}
-
-        {isToday && show('quests') && (
-          <section className="card">
-            <div className="between" style={{ marginBottom: 10 }}>
-              <h2 className="h2">Daily quests</h2>
-              <span className="mono mut">{g.quests.filter((q) => q.isDone).length} / 3 done</span>
-            </div>
-            {g.quests.map((q) => (
-              <div key={q.id} className="item" style={{ padding: '10px 0' }}>
-                <span className={`check${q.isDone ? ' on' : ''}`}>{q.isDone && <Icon name="check" size={14} stroke={3.5} />}</span>
-                <span className="grow" style={q.isDone ? { color: 'var(--mut)', textDecoration: 'line-through' } : undefined}>{q.title}</span>
-                <span className={`mono ${q.isDone ? 'fuel' : 'mut'}`}>+{q.xp} XP</span>
-              </div>
-            ))}
-          </section>
-        )}
-
-        {gap.length > 0 && (
-          <section className="card hot">
-            <div className="between" style={{ alignItems: 'center' }}>
-              <h2 className="h2">Close the gap</h2>
-              <button
-                className="btn dark sm"
-                aria-label="Show different ideas"
-                onClick={() => {
-                  setRound(round + 1);
-                  setOpen(null);
-                }}
-              >
-                <Icon name="refresh" size={16} /> Refresh
-              </button>
-            </div>
-            <p className="small" style={{ margin: '6px 0 12px' }}>
-              {energy(Math.max(0, kLeft), unit)} {unit} and {fmt(Math.max(0, pLeft))} g protein to go. Ideas for <b>{MOMENT_LABEL[momentOf(hour)]}</b>{focus && <>, heavy on <b>{FOCUS_LABEL[focus]}</b> because it’s your lowest</>}.{atSchool ? ' These are easy to eat at school.' : ''} Tap an idea for the recipe, or + to log it.
-            </p>
-            <div className="stack">
-              {gap.map((f) => {
-                const recipe = recipeFor(f, s.recipeEdits);
-                const isOpen = open === f.id;
-                return (
-                  <div key={f.id} className="stack" style={{ gap: 6 }}>
-                    <div className="row" style={{ gap: 6 }}>
-                      <button
-                        className="btn dark grow"
-                        aria-expanded={isOpen}
-                        style={{ justifyContent: 'space-between', minHeight: 48, fontWeight: 500, whiteSpace: 'normal', textAlign: 'left', gap: 8 }}
-                        onClick={() => setOpen(isOpen ? null : f.id)}
-                      >
-                        <span>{f.name}</span>
-                        <span className="row" style={{ gap: 8, flex: 'none' }}>
-                          <span className="mono fuel">{energy(f.kcal, unit)} · {f.protein} g</span>
-                          <span style={{ display: 'flex', transform: isOpen ? 'rotate(90deg)' : undefined, transition: 'transform .15s' }}><Icon name="right" size={16} /></span>
-                        </span>
-                      </button>
-                      <button className="btn dark icon" aria-label={`Log ${f.name}`} onClick={() => addFood(f)}>+</button>
-                    </div>
-                    {isOpen && (
-                      <div className="stack" style={{ background: 'var(--s1)', color: 'var(--ink)', borderRadius: 18, padding: 14, gap: 12 }}>
-                        {recipe ? <RecipeView recipe={recipe} editable /> : <p className="small mut">Nothing to make: {f.serving}.</p>}
-                        <button className="btn primary block" onClick={() => addFood(f)}>Log it · +{XP.meal} XP</button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <a href="#/coach" className="btn dark block" style={{ marginTop: 10 }}>
-              <Icon name="bolt" size={18} /> 5, 10 and 20 min ideas from your coach
-            </a>
-          </section>
-        )}
-
-        <section className="stack" style={{ marginTop: 8 }}>
-          <div className="between" style={{ alignItems: 'center' }}>
-            <div className="stack" style={{ gap: 0 }}>
-              <h2 className="h2">Log</h2>
-              {ago && <span className="mono mut">Last ate {ago}{ago === 'just now' ? '' : ' ago'}</span>}
-            </div>
-            <div className="row" style={{ gap: 6 }}>
-            <label className="btn sm date-pick">
-              <Icon name="copy" size={16} /> Copy from…
-              <input
-                type="date"
-                aria-label="Copy everything from another day"
-                max={addDays(date, -1)}
-                value=""
-                onChange={(e) => {
-                  const from = e.target.value;
-                  if (!from || from >= date) return;
-                  const n = s.copyDay(from, date);
-                  toast(n ? `Copied ${n} item${n === 1 ? '' : 's'} from ${fmtDate(from, { weekday: 'short', day: 'numeric', month: 'short' })}` : 'Nothing logged that day', Math.min(n, XP.mealCap) * XP.meal);
-                }}
-              />
-            </label>
-            {(s.days[addDays(date, -1)]?.entries.length ?? 0) > 0 && (
-              <button
-                className="btn sm"
-                onClick={() => {
-                  const n = s.copyDay(addDays(date, -1), date);
-                  toast(`Copied ${n} item${n === 1 ? '' : 's'} from the day before`, Math.min(n, XP.mealCap) * XP.meal);
-                }}
-              >
-                Yesterday
-              </button>
-            )}
-            </div>
-          </div>
-          {sections.length > 0 ? (
-            <div className="card tight">
-              {sections.map((sec, si) => (
-                <div key={sec.entries[0].id} style={si ? { borderTop: '1px solid var(--line2)', marginTop: 4, paddingTop: 4 } : undefined}>
-                  <div className="between" style={{ padding: '8px 0 2px' }}>
-                    <span className="mono fuel">{SECTION_LABEL[sec.moment]}</span>
-                    <span className="mono dim">{energy(sec.kcal, unit)} {unit} · {fmt(sec.protein)} g</span>
-                  </div>
-                  {sec.entries.map((e, i) => (
-                    <button key={e.id} className="item-btn" style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, borderTop: i ? '1px solid var(--line)' : 0 }} onClick={() => setEditing(e)}>
-                      <span className="mono dim" style={{ width: 64, flex: 'none' }}>{timeOf(e.at)}</span>
-                      <span className="grow">{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
-                      <span className="mono mut" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)} · {fmt(entryMacros(e).protein)} g</span>
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="empty">Nothing logged {isToday ? 'yet today' : 'this day'}.</p>
-          )}
-          <a href={addHref} className="btn primary block"><Icon name="plus" size={18} stroke={3} /> Add food</a>
-          {sections.length > 0 && (
-            <button
-              className="btn sm"
-              style={{ alignSelf: 'center' }}
-              onClick={async () => {
-                const text = daySummary(fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long' }), day.entries, T, unit, timeOf);
-                try {
-                  if (navigator.share) await navigator.share({ text });
-                  else {
-                    await navigator.clipboard.writeText(text);
-                    toast('Day summary copied');
-                  }
-                } catch (e) {
-                  if ((e as Error).name !== 'AbortError') toast('Could not share. Try again.');
-                }
-              }}
-            >
-              <Icon name="copy" size={14} /> Share this day
-            </button>
-          )}
-        </section>
-
-        {show('note') && <DayNote date={date} note={day.note ?? ''} />}
-
-        {show('water') && <section className="card">
-          <div className="between" style={{ alignItems: 'center' }}>
-            <div className="stack" style={{ gap: 2 }}>
-              <span className="mono mut">Water</span>
-              <span><span className="num" style={{ fontSize: 24 }}>{(day.water * 0.25).toFixed(2).replace(/0$/, '')}</span><span className="mut small"> / {s.settings.waterL} L</span></span>
-            </div>
-            <div className="row">
-              <button className="btn icon" aria-label="Remove a glass" onClick={() => s.setWater(date, day.water - 1)}>−</button>
-              <button className="btn sm" aria-label="Add a 500 ml bottle" onClick={() => addWater(2)}>+500 ml</button>
-              <button className="btn icon ink" aria-label="Add a 250 ml glass" onClick={() => addWater(1)}>+</button>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(waterGoal, day.water)}, minmax(0,1fr))`, gap: 4, marginTop: 12 }}>
-            {Array.from({ length: Math.max(waterGoal, day.water) }, (_, i) => (
-              <div key={i} style={{ height: 10, background: i < day.water ? 'var(--pro)' : 'var(--track)' }} />
-            ))}
-          </div>
-        </section>}
-
-        {show('quality') && <section className="card">
-          <span className="mono mut">Food quality · +5 XP each</span>
-          <div className="row" style={{ flexWrap: 'wrap', marginTop: 10 }}>
-            {CHECKS.map(([k, label]) => (
-              <button key={k} className="chip" aria-pressed={!!day.checks[k]} onClick={() => s.toggleCheck(date, k)}>{label}</button>
-            ))}
-          </div>
-        </section>}
-
-        {show('tips') && <details className="card">
-          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Ways to eat more without feeling stuffed</summary>
-          <ul className="small mut" style={{ paddingLeft: 18, margin: '10px 0 0', display: 'grid', gap: 6 }}>
-            <li>Add a snack or a drink before making meals bigger. Three meals plus two or three snacks is easier than three huge meals.</li>
-            <li>Drink some calories: a milk, banana, oats and peanut butter smoothie is about 540 kcal.</li>
-            <li>Put energy-dense foods on what you already eat: ghee on rotli, peanut butter on toast, cheese and avocado in sandwiches.</li>
-            <li>Keep a snack in your school bag so recess and after school never get skipped.</li>
-            <li>Build up over 2 to 3 weeks. Jumping to a big target overnight usually backfires.</li>
-          </ul>
-        </details>}
+        {order.map((id) => <Fragment key={id}>{cards[id]}</Fragment>)}
 
         <a href="#/profile?open=display" className="btn sm" style={{ alignSelf: 'center' }}><Icon name="pencil" size={14} /> Customise this page</a>
       </div>

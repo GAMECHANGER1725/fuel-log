@@ -19,6 +19,43 @@ export type Card = (typeof CARDS)[number][0];
 
 const IDS: readonly string[] = CARDS.map(([id]) => id);
 
+/** Today's movable cards, in the default order ('log' can move but not hide; carbs and fat stay in the top card). */
+export const ORDER = ['quick', 'week', 'quests', 'gap', 'log', 'note', 'water', 'quality', 'tips'] as const;
+export type OrderCard = (typeof ORDER)[number];
+export const ORDER_LABEL: Record<OrderCard, string> = {
+  quick: 'Quick log',
+  week: 'This week',
+  quests: 'Daily quests',
+  gap: 'Close the gap',
+  log: 'Log',
+  note: 'Day note',
+  water: 'Water',
+  quality: 'Food quality',
+  tips: 'Eating tips',
+};
+
+/** Known cards once each, in the saved order; any missing (e.g. added later) go where they sit by default. */
+export function cleanOrder(v: unknown): OrderCard[] {
+  const saved = Array.isArray(v) ? [...new Set(v.filter((x): x is OrderCard => (ORDER as readonly unknown[]).includes(x)))] : [];
+  const out = [...saved];
+  ORDER.forEach((id, i) => {
+    if (out.includes(id)) return;
+    const before = ORDER.slice(0, i).reverse().find((x) => out.includes(x));
+    out.splice(before ? out.indexOf(before) + 1 : 0, 0, id);
+  });
+  return out;
+}
+
+/** Move a card one place up (-1) or down (+1). */
+export function moveIn(order: OrderCard[], id: OrderCard, dir: -1 | 1): OrderCard[] {
+  const i = order.indexOf(id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= order.length) return order;
+  const out = [...order];
+  [out[i], out[j]] = [out[j], out[i]];
+  return out;
+}
+
 /** Accent colours; the swatch is the dark-theme shade (styles.css has both). */
 export const ACCENTS = [
   ['ember', 'Ember', '#ff8a4c'],
@@ -49,7 +86,10 @@ interface Prefs {
   size: TextSize;
   /** Id of the last What's new sheet seen on this device. */
   newsSeen: string;
+  order: OrderCard[];
   toggle: (c: Card) => void;
+  move: (id: OrderCard, dir: -1 | 1) => void;
+  resetOrder: () => void;
   markNews: (id: string) => void;
   setAccent: (a: Accent) => void;
   setSize: (s: TextSize) => void;
@@ -62,6 +102,9 @@ export const usePrefs = create<Prefs>()(
       accent: 'ember',
       size: 'normal',
       newsSeen: '',
+      order: [...ORDER],
+      move: (id, dir) => set((s) => ({ order: moveIn(s.order, id, dir) })),
+      resetOrder: () => set({ order: [...ORDER] }),
       markNews: (newsSeen) => set({ newsSeen }),
       toggle: (c) => set((s) => ({ hidden: toggleIn(s.hidden, c) })),
       setAccent: (accent) => set({ accent }),
@@ -69,10 +112,17 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown };
-        return { ...cur, hidden: cleanHidden(saved.hidden), accent: cleanAccent(saved.accent), size: cleanSize(saved.size), newsSeen: typeof saved.newsSeen === 'string' ? saved.newsSeen.slice(0, 20) : '' };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown };
+        return {
+          ...cur,
+          hidden: cleanHidden(saved.hidden),
+          accent: cleanAccent(saved.accent),
+          size: cleanSize(saved.size),
+          newsSeen: typeof saved.newsSeen === 'string' ? saved.newsSeen.slice(0, 20) : '',
+          order: cleanOrder(saved.order),
+        };
       },
     },
   ),

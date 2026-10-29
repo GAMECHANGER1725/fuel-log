@@ -11,7 +11,7 @@ import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
-import { ACCENTS, CARDS, SIZES, usePrefs } from '../lib/prefs';
+import { ACCENTS, CARDS, ORDER_LABEL, SIZES, usePrefs, type Card } from '../lib/prefs';
 import WhatsNew from '../components/WhatsNew';
 
 const TONE = { fuel: 'var(--fuel)', protein: 'var(--pro)', sand: 'var(--carb)', ink: 'var(--ink)' };
@@ -372,12 +372,28 @@ function TextSizePicker() {
 }
 
 function TodayCards() {
-  const { hidden, toggle } = usePrefs();
+  const { hidden, toggle, order, move, resetOrder } = usePrefs();
+  const hideable = (id: string): id is Card => CARDS.some(([c]) => c === id);
   return (
-    <div className="row" style={{ flexWrap: 'wrap' }}>
-      {CARDS.map(([id, label]) => (
-        <button key={id} className="chip" aria-pressed={!hidden.includes(id)} onClick={() => toggle(id)}>{label}</button>
+    <div className="stack" style={{ gap: 6 }}>
+      <label className="row small">
+        <input type="checkbox" checked={!hidden.includes('macros')} onChange={() => toggle('macros')} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
+        Carbs, fat and energy split in the top card
+      </label>
+      <span className="small mut">Cards, top to bottom. Tick to show, arrows to move.</span>
+      {order.map((id, i) => (
+        <div key={id} className="row" style={{ gap: 8, minHeight: 44 }}>
+          {hideable(id) ? (
+            <input type="checkbox" aria-label={`Show ${ORDER_LABEL[id]}`} checked={!hidden.includes(id)} onChange={() => toggle(id)} style={{ width: 20, height: 20, accentColor: 'var(--fuel)', flex: 'none' }} />
+          ) : (
+            <span style={{ width: 20, flex: 'none' }} />
+          )}
+          <span className="grow" style={hideable(id) && hidden.includes(id) ? { color: 'var(--mut)' } : undefined}>{ORDER_LABEL[id]}</span>
+          <button className="btn icon sm" style={{ width: 36 }} aria-label={`Move ${ORDER_LABEL[id]} up`} disabled={i === 0} onClick={() => move(id, -1)}><span style={{ transform: 'rotate(90deg)', display: 'flex' }}><Icon name="left" size={16} /></span></button>
+          <button className="btn icon sm" style={{ width: 36 }} aria-label={`Move ${ORDER_LABEL[id]} down`} disabled={i === order.length - 1} onClick={() => move(id, 1)}><span style={{ transform: 'rotate(90deg)', display: 'flex' }}><Icon name="right" size={16} /></span></button>
+        </div>
       ))}
+      <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={resetOrder}>Reset order</button>
     </div>
   );
 }
