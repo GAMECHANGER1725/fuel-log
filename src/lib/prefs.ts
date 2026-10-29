@@ -48,19 +48,20 @@ export const ORDER_LABEL: Record<OrderCard, string> = {
 };
 
 /** Known cards once each, in the saved order; any missing (e.g. added later) go where they sit by default. */
-export function cleanOrder(v: unknown): OrderCard[] {
-  const saved = Array.isArray(v) ? [...new Set(v.filter((x): x is OrderCard => (ORDER as readonly unknown[]).includes(x)))] : [];
+export function cleanOrderOf<T extends string>(v: unknown, all: readonly T[]): T[] {
+  const saved = Array.isArray(v) ? [...new Set(v.filter((x): x is T => (all as readonly unknown[]).includes(x)))] : [];
   const out = [...saved];
-  ORDER.forEach((id, i) => {
+  all.forEach((id, i) => {
     if (out.includes(id)) return;
-    const before = ORDER.slice(0, i).reverse().find((x) => out.includes(x));
+    const before = all.slice(0, i).reverse().find((x) => out.includes(x));
     out.splice(before ? out.indexOf(before) + 1 : 0, 0, id);
   });
   return out;
 }
+export const cleanOrder = (v: unknown): OrderCard[] => cleanOrderOf(v, ORDER);
 
 /** Move a card one place up (-1) or down (+1). */
-export function moveIn(order: OrderCard[], id: OrderCard, dir: -1 | 1): OrderCard[] {
+export function moveIn<T>(order: T[], id: T, dir: -1 | 1): T[] {
   const i = order.indexOf(id);
   const j = i + dir;
   if (i < 0 || j < 0 || j >= order.length) return order;
@@ -103,6 +104,7 @@ export const PROGRESS_CARDS = [
   ['weighins', 'Weigh-ins'],
 ] as const;
 export type ProgressCard = (typeof PROGRESS_CARDS)[number][0];
+const PROGRESS_IDS = PROGRESS_CARDS.map(([id]) => id);
 
 /** How many of your foods Quick log shows. */
 export const QUICK_COUNTS = [6, 10, 16];
@@ -216,6 +218,8 @@ interface Prefs {
   quietLevelUp: boolean;
   setQuietLevelUp: (q: boolean) => void;
   progressHidden: ProgressCard[];
+  progressOrder: ProgressCard[];
+  moveProgress: (id: ProgressCard, dir: -1 | 1) => void;
   toggleProgress: (c: ProgressCard) => void;
   quickCount: number;
   quickWrap: boolean;
@@ -272,6 +276,8 @@ export const usePrefs = create<Prefs>()(
       quietLevelUp: false,
       setQuietLevelUp: (quietLevelUp) => set({ quietLevelUp }),
       progressHidden: [],
+      progressOrder: [...PROGRESS_IDS],
+      moveProgress: (id, dir) => set((s) => ({ progressOrder: moveIn(s.progressOrder, id, dir) })),
       toggleProgress: (c) => set((s) => ({ progressHidden: s.progressHidden.includes(c) ? s.progressHidden.filter((x) => x !== c) : [...s.progressHidden, c] })),
       quickCount: 10,
       quickWrap: false,
@@ -310,9 +316,9 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches, weighEvery: s.weighEvery, start: s.start, shopping: s.shopping, trainDays: s.trainDays, lastAutoBoost: s.lastAutoBoost, quickCount: s.quickCount, quickWrap: s.quickWrap, progressHidden: s.progressHidden, quietLevelUp: s.quietLevelUp }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches, weighEvery: s.weighEvery, start: s.start, shopping: s.shopping, trainDays: s.trainDays, lastAutoBoost: s.lastAutoBoost, quickCount: s.quickCount, quickWrap: s.quickWrap, progressHidden: s.progressHidden, quietLevelUp: s.quietLevelUp, progressOrder: s.progressOrder }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown; weighEvery?: unknown; start?: unknown; shopping?: unknown; trainDays?: unknown; lastAutoBoost?: unknown; quickCount?: unknown; quickWrap?: unknown; progressHidden?: unknown; quietLevelUp?: unknown };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown; weighEvery?: unknown; start?: unknown; shopping?: unknown; trainDays?: unknown; lastAutoBoost?: unknown; quickCount?: unknown; quickWrap?: unknown; progressHidden?: unknown; quietLevelUp?: unknown; progressOrder?: unknown };
         return {
           ...cur,
           hidden: cleanHidden(saved.hidden),
@@ -329,6 +335,7 @@ export const usePrefs = create<Prefs>()(
           quickCount: QUICK_COUNTS.includes(saved.quickCount as number) ? (saved.quickCount as number) : 10,
           quickWrap: saved.quickWrap === true,
           quietLevelUp: saved.quietLevelUp === true,
+          progressOrder: cleanOrderOf(saved.progressOrder, PROGRESS_IDS),
           progressHidden: Array.isArray(saved.progressHidden) ? PROGRESS_CARDS.map(([id]) => id).filter((id) => (saved.progressHidden as unknown[]).includes(id)) : [],
           lastAutoBoost: typeof saved.lastAutoBoost === 'string' ? saved.lastAutoBoost.slice(0, 10) : '',
           start: STARTS.find(([id]) => id === saved.start)?.[0] ?? 'today',

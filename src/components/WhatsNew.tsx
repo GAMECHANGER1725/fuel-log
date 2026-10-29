@@ -2,14 +2,14 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29zi';
+export const NEWS_ID = '2026-10-29zj';
 
 const NEWS: [title: string, body: string, href?: string][] = [
   ['Pause reminders for today', 'Busy day? Pause every reminder until tomorrow in Profile, Reminders.', '#/profile?open=reminders'],
   ['Quieter level-ups', 'Prefer no full-screen moment? Pick Just a message under Level-ups in Profile, Look.', '#/profile?open=look'],
   ['Fold a meal', 'Tap Breakfast, Lunch or any meal heading in the log to fold it away; its totals stay. Tap again to open it.'],
   ['Notes in Share this day', 'Sharing a day now includes the day note and any notes on foods.'],
-  ['Choose your Progress cards', 'Hide the Progress cards you don’t use: tap Customise this page at the bottom of Progress.', '#/profile?open=progress'],
+  ['Choose your Progress cards', 'Hide or reorder Progress cards: tap Customise this page at the bottom of Progress.', '#/profile?open=progress'],
   ['Quick log your way', 'Show 6, 10 or 16 of your foods in Quick log, in one scrolling row or all at once.', '#/profile?open=today'],
   ['Automatic training days', 'Pick your gym days in Profile and the training-day boost switches on by itself on those days.', '#/profile?open=today'],
   ['Notes on a food', 'Tap a logged food to add a short note, like “homemade, extra ghee”. It shows under the food in the log, and Search your log finds it.'],

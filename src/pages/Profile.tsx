@@ -23,6 +23,8 @@ export default function ProfilePage() {
   const { params } = useRoute();
   const progressHidden = usePrefs((p) => p.progressHidden);
   const toggleProgress = usePrefs((p) => p.toggleProgress);
+  const progressOrder = usePrefs((p) => p.progressOrder);
+  const moveProgress = usePrefs((p) => p.moveProgress);
   const open = params.get('open');
   const earned = g.badges.filter((b) => b.earned).length;
   const sync = useSync();
@@ -117,12 +119,16 @@ export default function ProfilePage() {
           <TodayForm />
         </Section>
         <Section title="Progress page" hint={`${PROGRESS_CARDS.length - progressHidden.length} of ${PROGRESS_CARDS.length} cards`} open={open === 'progress'}>
-          <span className="small mut">Cards to show on Progress (this device)</span>
-          {PROGRESS_CARDS.map(([id, label]) => (
-            <label key={id} className="row small">
-              <input type="checkbox" checked={!progressHidden.includes(id)} onChange={() => toggleProgress(id)} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
-              {label}
-            </label>
+          <span className="small mut">Cards on Progress, top to bottom (this device). Tick to show, arrows to move.</span>
+          {progressOrder.map((id, i) => (
+            <div key={id} className="row" style={{ gap: 8, minHeight: 44 }}>
+              <label className="row small grow">
+                <input type="checkbox" checked={!progressHidden.includes(id)} onChange={() => toggleProgress(id)} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
+                {PROGRESS_CARDS.find(([c]) => c === id)?.[1]}
+              </label>
+              <button className="btn icon sm" style={{ width: 36 }} aria-label={`Move ${PROGRESS_CARDS.find(([c]) => c === id)?.[1]} up`} disabled={i === 0} onClick={() => moveProgress(id, -1)}><span style={{ transform: 'rotate(90deg)', display: 'flex' }}><Icon name="left" size={16} /></span></button>
+              <button className="btn icon sm" style={{ width: 36 }} aria-label={`Move ${PROGRESS_CARDS.find(([c]) => c === id)?.[1]} down`} disabled={i === progressOrder.length - 1} onClick={() => moveProgress(id, 1)}><span style={{ transform: 'rotate(90deg)', display: 'flex' }}><Icon name="right" size={16} /></span></button>
+            </div>
           ))}
         </Section>
         <Section title="Reminders" hint={!remindersOn() ? 'Off' : pausedToday() ? 'Paused today' : 'On'} hintColor={remindersOn() && !pausedToday() ? 'var(--pro)' : undefined} open={open === 'reminders'}>

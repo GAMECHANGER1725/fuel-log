@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { useStore, dataOf } from '../lib/store';
 import { addDays, dateOf, daysBetween, fmtDate, monthRange, weekStart } from '../lib/dates';
 import { dayTotals, energy, entryMacros, fmt, r1, timeOf } from '../lib/nutrition';
@@ -22,6 +22,7 @@ export default function Progress() {
   const tags = usePrefs((p) => p.tags);
   const progressHidden = usePrefs((p) => p.progressHidden);
   const on = (c: ProgressCard) => !progressHidden.includes(c);
+  const progressOrder = usePrefs((p) => p.progressOrder);
 
   const line = trendLine(s.weighIns);
   const latest = line[line.length - 1];
@@ -61,6 +62,139 @@ export default function Progress() {
       })(),
     };
   });
+
+  // Progress's cards, keyed by id; their order and visibility come from per-device prefs.
+  const cards: Record<ProgressCard, ReactNode> = {
+    heat: on('heat') && (
+      <section className="card">
+        <div className="between" style={{ marginBottom: 12 }}>
+          <h2 className="h2">Days hit</h2>
+          <div className="row" style={{ gap: 6 }}>
+            <button className="btn icon sm" style={{ width: 34 }} aria-label="Older weeks" disabled={!olderExists} onClick={() => setPage(page + 1)}><Icon name="left" size={16} /></button>
+            <button className="btn icon sm" style={{ width: 34 }} aria-label="Newer weeks" disabled={page === 0} onClick={() => setPage(page - 1)}><Icon name="right" size={16} /></button>
+          </div>
+        </div>
+        <div className="between" style={{ margin: '-4px 0 10px' }}>
+          <span className="mono dim">{fmtDate(cells[0])} – {fmtDate(cells[34])}</span>
+          <span className="mono mut">{hitBoth} of {elapsed.length} · tap a day</span>
+        </div>
+        <div className="heat" role="img" aria-label={`Hit both targets on ${hitBoth} of the last ${elapsed.length} days`}>
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+            <span key={i} className="mono dim" style={{ textAlign: 'center', fontSize: 10 }}>{d}</span>
+          ))}
+          {cells.map((k) => {
+            const st = g.byDate.get(k);
+            const cls = k > today ? 'future' : k === today ? 'today' : k < firstDay ? 'pre' : st?.hitKcal && st.hitProtein ? 'both' : st?.hitKcal || st?.hitProtein ? 'one' : '';
+            // Past and today's cells open that day's log.
+            return k > today || k < firstDay ? <i key={k} className={cls} /> : <a key={k} className={cls} href={k === today ? '#/today' : `#/today?d=${k}`} aria-label={`Open ${fmtDate(k, { weekday: 'long', day: 'numeric', month: 'long' })}`} />;
+          })}
+        </div>
+        <div className="row" style={{ gap: 14, marginTop: 12, flexWrap: 'wrap' }}>
+          <Legend color="var(--fuel)" label="Kcal + protein" />
+          <Legend color="var(--fuel-dim)" label="One of them" />
+          <Legend color="var(--track)" label="Missed" />
+        </div>
+      </section>
+    ),
+    compare: on('compare') && (
+      <WeekCompare today={today} />
+    ),
+    daily: on('daily') && (
+      <DailyChart today={today} />
+    ),
+    weekday: on('weekday') && (
+      <WeekdayChart today={today} />
+    ),
+    records: on('records') && (() => {
+      const r = records(s.days);
+      if (!r.kcal && !r.water) return null;
+      const tile = (label: string, value: string, date: string | undefined) => (
+        <a href={date ? (date === today ? '#/today' : `#/today?d=${date}`) : undefined} className="card stack" style={{ padding: 12, gap: 2, color: 'var(--ink)', textDecoration: 'none', background: 'var(--s2)' }}>
+          <span className="num" style={{ fontSize: 24, lineHeight: 1 }}>{value}</span>
+          <span className="mono mut" style={{ fontSize: 10 }}>{label}</span>
+          {date && <span className="mono dim" style={{ fontSize: 10 }}>{fmtDate(date, { day: 'numeric', month: 'short' })}</span>}
+        </a>
+      );
+      return (
+        <section className="card">
+          <h2 className="h2" style={{ marginBottom: 10 }}>Personal records</h2>
+          <div className="grid2" style={{ gap: 8 }}>
+            {tile(`Most ${unit} in a day`, r.kcal ? energy(r.kcal.value, unit) : '–', r.kcal?.date)}
+            {tile('Most protein in a day', r.protein ? `${fmt(r.protein.value)} g` : '–', r.protein?.date)}
+            {tile('Most water in a day', r.water ? `${(r.water.value * 0.25).toFixed(2).replace(/0$/, '')} L` : '–', r.water?.date)}
+            {tile('Best streak', `${g.streak.best} day${g.streak.best === 1 ? '' : 's'}`, undefined)}
+          </div>
+        </section>
+      );
+    })(),
+    top: on('top') && (
+      <TopFoods today={today} />
+    ),
+    search: on('search') && (
+      <LogSearch today={today} />
+    ),
+    averages: on('averages') && (
+      <section className="card">
+        <h2 className="h2" style={{ marginBottom: 8 }}>Weekly averages</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr .8fr .7fr', fontSize: 14 }}>
+          {['Week of', unit, 'Protein', 'Water', 'Days'].map((h, i) => (
+            <span key={h} className="mono dim" style={{ padding: '8px 0', fontSize: 10, textAlign: i ? 'right' : 'left' }}>{h}</span>
+          ))}
+          {weeks.map((w) => (
+            <WeekRow key={w.w} label={w.w === weekStart(today) ? 'This week' : fmtDate(w.w)} cells={[w.kcal === null ? '–' : energy(w.kcal, unit), w.protein === null ? '–' : `${fmt(w.protein)} g`, w.water === null ? '–' : `${w.water.toFixed(1)} L`, `${w.n}/7`]} />
+          ))}
+        </div>
+      </section>
+    ),
+    notes: on('notes') && (() => {
+      const notes = Object.entries(s.days).filter(([, d]) => d.note).sort(([a], [b]) => (a < b ? 1 : -1)).slice(0, 10);
+      return notes.length > 0 && (
+        <section className="card">
+          <h2 className="h2" style={{ marginBottom: 4 }}>Recent notes</h2>
+          {notes.map(([k, d]) => (
+            <a key={k} href={k === today ? '#/today' : `#/today?d=${k}`} className="item" style={{ padding: '8px 0', color: 'var(--ink)', textDecoration: 'none' }}>
+              <span className="mono dim" style={{ width: 84, flex: 'none' }}>{fmtDate(k, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+              <span className="grow">{d.note}</span>
+              <span className="mono mut" style={{ flex: 'none' }}>{energy(dayTotals(d).kcal, unit)}</span>
+            </a>
+          ))}
+        </section>
+      );
+    })(),
+    tags: on('tags') && (() => {
+      const stats = tagStats(s.days, today, tags);
+      if (!stats.length) return null;
+      const diff = (v: number, show: string) => (Math.abs(v) < 0.5 ? '' : ` (${v > 0 ? '+' : '−'}${show})`);
+      return (
+        <section className="card">
+          <h2 className="h2" style={{ marginBottom: 2 }}>Tagged days</h2>
+          <p className="small mut" style={{ margin: '0 0 6px' }}>Average on days with each tag, against your other logged days (last 8 weeks).</p>
+          {stats.map((x) => (
+            <div key={x.tag} className="item" style={{ padding: '8px 0', gap: 8 }}>
+              <span className="grow">{x.tag} <span className="mono dim">{x.n} days</span></span>
+              <span className="mono mut" style={{ textAlign: 'right' }}>
+                {energy(x.kcal, unit)} {unit}{diff(x.kcal - x.otherKcal, energy(Math.abs(x.kcal - x.otherKcal), unit))}
+                <br />
+                {fmt(x.protein)} g{diff(x.protein - x.otherProtein, `${fmt(Math.abs(x.protein - x.otherProtein))} g`)}
+              </span>
+            </div>
+          ))}
+        </section>
+      );
+    })(),
+    weighins: on('weighins') && s.weighIns.length > 0 && (
+        <section className="card">
+          <h2 className="h2" style={{ marginBottom: 4 }}>Weigh-ins</h2>
+          {[...s.weighIns].reverse().slice(0, 10).map((w) => (
+            <div key={w.date} className="item" style={{ padding: '8px 0' }}>
+              <span className="grow">{fmtDate(w.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+              <span className="num" style={{ fontSize: 20 }}>{w.kg.toFixed(1)} kg</span>
+              <button className="btn icon sm" style={{ width: 36 }} aria-label={`Delete weigh-in ${w.date}`} onClick={() => s.removeWeighIn(w.date)}><Icon name="trash" size={16} /></button>
+            </div>
+          ))}
+        </section>
+    ),
+  };
 
   return (
     <>
@@ -119,143 +253,7 @@ export default function Progress() {
           </section>
         )}
 
-        {on('heat') && (
-          <section className="card">
-            <div className="between" style={{ marginBottom: 12 }}>
-              <h2 className="h2">Days hit</h2>
-              <div className="row" style={{ gap: 6 }}>
-                <button className="btn icon sm" style={{ width: 34 }} aria-label="Older weeks" disabled={!olderExists} onClick={() => setPage(page + 1)}><Icon name="left" size={16} /></button>
-                <button className="btn icon sm" style={{ width: 34 }} aria-label="Newer weeks" disabled={page === 0} onClick={() => setPage(page - 1)}><Icon name="right" size={16} /></button>
-              </div>
-            </div>
-            <div className="between" style={{ margin: '-4px 0 10px' }}>
-              <span className="mono dim">{fmtDate(cells[0])} – {fmtDate(cells[34])}</span>
-              <span className="mono mut">{hitBoth} of {elapsed.length} · tap a day</span>
-            </div>
-            <div className="heat" role="img" aria-label={`Hit both targets on ${hitBoth} of the last ${elapsed.length} days`}>
-              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-                <span key={i} className="mono dim" style={{ textAlign: 'center', fontSize: 10 }}>{d}</span>
-              ))}
-              {cells.map((k) => {
-                const st = g.byDate.get(k);
-                const cls = k > today ? 'future' : k === today ? 'today' : k < firstDay ? 'pre' : st?.hitKcal && st.hitProtein ? 'both' : st?.hitKcal || st?.hitProtein ? 'one' : '';
-                // Past and today's cells open that day's log.
-                return k > today || k < firstDay ? <i key={k} className={cls} /> : <a key={k} className={cls} href={k === today ? '#/today' : `#/today?d=${k}`} aria-label={`Open ${fmtDate(k, { weekday: 'long', day: 'numeric', month: 'long' })}`} />;
-              })}
-            </div>
-            <div className="row" style={{ gap: 14, marginTop: 12, flexWrap: 'wrap' }}>
-              <Legend color="var(--fuel)" label="Kcal + protein" />
-              <Legend color="var(--fuel-dim)" label="One of them" />
-              <Legend color="var(--track)" label="Missed" />
-            </div>
-          </section>
-        )}
-
-        {on('compare') && (
-          <WeekCompare today={today} />
-        )}
-
-        {on('daily') && (
-          <DailyChart today={today} />
-        )}
-        {on('weekday') && (
-          <WeekdayChart today={today} />
-        )}
-
-        {on('records') && (() => {
-          const r = records(s.days);
-          if (!r.kcal && !r.water) return null;
-          const tile = (label: string, value: string, date: string | undefined) => (
-            <a href={date ? (date === today ? '#/today' : `#/today?d=${date}`) : undefined} className="card stack" style={{ padding: 12, gap: 2, color: 'var(--ink)', textDecoration: 'none', background: 'var(--s2)' }}>
-              <span className="num" style={{ fontSize: 24, lineHeight: 1 }}>{value}</span>
-              <span className="mono mut" style={{ fontSize: 10 }}>{label}</span>
-              {date && <span className="mono dim" style={{ fontSize: 10 }}>{fmtDate(date, { day: 'numeric', month: 'short' })}</span>}
-            </a>
-          );
-          return (
-            <section className="card">
-              <h2 className="h2" style={{ marginBottom: 10 }}>Personal records</h2>
-              <div className="grid2" style={{ gap: 8 }}>
-                {tile(`Most ${unit} in a day`, r.kcal ? energy(r.kcal.value, unit) : '–', r.kcal?.date)}
-                {tile('Most protein in a day', r.protein ? `${fmt(r.protein.value)} g` : '–', r.protein?.date)}
-                {tile('Most water in a day', r.water ? `${(r.water.value * 0.25).toFixed(2).replace(/0$/, '')} L` : '–', r.water?.date)}
-                {tile('Best streak', `${g.streak.best} day${g.streak.best === 1 ? '' : 's'}`, undefined)}
-              </div>
-            </section>
-          );
-        })()}
-
-        {on('top') && (
-          <TopFoods today={today} />
-        )}
-        {on('search') && (
-          <LogSearch today={today} />
-        )}
-
-        {on('averages') && (
-          <section className="card">
-            <h2 className="h2" style={{ marginBottom: 8 }}>Weekly averages</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr .8fr .7fr', fontSize: 14 }}>
-              {['Week of', unit, 'Protein', 'Water', 'Days'].map((h, i) => (
-                <span key={h} className="mono dim" style={{ padding: '8px 0', fontSize: 10, textAlign: i ? 'right' : 'left' }}>{h}</span>
-              ))}
-              {weeks.map((w) => (
-                <WeekRow key={w.w} label={w.w === weekStart(today) ? 'This week' : fmtDate(w.w)} cells={[w.kcal === null ? '–' : energy(w.kcal, unit), w.protein === null ? '–' : `${fmt(w.protein)} g`, w.water === null ? '–' : `${w.water.toFixed(1)} L`, `${w.n}/7`]} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {on('notes') && (() => {
-          const notes = Object.entries(s.days).filter(([, d]) => d.note).sort(([a], [b]) => (a < b ? 1 : -1)).slice(0, 10);
-          return notes.length > 0 && (
-            <section className="card">
-              <h2 className="h2" style={{ marginBottom: 4 }}>Recent notes</h2>
-              {notes.map(([k, d]) => (
-                <a key={k} href={k === today ? '#/today' : `#/today?d=${k}`} className="item" style={{ padding: '8px 0', color: 'var(--ink)', textDecoration: 'none' }}>
-                  <span className="mono dim" style={{ width: 84, flex: 'none' }}>{fmtDate(k, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-                  <span className="grow">{d.note}</span>
-                  <span className="mono mut" style={{ flex: 'none' }}>{energy(dayTotals(d).kcal, unit)}</span>
-                </a>
-              ))}
-            </section>
-          );
-        })()}
-
-        {on('tags') && (() => {
-          const stats = tagStats(s.days, today, tags);
-          if (!stats.length) return null;
-          const diff = (v: number, show: string) => (Math.abs(v) < 0.5 ? '' : ` (${v > 0 ? '+' : '−'}${show})`);
-          return (
-            <section className="card">
-              <h2 className="h2" style={{ marginBottom: 2 }}>Tagged days</h2>
-              <p className="small mut" style={{ margin: '0 0 6px' }}>Average on days with each tag, against your other logged days (last 8 weeks).</p>
-              {stats.map((x) => (
-                <div key={x.tag} className="item" style={{ padding: '8px 0', gap: 8 }}>
-                  <span className="grow">{x.tag} <span className="mono dim">{x.n} days</span></span>
-                  <span className="mono mut" style={{ textAlign: 'right' }}>
-                    {energy(x.kcal, unit)} {unit}{diff(x.kcal - x.otherKcal, energy(Math.abs(x.kcal - x.otherKcal), unit))}
-                    <br />
-                    {fmt(x.protein)} g{diff(x.protein - x.otherProtein, `${fmt(Math.abs(x.protein - x.otherProtein))} g`)}
-                  </span>
-                </div>
-              ))}
-            </section>
-          );
-        })()}
-
-        {on('weighins') && s.weighIns.length > 0 && (
-            <section className="card">
-              <h2 className="h2" style={{ marginBottom: 4 }}>Weigh-ins</h2>
-              {[...s.weighIns].reverse().slice(0, 10).map((w) => (
-                <div key={w.date} className="item" style={{ padding: '8px 0' }}>
-                  <span className="grow">{fmtDate(w.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-                  <span className="num" style={{ fontSize: 20 }}>{w.kg.toFixed(1)} kg</span>
-                  <button className="btn icon sm" style={{ width: 36 }} aria-label={`Delete weigh-in ${w.date}`} onClick={() => s.removeWeighIn(w.date)}><Icon name="trash" size={16} /></button>
-                </div>
-              ))}
-            </section>
-        )}
+        {progressOrder.map((id) => <Fragment key={id}>{cards[id]}</Fragment>)}
         <a href="#/profile?open=progress" className="btn sm" style={{ alignSelf: 'center' }}><Icon name="pencil" size={14} /> Customise this page</a>
       </div>
 

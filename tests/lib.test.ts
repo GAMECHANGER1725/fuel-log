@@ -11,7 +11,7 @@ import { findByBarcode, parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
-import { ORDER, addShopping, autoBoostDue, cleanShopping, shoppingText, cleanTags, pushSearch, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
+import { ORDER, cleanOrderOf, addShopping, autoBoostDue, cleanShopping, shoppingText, cleanTags, pushSearch, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
 import { daySummary, rangeStats, usualNow, waterWeek, foodHistory, hasTag, searchLog, weekBalance, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
@@ -616,6 +616,13 @@ describe('eat reminder', () => {
     expect(eatDue(at('14:00'), at('10:30'), 0, 1500, 3000, 0)).toBe(false); // off
     expect(eatDue(at('22:00'), at('10:30'), 0, 1500, 3000, 3 * H)).toBe(false); // after 9 pm
     expect(eatDue(at('11:00'), 0, 0, 0, 3000, 3 * H)).toBe(true); // nothing since 8 am
+  });
+});
+
+describe('card order for any page', () => {
+  it('keeps known ids once each and puts missing ones in their default place', () => {
+    expect(cleanOrderOf(['c', 'a', 'a', 'zzz'], ['a', 'b', 'c'] as const)).toEqual(['c', 'a', 'b']);
+    expect(cleanOrderOf(null, ['a', 'b'] as const)).toEqual(['a', 'b']);
   });
 });
 
