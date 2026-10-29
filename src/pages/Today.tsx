@@ -600,6 +600,7 @@ function DayNote({ date, note }: { date: string; note: string }) {
 
 /** Favourites, topped up with recent foods, as one-tap chips (one serving each, with Undo). */
 function QuickLog({ date }: { date: string }) {
+  const hidden = usePrefs((p) => p.hidden);
   const favourites = useStore((s) => s.favourites);
   const recents = useStore((s) => s.recents);
   const unit = useStore((s) => s.settings.unit);
@@ -616,10 +617,10 @@ function QuickLog({ date }: { date: string }) {
     <section className="stack" style={{ gap: 6 }}>
       <span className="mono mut">Quick log{foods.length ? ' · tap a food for your usual amount, hold to choose' : ''}</span>
       <div className="quick">
-        <a className="chip" href={link('scan')}><Icon name="barcode" size={16} /> Scan</a>
-        <a className="chip" href={link('photo')}><Icon name="camera" size={16} /> Snap meal</a>
-        <a className="chip" href={link('manual')}><Icon name="pencil" size={16} /> Numbers</a>
-        {again && (
+        {!hidden.includes('qscan') && <a className="chip" href={link('scan')}><Icon name="barcode" size={16} /> Scan</a>}
+        {!hidden.includes('qsnap') && <a className="chip" href={link('photo')}><Icon name="camera" size={16} /> Snap meal</a>}
+        {!hidden.includes('qnum') && <a className="chip" href={link('manual')}><Icon name="pencil" size={16} /> Numbers</a>}
+        {again && !hidden.includes('qagain') && (
           <button
             className="chip"
             title={again.entries.map((e) => e.name).join(', ')}

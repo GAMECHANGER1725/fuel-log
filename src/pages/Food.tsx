@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useStore } from '../lib/store';
 import { fmtDate, todayKey } from '../lib/dates';
-import { BROWSE, FOODS, FOOD_SORTS, browseFoods, foodMacros, proteinPer100kcal, searchFoods, sortFoods, type Browse, type FoodSort } from '../lib/foods';
+import { BROWSE, FOODS, FOOD_SORTS, browseFoods, foodMacros, proteinPer100kcal, searchFoods, sortFoods, type Browse } from '../lib/foods';
 import { searchProducts } from '../lib/off';
 import { coverage, dayTargets, dayTotals, energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
@@ -13,6 +13,7 @@ import { hasAi, type AiMode } from '../lib/ai';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { lastQty, mealGroups, type MealGroup } from '../lib/meals';
+import { usePrefs } from '../lib/prefs';
 
 type Picked = { food: Food; source: Source };
 
@@ -22,7 +23,8 @@ export default function FoodPage() {
   const date = params.get('d') ?? today;
   const [q, setQ] = useState('');
   const [browse, setBrowse] = useState<Browse | null>(null);
-  const [sort, setSort] = useState<FoodSort>('match');
+  const sort = usePrefs((p) => p.foodSort);
+  const setSort = usePrefs((p) => p.setFoodSort);
   // "/" jumps to the search box on a keyboard.
   const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {

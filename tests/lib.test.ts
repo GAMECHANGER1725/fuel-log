@@ -11,7 +11,7 @@ import { findByBarcode, parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
-import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, moveIn, toggleIn } from '../src/lib/prefs';
+import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
 import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
@@ -355,6 +355,9 @@ describe('prefs', () => {
   it('keeps only known Today cards, once each', () => {
     expect(cleanHidden(['water', 'nope', 'water', 3, 'tips'])).toEqual(['water', 'tips']);
     expect(cleanHidden('water')).toEqual([]);
+    expect(cleanHidden(['qscan', 'qagain', 'qnope'])).toEqual(['qscan', 'qagain']);
+    expect(cleanSort('lean')).toBe('lean');
+    expect(cleanSort('bogus')).toBe('match');
     expect(cleanHidden(undefined)).toEqual([]);
   });
   it('toggles a card in and out', () => {

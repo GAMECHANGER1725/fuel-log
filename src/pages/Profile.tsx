@@ -11,7 +11,7 @@ import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
-import { ACCENTS, BOOSTS, BOTTLES, CARDS, ORDER_LABEL, SIZES, usePrefs, type Card } from '../lib/prefs';
+import { ACCENTS, BOOSTS, BOTTLES, CARDS, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
 import WhatsNew from '../components/WhatsNew';
 
 const TONE = { fuel: 'var(--fuel)', protein: 'var(--pro)', sand: 'var(--carb)', ink: 'var(--ink)' };
@@ -455,6 +455,14 @@ function TodayCards() {
         <input type="checkbox" checked={!hidden.includes('train')} onChange={() => toggle('train')} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
         Training day button in the top card
       </label>
+      <span className="small mut">Quick log buttons (your foods always show)</span>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 6 }} role="group" aria-label="Quick log buttons">
+        {QUICK_ACTIONS.map((id) => (
+          <button key={id} className="chip" aria-pressed={!hidden.includes(id)} onClick={() => toggle(id)}>
+            {CARDS.find(([c]) => c === id)?.[1]}
+          </button>
+        ))}
+      </div>
       <span className="small mut">Cards, top to bottom. Tick to show, arrows to move.</span>
       {order.map((id, i) => (
         <div key={id} className="row" style={{ gap: 8, minHeight: 44 }}>
