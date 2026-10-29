@@ -129,7 +129,7 @@ const ROWS: Row[] = [
   ['Cookies', '2 cookies', 160, 2, 22, 7.5, 'ps'],
   ['Banana bread', '1 slice', 330, 5, 50, 12, 'pbs'],
 
-  // Takeaway
+  // Takeaway (untagged ones are search-only: Close the gap shouldn't send you to a restaurant)
   ['Veggie burger', '1 burger', 480, 18, 52, 22, 'm'],
   ['Falafel wrap', '1 wrap', 520, 17, 62, 22, 'pm'],
   ['Bean and cheese burrito bowl', '1 bowl', 620, 24, 85, 20, 'm'],
@@ -138,18 +138,18 @@ const ROWS: Row[] = [
   ['Vegetarian sausage roll', '1 roll', 330, 10, 28, 19, 's'],
   ['Vegetarian sushi hand roll', '1 roll', 190, 4, 36, 3.5, 'pm'],
   ['Pizza', '1 large slice', 280, 12, 33, 11, 'm'],
-  ['Veggie sub with cheese', '6-inch sub', 330, 15, 50, 9, 'm'],
-  ['Paneer kathi roll', '1 roll', 520, 20, 55, 24, 'm'],
-  ['Vegetable fried rice', '1 takeaway box (~400 g)', 650, 14, 100, 20, 'm'],
-  ['Veg thali (restaurant)', '1 thali', 950, 28, 120, 38, 'm'],
-  ['Vegetarian pad thai with egg', '1 plate', 700, 22, 90, 26, 'm'],
-  ['Nachos with beans and cheese', '1 plate', 850, 28, 80, 45, 'm'],
-  ['Vegetable spring rolls', '2 rolls', 260, 5, 30, 13, 's'],
-  ['Vegetable dumplings, steamed', '6 dumplings', 300, 9, 45, 8, 's'],
+  ['Veggie sub with cheese', '6-inch sub', 330, 15, 50, 9],
+  ['Paneer kathi roll', '1 roll', 520, 20, 55, 24],
+  ['Vegetable fried rice', '1 takeaway box (~400 g)', 650, 14, 100, 20],
+  ['Veg thali (restaurant)', '1 thali', 950, 28, 120, 38],
+  ['Vegetarian pad thai with egg', '1 plate', 700, 22, 90, 26],
+  ['Nachos with beans and cheese', '1 plate', 850, 28, 80, 45],
+  ['Vegetable spring rolls', '2 rolls', 260, 5, 30, 13],
+  ['Vegetable dumplings, steamed', '6 dumplings', 300, 9, 45, 8],
   ['Mango kulfi', '1 stick', 180, 4, 20, 9, 's'],
   ['Masala chai with milk', '250 ml cup', 120, 4, 16, 4.5, 'd'],
-  ['Iced coffee (café)', 'large (~450 ml)', 380, 12, 45, 17, 'd'],
-  ['Chocolate milkshake', 'large (~500 ml)', 600, 16, 85, 22, 'd'],
+  ['Iced coffee (café)', 'large (~450 ml)', 380, 12, 45, 17],
+  ['Chocolate milkshake', 'large (~500 ml)', 600, 16, 85, 22],
 ];
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -392,6 +392,36 @@ export function gapSuggestions(
   if (ranked.length <= limit) return ranked;
   const start = (round * limit) % ranked.length;
   return Array.from({ length: limit }, (_, i) => ranked[(start + i) % ranked.length]);
+}
+
+/**
+ * One way to finish the day: up to `max` different foods that together cover most of what's left of
+ * energy and protein without going far over. Greedy, picking the food that closes the most each step.
+ * ponytail: greedy, not an optimal pack; good enough for "something like this", and fast.
+ */
+export function planRest(need: Macros, candidates: Food[], opts: { wheyOk: boolean; atSchool?: boolean }, max = 3): { foods: Food[]; kcal: number; protein: number } | null {
+  const K = Math.max(0, need.kcal), P = Math.max(0, need.protein);
+  if (K < 300 && P < 15) return null;
+  const seen = new Set<string>();
+  let pool = candidates.filter((f) => {
+    const key = f.name.toLowerCase();
+    if (f.kcal <= 0 || seen.has(key) || (!opts.wheyOk && f.tags?.includes('w')) || (opts.atSchool && !f.tags?.includes('p'))) return false;
+    seen.add(key);
+    return true;
+  });
+  const foods: Food[] = [];
+  let k = K, p = P;
+  while (foods.length < max && (k >= 150 || p >= 8) && pool.length) {
+    const score = (f: Food) => (K ? (0.5 * Math.min(f.kcal, k)) / K : 0) + (P ? (0.5 * Math.min(f.protein, p)) / P : 0) - Math.max(0, f.kcal - k - 150) / K;
+    const best = pool.reduce((a, b) => (score(b) > score(a) ? b : a));
+    if (score(best) <= 0.05) break;
+    foods.push(best);
+    k -= best.kcal;
+    p -= best.protein;
+    pool = pool.filter((f) => f !== best);
+  }
+  if (!foods.length) return null;
+  return { foods, kcal: K - k, protein: P - p };
 }
 
 /** Portion of a food as macros (qty = number of servings). */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { coverage, dayTargets, dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCrossed } from '../src/lib/nutrition';
 import { foodDue, hourLabel, waterDue, wrapDue, wrapText } from '../src/lib/reminders';
-import { FOODS, browseFoods, proteinPer100kcal, sortFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
+import { FOODS, browseFoods, planRest, proteinPer100kcal, sortFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
 import { addDays, atOn, daysSinceWeighIn, hhmmOf, weekStart } from '../src/lib/dates';
 import { chartWindow, goalProgress, suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
@@ -682,6 +682,23 @@ describe('nextBadge', () => {
     expect(nextBadge([b('a', 1, 1), b('b', 3, 7), b('c', 40, 50), b('d', 0, 1)])?.id).toBe('c');
     expect(nextBadge([b('x', 5, 10), b('y', 1, 2)])?.id).toBe('y'); // same share, smaller goal
     expect(nextBadge([b('a', 1, 1), b('d', 0, 5)])).toBeNull();
+  });
+});
+
+describe('planRest', () => {
+  const f = (name: string, kcal: number, protein: number, tags?: string) => ({ id: name, name, serving: '', kcal, protein, carbs: 0, fat: 0, tags });
+  const pool = [f('Whey', 120, 24, 'w'), f('Paneer bhurji', 450, 25), f('Milk', 170, 9), f('Pizza', 1800, 60), f('Roti', 120, 4)];
+  const need = { kcal: 800, protein: 50, carbs: 0, fat: 0 };
+  it('picks a few foods that close both gaps without a big overshoot', () => {
+    const plan = planRest(need, pool, { wheyOk: true })!;
+    expect(plan.foods.map((x) => x.name)).not.toContain('Pizza');
+    expect(plan.foods.length).toBeLessThanOrEqual(3);
+    expect(plan.kcal).toBeLessThanOrEqual(800 + 150);
+    expect(plan.protein).toBeGreaterThanOrEqual(40);
+  });
+  it('respects no-whey and stops when little is left', () => {
+    expect(planRest(need, pool, { wheyOk: false })!.foods.map((x) => x.name)).not.toContain('Whey');
+    expect(planRest({ kcal: 200, protein: 10, carbs: 0, fat: 0 }, pool, { wheyOk: true })).toBeNull();
   });
 });
 

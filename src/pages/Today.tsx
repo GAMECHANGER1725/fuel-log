@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useStore } from '../lib/store';
 import { addDays, daysSinceWeighIn, fmtDate, hhmmOf, weekStart } from '../lib/dates';
 import { KJ, dayTargets, dayTotals, energy, energySplit, entryMacros, fmt, paceGap, sinceLast, timeOf } from '../lib/nutrition';
-import { FOCUS_LABEL, FOODS, MOMENT_LABEL, gapFocus, gapSuggestions, momentOf, remaining } from '../lib/foods';
+import { FOCUS_LABEL, FOODS, MOMENT_LABEL, gapFocus, gapSuggestions, momentOf, planRest, remaining } from '../lib/foods';
 import { XP, nextBadge } from '../lib/game';
 import type { Entry, Food } from '../lib/types';
 import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, toastAdded, useEatenAt, useGame, useLongPress, useNow, useRoute, useSwipe, useToday } from '../components/ui';
@@ -74,6 +74,15 @@ export default function Today() {
         round,
       )
     : [];
+
+  // One way to finish the day, from the foods you actually eat (built-in ideas fill in if you have few).
+  const plan = gap.length
+    ? (() => {
+        const mine = [...s.favourites, ...s.recents].filter((f) => !noSuggest.includes(f.name.toLowerCase()));
+        const pool = mine.length >= 4 ? mine : [...mine, ...FOODS.filter((f) => f.tags && !noSuggest.includes(f.name.toLowerCase()))];
+        return planRest(need, pool.map((f) => withEdit(f, s.recipeEdits)), { wheyOk: s.settings.wheyOk, atSchool });
+      })()
+    : null;
 
   const addFood = (f: Food) => {
     const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty: 1, source: 'db', foodId: f.id }], [f]);
@@ -176,11 +185,11 @@ export default function Today() {
                       style={{ justifyContent: 'space-between', minHeight: 48, fontWeight: 500, whiteSpace: 'normal', textAlign: 'left', gap: 8 }}
                       onClick={() => setOpen(isOpen ? null : f.id)}
                     >
-                      <span>{f.name}</span>
-                      <span className="row" style={{ gap: 8, flex: 'none' }}>
-                        <span className="mono fuel">{energy(f.kcal, unit)} · {f.protein} g</span>
-                        <span style={{ display: 'flex', transform: isOpen ? 'rotate(90deg)' : undefined, transition: 'transform .15s' }}><Icon name="right" size={16} /></span>
+                      <span className="stack" style={{ gap: 2, minWidth: 0 }}>
+                        <span>{f.name}</span>
+                        <span className="mono fuel">{energy(f.kcal, unit)} {unit} · {f.protein} g</span>
                       </span>
+                      <span style={{ display: 'flex', flex: 'none', transform: isOpen ? 'rotate(90deg)' : undefined, transition: 'transform .15s' }}><Icon name="right" size={16} /></span>
                     </button>
                     <button className="btn dark icon" aria-label={`Log ${f.name}`} onClick={() => addFood(f)}>+</button>
                     <button
@@ -205,6 +214,23 @@ export default function Today() {
               );
             })}
           </div>
+          {plan && (
+            <div className="stack" style={{ gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.15)' }}>
+              <span className="small"><b>One way to finish today:</b> {plan.foods.map((f) => f.name).join(' + ')}</span>
+              <div className="between" style={{ alignItems: 'center', gap: 8 }}>
+                <span className="mono fuel">{energy(plan.kcal, unit)} {unit} · {fmt(plan.protein)} g</span>
+                <button
+                  className="btn dark sm"
+                  onClick={() => {
+                    const ids = s.addEntries(date, plan.foods.map((f) => ({ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty: 1, source: f.barcode ? ('off' as const) : ('db' as const), foodId: f.id })), plan.foods);
+                    toastAdded(`Added ${plan.foods.length} foods`, Math.min(plan.foods.length, XP.mealCap) * XP.meal, date, ids);
+                  }}
+                >
+                  Log all now
+                </button>
+              </div>
+            </div>
+          )}
           <a href="#/coach" className="btn dark block" style={{ marginTop: 10 }}>
             <Icon name="bolt" size={18} /> 5, 10 and 20 min ideas from your coach
           </a>
