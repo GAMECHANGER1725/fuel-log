@@ -480,11 +480,15 @@ function QuickLog({ date }: { date: string }) {
   const addEntries = useStore((s) => s.addEntries);
   const seen = new Set<string>();
   const foods = [...favourites, ...recents].filter((f) => !seen.has(f.name.toLowerCase()) && seen.add(f.name.toLowerCase())).slice(0, 10);
-  if (!foods.length) return null;
+  const today = useToday();
+  const link = (open: string) => `#/food?open=${open}${date === today ? '' : `&d=${date}`}`;
   return (
     <section className="stack" style={{ gap: 6 }}>
-      <span className="mono mut">Quick log · tap to add your usual amount</span>
+      <span className="mono mut">Quick log{foods.length ? ' · tap a food to add your usual amount' : ''}</span>
       <div className="quick">
+        <a className="chip" href={link('scan')}><Icon name="barcode" size={16} /> Scan</a>
+        <a className="chip" href={link('photo')}><Icon name="camera" size={16} /> Snap meal</a>
+        <a className="chip" href={link('manual')}><Icon name="pencil" size={16} /> Numbers</a>
         {foods.map((f) => (
           <button
             key={f.id + f.name}

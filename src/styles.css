@@ -287,3 +287,5 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 
 /* Offline banner */
 .offline { margin: 12px 16px 0; padding: 8px 14px; border-radius: 999px; background: var(--s2); color: var(--mut); font-size: 13px; font-weight: 600; text-align: center; }
+
+.quick a.chip { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; background: var(--fuel-soft); color: var(--fuel); }

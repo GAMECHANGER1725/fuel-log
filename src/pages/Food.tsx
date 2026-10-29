@@ -36,8 +36,15 @@ export default function FoodPage() {
   const [tidy, setTidy] = useState<'fav' | 'recent' | null>(null); // which list shows remove buttons
   const [editingFav, setEditingFav] = useState<Food | null>(null);
   const [picked, setPicked] = useState<Picked | null>(null);
-  // #/food?open=scan comes from the app-icon shortcut.
-  const [sheet, setSheet] = useState<'scan' | 'manual' | AiMode | null>(params.get('open') === 'scan' ? 'scan' : null);
+  // #/food?open=scan|manual|photo|label|text opens that sheet straight away (app-icon shortcut, Today's quick
+  // actions); closing it goes back to Today, since that's where the tap came from.
+  const opened = (['scan', 'manual', 'photo', 'label', 'text'] as const).find((m) => m === params.get('open')) ?? null;
+  const [sheet, setSheet] = useState<'scan' | 'manual' | AiMode | null>(opened);
+  const fromLink = useRef(!!opened);
+  const closeSheet = () => {
+    setSheet(null);
+    if (fromLink.current) back();
+  };
   const [off, setOff] = useState<{ q: string; foods: Food[]; loading: boolean; failed: boolean }>({ q: '', foods: [], loading: false, failed: false });
   const s = useStore();
   const unit = s.settings.unit;
@@ -211,11 +218,20 @@ export default function FoodPage() {
       </div>
 
       {editingFav && <FavEditSheet food={editingFav} onClose={() => setEditingFav(null)} />}
-      {picked && <AddSheet date={date} picked={picked} onClose={() => setPicked(null)} />}
-      {sheet === 'manual' && <ManualSheet date={date} onClose={() => setSheet(null)} />}
+      {picked && (
+        <AddSheet
+          date={date}
+          picked={picked}
+          onClose={() => {
+            setPicked(null);
+            if (fromLink.current) back();
+          }}
+        />
+      )}
+      {sheet === 'manual' && <ManualSheet date={date} onClose={closeSheet} />}
       {sheet === 'scan' && (
         <Scanner
-          onClose={() => setSheet(null)}
+          onClose={closeSheet}
           onFound={(food) => {
             setSheet(null);
             setPicked({ food, source: 'scan' });
@@ -223,7 +239,7 @@ export default function FoodPage() {
           onReadLabel={() => setSheet('label')}
         />
       )}
-      {(sheet === 'photo' || sheet === 'label' || sheet === 'text') && <AiSheet mode={sheet} date={date} initialText={sheet === 'text' ? q : ''} onClose={() => setSheet(null)} />}
+      {(sheet === 'photo' || sheet === 'label' || sheet === 'text') && <AiSheet mode={sheet} date={date} initialText={sheet === 'text' ? q : ''} onClose={closeSheet} />}
     </>
   );
 }
