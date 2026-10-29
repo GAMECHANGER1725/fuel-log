@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useStore } from '../lib/store';
-import { fmtDate, todayKey } from '../lib/dates';
+import { daysBetween, fmtDate, todayKey } from '../lib/dates';
 import { BROWSE, FOODS, FOOD_SORTS, browseFoods, foodMacros, proteinPer100kcal, searchFoods, sortFoods, type Browse } from '../lib/foods';
 import { searchProducts } from '../lib/off';
 import { coverage, dayTargets, dayTotals, energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
@@ -12,7 +12,7 @@ import AiSheet from '../components/AiSheet';
 import { hasAi, type AiMode } from '../lib/ai';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
-import { lastQty, mealGroups, type MealGroup } from '../lib/meals';
+import { foodHistory, lastQty, mealGroups, type MealGroup } from '../lib/meals';
 import { usePrefs } from '../lib/prefs';
 
 type Picked = { food: Food; source: Source };
@@ -300,6 +300,8 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
   const xp = XP.meal + (source === 'scan' ? XP.scan : 0);
   const recipe = recipeFor(food, s.recipeEdits);
   const when = useEatenAt(date);
+  const hist = useMemo(() => foodHistory(s.days, todayKey(), food.name), [s.days, food.name]);
+  const ago = hist.last && daysBetween(hist.last, todayKey());
 
   const add = () => {
     const entry =
@@ -316,6 +318,11 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
       <div className="stack" style={{ gap: 2 }}>
         <span className="mono mut">{source === 'scan' ? `Scanned · ${food.barcode}` : source === 'off' ? 'Open Food Facts' : food.serving}</span>
         <h2 className="h2" style={{ fontSize: 26 }}>{food.name}</h2>
+        <span className="small mut">
+          {hist.last
+            ? `Had on ${hist.days} day${hist.days === 1 ? '' : 's'} in the last month · last ${ago === 0 ? 'today' : ago === 1 ? 'yesterday' : `${ago} days ago`}`
+            : 'New to your log'}
+        </span>
       </div>
       {byGrams && (
         <div className="row">

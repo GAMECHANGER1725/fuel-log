@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
+import { daySummary, foodHistory, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -550,6 +550,18 @@ describe('usual amount and targets crossed', () => {
     expect(lastQty(days, k, 'Rotli, plain', '1 rotli')).toBe(2);
     expect(lastQty(days, k, 'Dal', '1 bowl')).toBe(1);
     expect(lastQty(days, addDays(k, 40), 'Rotli, plain', '1 rotli')).toBe(1);
+  });
+  it('counts the days you had a food, and the last one', () => {
+    const k = '2026-10-20';
+    const e = (name: string) => entry(100, 5, { name });
+    const days: Record<string, DayLog> = {
+      [k]: day([e('Dal'), e('dal ')]),
+      [addDays(k, -3)]: day([e('Dal')]),
+      [addDays(k, -40)]: day([e('Dal')]),
+    };
+    expect(foodHistory(days, k, 'DAL')).toEqual({ days: 2, last: k });
+    expect(foodHistory(days, addDays(k, 2), 'Dal')).toEqual({ days: 2, last: k });
+    expect(foodHistory(days, k, 'Paneer')).toEqual({ days: 0, last: null });
   });
   it('spots a target just passed', () => {
     const T = { kcal: 3000, protein: 115, carbs: 0, fat: 0 };

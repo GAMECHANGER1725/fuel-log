@@ -19,6 +19,27 @@ export function lastQty(days: Record<string, DayLog>, today: string, name: strin
   return 1;
 }
 
+export interface FoodHistory {
+  /** Days in the last `lookback` with this food logged. */
+  days: number;
+  /** Most recent day it was logged, or null. */
+  last: string | null;
+}
+
+/** How often you've had a food (by name, any serving) in the last `lookback` days, for the food sheet. */
+export function foodHistory(days: Record<string, DayLog>, today: string, name: string, lookback = 30): FoodHistory {
+  const n = name.trim().toLowerCase();
+  let count = 0;
+  let last: string | null = null;
+  for (let i = 0; i < lookback; i++) {
+    const k = addDays(today, -i);
+    if (!(days[k]?.entries ?? []).some((e) => e.name.trim().toLowerCase() === n)) continue;
+    count++;
+    last ??= k;
+  }
+  return { days: count, last };
+}
+
 export interface MealGroup {
   /** Same foods and amounts give the same key. */
   key: string;
