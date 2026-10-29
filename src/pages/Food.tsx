@@ -35,6 +35,7 @@ export default function FoodPage() {
   }, []);
   const [tidy, setTidy] = useState<'fav' | 'recent' | null>(null); // which list shows remove buttons
   const [editingFav, setEditingFav] = useState<Food | null>(null);
+  const [allRecent, setAllRecent] = useState(false);
   const [picked, setPicked] = useState<Picked | null>(null);
   // #/food?open=scan|manual|photo|label|text opens that sheet straight away (app-icon shortcut, Today's quick
   // actions); closing it goes back to Today, since that's where the tap came from.
@@ -211,7 +212,8 @@ export default function FoodPage() {
             )}
             <section>
               {s.recents.length ? listHead('Recent', 'recent') : <h2 className="h2" style={{ marginBottom: 6 }}>Recent</h2>}
-              {s.recents.length ? s.recents.slice(0, 12).map((f) => row(f, f.barcode ? 'off' : 'db', tidy === 'recent' ? () => s.removeRecent(f.name) : undefined)) : <p className="empty">Foods you log show up here for one-tap adding.</p>}
+              {s.recents.length ? s.recents.slice(0, allRecent ? undefined : 12).map((f) => row(f, f.barcode ? 'off' : 'db', tidy === 'recent' ? () => s.removeRecent(f.name) : undefined)) : <p className="empty">Foods you log show up here for one-tap adding.</p>}
+              {s.recents.length > 12 && <button className="btn sm" style={{ marginTop: 8 }} onClick={() => setAllRecent(!allRecent)}>{allRecent ? 'Show fewer' : `Show all ${s.recents.length}`}</button>}
             </section>
           </>
         )}
