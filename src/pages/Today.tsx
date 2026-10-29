@@ -8,6 +8,7 @@ import type { Entry, Food } from '../lib/types';
 import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, useEatenAt, useGame, useRoute, useToday } from '../components/ui';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
+import { usePrefs, type Card } from '../lib/prefs';
 
 const CHECKS: [string, string][] = [
   ['veg', 'Fruit or veg'],
@@ -26,6 +27,8 @@ export default function Today() {
   const [editing, setEditing] = useState<Entry | null>(null);
   const [round, setRound] = useState(0); // how many times Close the gap was refreshed
   const [open, setOpen] = useState<string | null>(null); // which idea's recipe is showing
+  const hidden = usePrefs((p) => p.hidden);
+  const show = (c: Card) => !hidden.includes(c);
 
   const day = s.days[date] ?? { entries: [], water: 0, checks: {} };
   const t = dayTotals(day);
@@ -43,7 +46,7 @@ export default function Today() {
   const need = remaining(T, t);
   const focus = gapFocus(need, T);
   const hour = now.getHours() + now.getMinutes() / 60;
-  const gap = isToday
+  const gap = isToday && show('gap')
     ? gapSuggestions(need, T, [...s.favourites, ...FOODS.filter((f) => f.tags)].map((f) => withEdit(f, s.recipeEdits)), { wheyOk: s.settings.wheyOk, atSchool, hour }, 3, round)
     : [];
 
@@ -63,10 +66,11 @@ export default function Today() {
           <button className="btn icon sm" style={{ width: 36 }} aria-label="Previous day" onClick={() => setDate(addDays(date, -1))}>
             <Icon name="left" size={18} />
           </button>
-          <div className="stack" style={{ gap: 2, padding: '0 6px' }}>
-            <span className="mono mut">{fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+          <label className="stack date-pick" style={{ gap: 2, padding: '0 6px' }}>
+            <span className="mono mut">{fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short' })} ▾</span>
             <h1 className="title">{isToday ? 'Today' : date === addDays(today, -1) ? 'Yesterday' : fmtDate(date, { weekday: 'long' })}</h1>
-          </div>
+            <input type="date" aria-label="Pick a day" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value <= today ? e.target.value : today)} />
+          </label>
           {!isToday && (
             <button className="btn icon sm" style={{ width: 36 }} aria-label="Next day" onClick={() => setDate(addDays(date, 1))}>
               <Icon name="right" size={18} />
@@ -74,6 +78,7 @@ export default function Today() {
           )}
         </div>
         <div className="row">
+          {date < addDays(today, -1) && <button className="btn sm" onClick={() => setDate(today)}>Today</button>}
           <a href="#/profile" className="btn sm" aria-label={`Streak ${g.streak.current} days`}>
             <span className="fuel"><Icon name="flame" size={16} stroke={2.2} /></span>
             <span className="num" style={{ fontSize: 20 }}>{g.streak.current}</span>
@@ -112,7 +117,7 @@ export default function Today() {
               </div>
             </div>
           </div>
-          <div className="grid2 rule" style={{ marginTop: 14, paddingTop: 14, gap: 12 }}>
+          {show('macros') && <div className="grid2 rule" style={{ marginTop: 14, paddingTop: 14, gap: 12 }}>
             <div className="stack" style={{ gap: 6 }}>
               <div className="between"><span className="mono mut">Carbs</span><span className="small">{fmt(t.carbs)} / {T.carbs} g</span></div>
               <Bar value={t.carbs} max={T.carbs} color="var(--carb)" />
@@ -121,10 +126,10 @@ export default function Today() {
               <div className="between"><span className="mono mut">Fat</span><span className="small">{fmt(t.fat)} / {T.fat} g</span></div>
               <Bar value={t.fat} max={T.fat} color="var(--fat)" />
             </div>
-          </div>
+          </div>}
         </section>
 
-        {isToday && (
+        {isToday && show('quests') && (
           <section className="card">
             <div className="between" style={{ marginBottom: 10 }}>
               <h2 className="h2">Daily quests</h2>
@@ -226,7 +231,7 @@ export default function Today() {
           <a href={addHref} className="btn primary block"><Icon name="plus" size={18} stroke={3} /> Add food</a>
         </section>
 
-        <section className="card">
+        {show('water') && <section className="card">
           <div className="between" style={{ alignItems: 'center' }}>
             <div className="stack" style={{ gap: 2 }}>
               <span className="mono mut">Water</span>
@@ -242,18 +247,18 @@ export default function Today() {
               <div key={i} style={{ height: 10, background: i < day.water ? 'var(--pro)' : 'var(--track)' }} />
             ))}
           </div>
-        </section>
+        </section>}
 
-        <section className="card">
+        {show('quality') && <section className="card">
           <span className="mono mut">Food quality · +5 XP each</span>
           <div className="row" style={{ flexWrap: 'wrap', marginTop: 10 }}>
             {CHECKS.map(([k, label]) => (
               <button key={k} className="chip" aria-pressed={!!day.checks[k]} onClick={() => s.toggleCheck(date, k)}>{label}</button>
             ))}
           </div>
-        </section>
+        </section>}
 
-        <details className="card">
+        {show('tips') && <details className="card">
           <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Ways to eat more without feeling stuffed</summary>
           <ul className="small mut" style={{ paddingLeft: 18, margin: '10px 0 0', display: 'grid', gap: 6 }}>
             <li>Add a snack or a drink before making meals bigger. Three meals plus two or three snacks is easier than three huge meals.</li>
@@ -262,7 +267,9 @@ export default function Today() {
             <li>Keep a snack in your school bag so recess and after school never get skipped.</li>
             <li>Build up over 2 to 3 weeks. Jumping to a big target overnight usually backfires.</li>
           </ul>
-        </details>
+        </details>}
+
+        <a href="#/profile?open=display" className="btn sm" style={{ alignSelf: 'center' }}><Icon name="pencil" size={14} /> Customise this page</a>
       </div>
 
       {editing && <EditSheet date={date} entry={editing} onClose={() => setEditing(null)} />}
@@ -272,6 +279,7 @@ export default function Today() {
 
 function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClose: () => void }) {
   const s = useStore();
+  const today = useToday();
   const [qty, setQty] = useState(entry.qty);
   const when = useEatenAt(date, entry.at);
   const m = entryMacros({ ...entry, qty });
@@ -286,7 +294,17 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
       <MacroGrid {...m} unit={s.settings.unit} />
       <TimeField value={when.hhmm} onChange={when.setHhmm} />
       <div className="row">
-        <button className="btn danger" onClick={() => { s.removeEntry(date, entry.id); toast(`Removed ${entry.name}`); onClose(); }} aria-label="Delete"><Icon name="trash" size={18} /></button>
+        <button
+          className="btn danger"
+          aria-label="Delete"
+          onClick={() => {
+            s.removeEntry(date, entry.id);
+            toast(`Removed ${entry.name}`, 0, { label: 'Undo', run: () => useStore.getState().restoreEntry(date, entry) });
+            onClose();
+          }}
+        >
+          <Icon name="trash" size={18} />
+        </button>
         <button
           className="btn"
           aria-pressed={fav}
@@ -301,6 +319,16 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
         </button>
         <button className="btn primary grow" onClick={() => { s.updateEntry(date, entry.id, when.hhmm === hhmmOf(entry.at) ? { qty } : { qty, at: when.at }); onClose(); }}>Save</button>
       </div>
+      <button
+        className="btn dashed"
+        onClick={() => {
+          s.addEntries(today, [{ name: entry.name, serving: entry.serving, base: entry.base, qty, source: entry.source, foodId: entry.foodId }]);
+          toast(`Logged ${entry.name} again${date === today ? '' : ' today'}`, XP.meal);
+          onClose();
+        }}
+      >
+        <Icon name="copy" size={16} /> Have it again now
+      </button>
     </Sheet>
   );
 }

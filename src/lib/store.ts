@@ -23,6 +23,8 @@ interface Actions {
   addEntries: (date: string, items: NewEntry[], foods?: Food[], at?: number) => void;
   updateEntry: (date: string, id: string, patch: Partial<Entry>) => void;
   removeEntry: (date: string, id: string) => void;
+  /** Put a removed entry back (undo). It gets a new id, since the old one stays in `tomb`. */
+  restoreEntry: (date: string, e: Entry) => void;
   copyDay: (from: string, to: string) => number;
   setWater: (date: string, glasses: number) => void;
   toggleCheck: (date: string, key: string) => void;
@@ -67,6 +69,7 @@ export const useStore = create<AppData & Actions>()(
           editDay(date, (d) => ({ ...d, entries: d.entries.filter((e) => e.id !== id) }));
           set((s) => ({ tomb: { ...s.tomb, [id]: Date.now() } }));
         },
+        restoreEntry: (date, e) => editDay(date, (d) => ({ ...d, entries: [...d.entries, { ...e, id: uid(), upd: Date.now() }] })),
         copyDay: (from, to) => {
           const src = get().days[from]?.entries ?? [];
           if (!src.length) return 0;

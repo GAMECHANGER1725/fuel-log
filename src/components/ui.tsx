@@ -174,21 +174,28 @@ export function MacroGrid({ kcal, protein, carbs, fat, unit }: { kcal: number; p
 
 // ----- Toast ---------------------------------------------------------------------
 
-export const useToast = create<{ msg: string | null; xp: number; n: number; show: (msg: string, xp?: number) => void }>((set) => ({
+/** A button on a toast, e.g. Undo. */
+export interface ToastAction {
+  label: string;
+  run: () => void;
+}
+
+export const useToast = create<{ msg: string | null; xp: number; n: number; action?: ToastAction; show: (msg: string, xp?: number, action?: ToastAction) => void }>((set) => ({
   msg: null,
   xp: 0,
   n: 0,
-  show: (msg, xp = 0) => set((s) => ({ msg, xp, n: s.n + 1 })),
+  show: (msg, xp = 0, action) => set((s) => ({ msg, xp, action, n: s.n + 1 })),
 }));
-export const toast = (msg: string, xp = 0) => useToast.getState().show(msg, xp);
+export const toast = (msg: string, xp = 0, action?: ToastAction) => useToast.getState().show(msg, xp, action);
 
 export function Toast() {
-  const { msg, xp, n } = useToast();
+  const { msg, xp, n, action } = useToast();
   const [shown, setShown] = useState(false);
   useEffect(() => {
     if (!msg) return;
     setShown(true);
-    const t = setTimeout(() => setShown(false), 2400);
+    // Longer when there's something to tap.
+    const t = setTimeout(() => setShown(false), action ? 5000 : 2400);
     return () => clearTimeout(t);
   }, [msg, n]);
   if (!shown || !msg) return null;
@@ -196,6 +203,17 @@ export function Toast() {
     <div className="toast" role="status" aria-live="polite" key={n}>
       <span>{msg}</span>
       {xp > 0 && <span className="xp">+{xp} XP</span>}
+      {action && (
+        <button
+          className="toast-act"
+          onClick={() => {
+            action.run();
+            setShown(false);
+          }}
+        >
+          {action.label}
+        </button>
+      )}
     </div>
   );
 }

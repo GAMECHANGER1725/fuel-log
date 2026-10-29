@@ -11,6 +11,7 @@ import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { remindersOn, remindersSupported, setReminders } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
+import { CARDS, usePrefs } from '../lib/prefs';
 
 const TONE = { fuel: 'var(--fuel)', protein: 'var(--pro)', sand: 'var(--carb)', ink: 'var(--ink)' };
 
@@ -101,7 +102,7 @@ export default function ProfilePage() {
         <Section title="Sync between devices" hint={syncHint} hintColor={sync.status === 'error' && sync.kind !== 'offline' ? 'var(--danger)' : sync.conn ? 'var(--pro)' : undefined} open={open === 'sync'}>
           <SyncForm />
         </Section>
-        <Section title="Display and food" hint={`${s.settings.unit} · ${s.settings.theme === 'auto' ? 'match device' : s.settings.theme}`}>
+        <Section title="Display and food" hint={`${s.settings.unit} · ${s.settings.theme === 'auto' ? 'match device' : s.settings.theme}`} open={open === 'display'}>
           <DisplayForm />
         </Section>
         <Section title="Backup and import" hint={s.lastExport ? `Last export ${fmtDate(s.lastExport)}` : 'Never exported'} open={open === 'backup'}>
@@ -326,6 +327,8 @@ function DisplayForm() {
       {opt(s.settings.unit, (unit) => s.setSettings({ unit }), [['kcal', 'Calories (kcal)'], ['kJ', 'Kilojoules (kJ)']])}
       <span className="mono mut">Theme</span>
       {opt(s.settings.theme, (theme) => s.setSettings({ theme }), [['auto', 'Match device'], ['dark', 'Dark'], ['light', 'Light']])}
+      <span className="mono mut">Show on Today (this device)</span>
+      <TodayCards />
       <span className="mono mut">Suggestions</span>
       <label className="row small">
         <input type="checkbox" checked={s.settings.wheyOk} onChange={(e) => s.setSettings({ wheyOk: e.target.checked })} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
@@ -334,6 +337,17 @@ function DisplayForm() {
       <span className="mono mut">Reminders</span>
       <ReminderToggle />
     </>
+  );
+}
+
+function TodayCards() {
+  const { hidden, toggle } = usePrefs();
+  return (
+    <div className="row" style={{ flexWrap: 'wrap' }}>
+      {CARDS.map(([id, label]) => (
+        <button key={id} className="chip" aria-pressed={!hidden.includes(id)} onClick={() => toggle(id)}>{label}</button>
+      ))}
+    </div>
   );
 }
 

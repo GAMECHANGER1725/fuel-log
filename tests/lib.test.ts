@@ -11,6 +11,7 @@ import { parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
+import { cleanHidden, toggleIn } from '../src/lib/prefs';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -346,5 +347,17 @@ describe('reminders', () => {
     expect(foodDue(at(17), '2026-10-09')).toBe(false);
     expect(foodDue(at(17), '2026-10-08')).toBe(true);
     expect(foodDue(at(20), '')).toBe(false);
+  });
+});
+
+describe('prefs', () => {
+  it('keeps only known Today cards, once each', () => {
+    expect(cleanHidden(['water', 'nope', 'water', 3, 'tips'])).toEqual(['water', 'tips']);
+    expect(cleanHidden('water')).toEqual([]);
+    expect(cleanHidden(undefined)).toEqual([]);
+  });
+  it('toggles a card in and out', () => {
+    expect(toggleIn([], 'gap')).toEqual(['gap']);
+    expect(toggleIn(['gap', 'water'], 'gap')).toEqual(['water']);
   });
 });

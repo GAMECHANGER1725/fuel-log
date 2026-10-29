@@ -188,6 +188,7 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .check { width: 24px; height: 24px; border-radius: 999px; flex: none; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 2px var(--line2); }
 .check.on { background: var(--fuel); color: var(--on-fuel); box-shadow: none; }
 .toast .xp { color: var(--fuel); font-size: 13px; }
+.toast-act { border: 0; background: none; color: var(--fuel); font: inherit; font-weight: 800; padding: 6px 2px 6px 8px; margin: -6px -6px -6px 0; min-height: 36px; cursor: pointer; }
 
 /* Bottom nav: icons only, ember tint on the current tab, round + in the middle. */
 .nav a[aria-current='page'] { background: var(--fuel-soft); color: var(--fuel); }
@@ -228,3 +229,8 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Tap the date on Today to jump to any day: a native date input laid invisibly over the label. */
+.date-pick { position: relative; cursor: pointer; }
+.date-pick input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; border: 0; padding: 0; cursor: pointer; }
+.date-pick input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
