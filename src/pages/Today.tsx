@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card } from '../lib/prefs';
-import { SECTION_LABEL, logSections } from '../lib/meals';
+import { SECTION_LABEL, daySummary, logSections } from '../lib/meals';
 
 const CHECKS: [string, string][] = [
   ['veg', 'Fruit or veg'],
@@ -265,6 +265,26 @@ export default function Today() {
             <p className="empty">Nothing logged {isToday ? 'yet today' : 'this day'}.</p>
           )}
           <a href={addHref} className="btn primary block"><Icon name="plus" size={18} stroke={3} /> Add food</a>
+          {sections.length > 0 && (
+            <button
+              className="btn sm"
+              style={{ alignSelf: 'center' }}
+              onClick={async () => {
+                const text = daySummary(fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long' }), day.entries, T, unit, timeOf);
+                try {
+                  if (navigator.share) await navigator.share({ text });
+                  else {
+                    await navigator.clipboard.writeText(text);
+                    toast('Day summary copied');
+                  }
+                } catch (e) {
+                  if ((e as Error).name !== 'AbortError') toast('Could not share. Try again.');
+                }
+              }}
+            >
+              <Icon name="copy" size={14} /> Share this day
+            </button>
+          )}
         </section>
 
         {show('water') && <section className="card">
@@ -351,7 +371,8 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
   const s = useStore();
   const today = useToday();
   const [qty, setQty] = useState(entry.qty);
-  const when = useEatenAt(date, entry.at);
+  const [day, setDay] = useState(date);
+  const when = useEatenAt(day, entry.at);
   const unit = s.settings.unit;
   // Name and per-serving numbers, editable to correct an estimate after logging.
   const toUnit = (kcal: number) => String(Math.round(unit === 'kJ' ? kcal * KJ : kcal));
@@ -381,6 +402,10 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
       <Stepper value={qty} onChange={setQty} label="servings" presets={SERVING_PRESETS} />
       <MacroGrid {...m} unit={s.settings.unit} />
       <TimeField value={when.hhmm} onChange={when.setHhmm} />
+      <label className="field">
+        <span>Day eaten</span>
+        <input className="input" type="date" max={today} value={day} onChange={(e) => e.target.value && setDay(e.target.value <= today ? e.target.value : today)} aria-label="Day eaten" />
+      </label>
       <details className="rule">
         <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 600 }}>Change name or numbers</summary>
         <div className="stack" style={{ gap: 10, paddingBottom: 6 }}>
@@ -418,7 +443,18 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
         >
           <Icon name="star" size={18} />
         </button>
-        <button className="btn primary grow" onClick={() => { s.updateEntry(date, entry.id, { qty, ...infoPatch, ...(when.hhmm === hhmmOf(entry.at) ? {} : { at: when.at }) }); onClose(); }}>Save</button>
+        <button
+          className="btn primary grow"
+          onClick={() => {
+            if (day !== date) {
+              s.moveEntry(date, day, { ...entry, qty, ...infoPatch, at: when.at });
+              toast(`Moved to ${fmtDate(day, { weekday: 'short', day: 'numeric', month: 'short' })}`);
+            } else s.updateEntry(date, entry.id, { qty, ...infoPatch, ...(when.hhmm === hhmmOf(entry.at) ? {} : { at: when.at }) });
+            onClose();
+          }}
+        >
+          {day !== date ? 'Move' : 'Save'}
+        </button>
       </div>
       <button
         className="btn dashed"

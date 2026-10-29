@@ -25,6 +25,8 @@ interface Actions {
   removeEntry: (date: string, id: string) => void;
   /** Put a removed entry back (undo). It gets a new id, since the old one stays in `tomb`. */
   restoreEntry: (date: string, e: Entry) => void;
+  /** Move an entry to another day (and time). Like delete + add, so sync sees the change on both days. */
+  moveEntry: (from: string, to: string, e: Entry) => void;
   copyDay: (from: string, to: string) => number;
   setWater: (date: string, glasses: number) => void;
   toggleCheck: (date: string, key: string) => void;
@@ -74,6 +76,10 @@ export const useStore = create<AppData & Actions>()(
           set((s) => ({ tomb: { ...s.tomb, [id]: Date.now() } }));
         },
         restoreEntry: (date, e) => editDay(date, (d) => ({ ...d, entries: [...d.entries, { ...e, id: uid(), upd: Date.now() }] })),
+        moveEntry: (from, to, e) => {
+          get().removeEntry(from, e.id);
+          get().restoreEntry(to, e);
+        },
         copyDay: (from, to) => {
           const src = get().days[from]?.entries ?? [];
           if (!src.length) return 0;

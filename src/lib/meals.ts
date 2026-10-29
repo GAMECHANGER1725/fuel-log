@@ -3,7 +3,7 @@
 
 import type { DayLog, Entry } from './types';
 import { addDays } from './dates';
-import { sumEntries } from './nutrition';
+import { energy, sumEntries } from './nutrition';
 import { momentOf, type Moment } from './foods';
 
 export interface MealGroup {
@@ -85,4 +85,16 @@ export function logSections(entries: Entry[]): LogSection[] {
     s.protein = t.protein;
   }
   return out;
+}
+
+/** Plain-text summary of a day for sharing, e.g. with a parent or coach. */
+export function daySummary(title: string, entries: Entry[], target: { kcal: number; protein: number }, unit: 'kcal' | 'kJ', fmtTime: (ms: number) => string): string {
+  const t = sumEntries(entries);
+  const e = (kcal: number) => `${energy(kcal, unit)} ${unit}`;
+  const lines = [`${title}: ${e(t.kcal)} of ${e(target.kcal)}, ${Math.round(t.protein)} g of ${target.protein} g protein`];
+  for (const s of logSections(entries)) {
+    lines.push('', `${SECTION_LABEL[s.moment]} (${e(s.kcal)}, ${Math.round(s.protein)} g)`);
+    for (const x of s.entries) lines.push(`• ${fmtTime(x.at)} ${x.qty !== 1 ? `${x.qty}× ` : ''}${x.name}`);
+  }
+  return lines.join('\n');
 }
