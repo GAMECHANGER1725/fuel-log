@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29d';
+export const NEWS_ID = '2026-10-29e';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['By weekday', 'Progress shows your average energy and protein for each day of the week, so a day you usually fall short stands out.', '#/progress'],
   ['Speak instead of typing', 'Tap the mic in Add food’s search, or Speak it under Describe it, and say what you ate.', '#/food'],
   ['How often you have it', 'A food’s Add sheet shows how many days you had it in the last month and when you last did.'],
   ['Training days', 'Tap Training day on Today to add 200 to 500 kcal to that day’s target (size in Profile). The week strip marks boosted days and days with a note.'],

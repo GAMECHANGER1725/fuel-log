@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, foodHistory, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
+import { daySummary, foodHistory, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -550,6 +550,20 @@ describe('usual amount and targets crossed', () => {
     expect(lastQty(days, k, 'Rotli, plain', '1 rotli')).toBe(2);
     expect(lastQty(days, k, 'Dal', '1 bowl')).toBe(1);
     expect(lastQty(days, addDays(k, 40), 'Rotli, plain', '1 rotli')).toBe(1);
+  });
+  it('averages energy and protein by weekday, Monday first', () => {
+    const today = '2026-10-29'; // a Thursday
+    const days: Record<string, DayLog> = {
+      '2026-10-26': day([entry(2000, 100)]), // Monday
+      '2026-10-19': day([entry(3000, 120)]), // Monday
+      '2026-10-25': day([entry(2500, 90)]), // Sunday
+      [today]: day([entry(9000, 900)]), // today doesn't count
+      '2026-08-01': day([entry(9000, 900)]), // too old
+    };
+    const w = weekdayAverages(days, today);
+    expect(w[0]).toEqual({ wd: 0, kcal: 2500, protein: 110, n: 2 });
+    expect(w[6]).toEqual({ wd: 6, kcal: 2500, protein: 90, n: 1 });
+    expect(w[3]).toEqual({ wd: 3, kcal: 0, protein: 0, n: 0 });
   });
   it('counts the days you had a food, and the last one', () => {
     const k = '2026-10-20';

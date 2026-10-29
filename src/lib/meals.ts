@@ -2,7 +2,7 @@
 // A group is two or more entries on one day each within `gapMin` minutes of the one before.
 
 import type { DayLog, Entry, Food } from './types';
-import { addDays, atOn } from './dates';
+import { addDays, atOn, dateOf } from './dates';
 import { energy, roundMacros, sumEntries } from './nutrition';
 import { momentOf, type Moment } from './foods';
 
@@ -217,6 +217,31 @@ export function insights(days: Record<string, DayLog>, today: string, target: { 
   const all = totals.reduce((a, x) => a + x.t.kcal, 0);
   if (all > 0 && late / all > 0.3) out.push({ tone: 'tip', text: `About ${Math.round((late / all) * 100)}% of your energy comes after 9 pm. Moving some earlier can help sleep.` });
   return out.slice(0, 4);
+}
+
+export interface WeekdayAvg {
+  /** 0 = Monday … 6 = Sunday. */
+  wd: number;
+  kcal: number;
+  protein: number;
+  /** Logged days that went into the average. */
+  n: number;
+}
+
+/** Average energy and protein for each weekday (Monday first) over the last `weeks` weeks, logged days before today only. */
+export function weekdayAverages(days: Record<string, DayLog>, today: string, weeks = 8): WeekdayAvg[] {
+  const out = Array.from({ length: 7 }, (_, wd) => ({ wd, kcal: 0, protein: 0, n: 0 }));
+  for (let i = 1; i <= weeks * 7; i++) {
+    const k = addDays(today, -i);
+    const d = days[k];
+    if (!d?.entries.length) continue;
+    const t = sumEntries(d.entries);
+    const o = out[(dateOf(k).getDay() + 6) % 7];
+    o.kcal += t.kcal;
+    o.protein += t.protein;
+    o.n++;
+  }
+  return out.map((o) => (o.n ? { ...o, kcal: o.kcal / o.n, protein: o.protein / o.n } : o));
 }
 
 /** Plain-text week summary for sharing: this week's stats, last week's for comparison, and weight change. */

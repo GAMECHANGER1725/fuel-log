@@ -6,7 +6,7 @@ import { chartWindow, goalProgress, projectedDate, trendLine, weeklyNudge, weekl
 
 import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
-import { records, topFoods, weekStats, weekSummary } from '../lib/meals';
+import { records, topFoods, weekdayAverages, weekStats, weekSummary } from '../lib/meals';
 import { hasAi } from '../lib/ai';
 import { Bar, Icon, Sheet, toast, useGame, useRoute, useToday } from '../components/ui';
 
@@ -143,6 +143,7 @@ export default function Progress() {
         <WeekCompare today={today} />
 
         <DailyChart today={today} />
+        <WeekdayChart today={today} />
 
         {(() => {
           const r = records(s.days);
@@ -311,6 +312,53 @@ function TopFoods({ today }: { today: string }) {
           </div>
         </div>
       ))}
+    </section>
+  );
+}
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+/** Average energy or protein per weekday over the last 8 weeks, so a habitually light day stands out. */
+function WeekdayChart({ today }: { today: string }) {
+  const days = useStore((s) => s.days);
+  const T = useStore((s) => s.settings.targets);
+  const unit = useStore((s) => s.settings.unit);
+  const [what, setWhat] = useState<'kcal' | 'protein'>('kcal');
+  const avgs = weekdayAverages(days, today);
+  const seen = avgs.filter((a) => a.n);
+  if (avgs.reduce((a, b) => a + b.n, 0) < 7 || seen.length < 3) return null;
+  const target = T[what];
+  const top = Math.max(target * 1.25, ...avgs.map((a) => a[what]));
+  const H = 100;
+  const color = what === 'kcal' ? 'var(--fuel)' : 'var(--pro)';
+  const show = (v: number) => (what === 'kcal' ? `${energy(v, unit)} ${unit}` : `${fmt(v)} g`);
+  const low = seen.reduce((a, b) => (b[what] < a[what] ? b : a));
+  const high = seen.reduce((a, b) => (b[what] > a[what] ? b : a));
+  return (
+    <section className="card">
+      <div className="between" style={{ marginBottom: 10, alignItems: 'center' }}>
+        <h2 className="h2">By weekday</h2>
+        <div className="row" style={{ gap: 6 }}>
+          <button className="chip" aria-pressed={what === 'kcal'} onClick={() => setWhat('kcal')}>Energy</button>
+          <button className="chip" aria-pressed={what === 'protein'} onClick={() => setWhat('protein')}>Protein</button>
+        </div>
+      </div>
+      <div className="chart14" style={{ height: H, gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8 }}>
+        <span className="chart14-target" style={{ bottom: (target / top) * H }} />
+        {avgs.map((a) => (
+          <a key={a.wd} aria-label={`${WEEKDAYS[a.wd]}: ${a.n ? `${show(a[what])} average over ${a.n} day${a.n === 1 ? '' : 's'}` : 'nothing logged'}`}>
+            <i style={{ height: Math.max(a.n ? 3 : 0, (a[what] / top) * H), background: a[what] >= target ? color : `color-mix(in srgb, ${color} 55%, var(--track))` }} />
+          </a>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8, marginTop: 6 }}>
+        {avgs.map((a) => (
+          <span key={a.wd} className="mono dim" style={{ fontSize: 10, textAlign: 'center', fontWeight: a === low ? 800 : undefined }}>{WEEKDAYS[a.wd].slice(0, 3)}</span>
+        ))}
+      </div>
+      <p className="small mut" style={{ marginTop: 6 }}>
+        Last 8 weeks, logged days. {low === high ? '' : `${WEEKDAYS[low.wd]}s are your lightest (${show(low[what])}), ${WEEKDAYS[high.wd]}s your biggest (${show(high[what])}).`}
+      </p>
     </section>
   );
 }
