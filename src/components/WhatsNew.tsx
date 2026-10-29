@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29zl';
+export const NEWS_ID = '2026-10-29zm';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Ate it a bit ago?', 'Under the time when logging, tap −15 min, −30 min or −1 h instead of changing the clock.'],
   ['Weekly goal', 'Aim for 4 to 7 days a week on both targets; This week on Today shows how you’re going. Set it in Profile, Today page.', '#/profile?open=today'],
   ['Cook for more', 'Recipes have Makes 1, 2 or 4 to scale the ingredients, and the shopping list gets the scaled amounts.'],
   ['Pause reminders for today', 'Busy day? Pause every reminder until tomorrow in Profile, Reminders.', '#/profile?open=reminders'],

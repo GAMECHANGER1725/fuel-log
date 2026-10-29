@@ -3,7 +3,7 @@ import { badgeCount, coverage, dayTargets, dayTotals, energy, energySplit, forGr
 import { eatDue, foodDue, hourLabel, waterDue, wrapDue, wrapText } from '../src/lib/reminders';
 import { FOODS, browseFoods, planRest, proteinPer100kcal, sortFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros, scaleAmount, scaleItem } from '../src/lib/recipes';
-import { addDays, atOn, daysSinceWeighIn, monthRange, hhmmOf, weekStart } from '../src/lib/dates';
+import { addDays, atOn, daysSinceWeighIn, monthRange, shiftHhmm, hhmmOf, weekStart } from '../src/lib/dates';
 import { chartWindow, goalProgress, suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
 import { computeGame, levelFromXp, nextBadge, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
 import { DEFAULT_CHECKS, DEFAULT_DATA, cleanChecks, exportCsv, exportText, normalize, parseBackup } from '../src/lib/backup';
@@ -616,6 +616,14 @@ describe('eat reminder', () => {
     expect(eatDue(at('14:00'), at('10:30'), 0, 1500, 3000, 0)).toBe(false); // off
     expect(eatDue(at('22:00'), at('10:30'), 0, 1500, 3000, 3 * H)).toBe(false); // after 9 pm
     expect(eatDue(at('11:00'), 0, 0, 0, 3000, 3 * H)).toBe(true); // nothing since 8 am
+  });
+});
+
+describe('earlier time', () => {
+  it('moves a time back within the day', () => {
+    expect(shiftHhmm('13:20', -30)).toBe('12:50');
+    expect(shiftHhmm('09:05', -60)).toBe('08:05');
+    expect(shiftHhmm('00:10', -15)).toBe('00:00');
   });
 });
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import { create } from 'zustand';
 import { useStore, dataOf } from '../lib/store';
 import { computeGame } from '../lib/game';
-import { atOn, hhmmOf, todayKey } from '../lib/dates';
+import { atOn, hhmmOf, shiftHhmm, todayKey } from '../lib/dates';
 
 // ----- Icons (inline stroke SVG, inherit colour) -------------------------------
 
@@ -108,6 +108,12 @@ export function TimeField({ value, onChange }: { value: string; onChange: (hhmm:
       <div className="row">
         <input className="input" type="time" value={value} onChange={(e) => onChange(e.target.value)} aria-label="Time eaten" style={{ flex: 1 }} />
         {value !== now && <button className="btn" onClick={() => onChange(now)}>Now</button>}
+      </div>
+      {/* Logging something from a bit earlier: one tap back from the time shown. */}
+      <div className="row" style={{ gap: 6 }} role="group" aria-label="Earlier">
+        {[15, 30, 60].map((m) => (
+          <button key={m} className="chip" style={{ minHeight: 34 }} onClick={() => onChange(shiftHhmm(value, -m))}>−{m < 60 ? `${m} min` : '1 h'}</button>
+        ))}
       </div>
     </label>
   );

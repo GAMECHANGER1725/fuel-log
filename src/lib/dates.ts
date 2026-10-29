@@ -53,6 +53,13 @@ export function monthRange(k: string, offset = 0): { start: string; n: number } 
   return { start: keyOf(first), n };
 }
 
+/** "13:20" moved by `minutes`, kept within the same day (00:00 to 23:59). */
+export function shiftHhmm(hhmm: string, minutes: number): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  const t = Math.min(23 * 60 + 59, Math.max(0, (h || 0) * 60 + (m || 0) + minutes));
+  return `${pad(Math.floor(t / 60))}:${pad(t % 60)}`;
+}
+
 export const daysSinceWeighIn = (weighIns: { date: string }[], today: string) => (weighIns.length ? daysBetween(weighIns[weighIns.length - 1].date, today) : null);
 
 /** Simple string hash, used to seed daily quests. */
