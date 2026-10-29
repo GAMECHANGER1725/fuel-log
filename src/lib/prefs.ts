@@ -13,6 +13,7 @@ export const CARDS = [
   ['water', 'Water'],
   ['quality', 'Food quality'],
   ['note', 'Day note'],
+  ['weigh', 'Weigh-in reminder'],
   ['tips', 'Eating tips'],
 ] as const;
 export type Card = (typeof CARDS)[number][0];
@@ -20,9 +21,10 @@ export type Card = (typeof CARDS)[number][0];
 const IDS: readonly string[] = CARDS.map(([id]) => id);
 
 /** Today's movable cards, in the default order ('log' can move but not hide; carbs and fat stay in the top card). */
-export const ORDER = ['quick', 'week', 'quests', 'gap', 'log', 'note', 'water', 'quality', 'tips'] as const;
+export const ORDER = ['weigh', 'quick', 'week', 'quests', 'gap', 'log', 'note', 'water', 'quality', 'tips'] as const;
 export type OrderCard = (typeof ORDER)[number];
 export const ORDER_LABEL: Record<OrderCard, string> = {
+  weigh: 'Weigh-in reminder',
   quick: 'Quick log',
   week: 'This week',
   quests: 'Daily quests',

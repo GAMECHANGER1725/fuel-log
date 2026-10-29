@@ -8,13 +8,15 @@ import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
 import { weekStats } from '../lib/meals';
 import { hasAi } from '../lib/ai';
-import { Icon, Sheet, toast, useGame, useToday } from '../components/ui';
+import { Icon, Sheet, toast, useGame, useRoute, useToday } from '../components/ui';
 
 export default function Progress() {
   const today = useToday();
   const s = useStore();
   const g = useGame();
-  const [weighing, setWeighing] = useState(false);
+  // #/progress?weigh=1 (from Today's reminder) opens the weigh-in sheet.
+  const { params } = useRoute();
+  const [weighing, setWeighing] = useState(params.get('weigh') === '1');
   const unit = s.settings.unit;
 
   const line = trendLine(s.weighIns);
@@ -166,7 +168,15 @@ export default function Progress() {
         )}
       </div>
 
-      {weighing && <WeighSheet today={today} onClose={() => setWeighing(false)} />}
+      {weighing && (
+        <WeighSheet
+          today={today}
+          onClose={() => {
+            setWeighing(false);
+            if (params.get('weigh')) window.location.replace('#/progress');
+          }}
+        />
+      )}
     </>
   );
 }

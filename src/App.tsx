@@ -73,6 +73,7 @@ export default function App() {
     return () => clearTimeout(t);
   }, [unlocked, hasKey, synced, auto, today]);
 
+  const online = useOnline();
   if (!unlocked) return <Lock />;
 
   const page =
@@ -85,6 +86,9 @@ export default function App() {
           <span className="mono" style={{ color: 'var(--danger)' }}>Sync problem</span>
           <span className="small" style={{ display: 'block' }}>{sync.error} Tap to fix.</span>
         </a>
+      )}
+      {!online && (
+        <div className="offline" role="status">Offline. Logging still works; sync catches up when you’re back.</div>
       )}
       {page}
       <Nav path={path} />
@@ -116,6 +120,22 @@ function Nav({ path }: { path: string }) {
       </div>
     </nav>
   );
+}
+
+/** Whether the browser thinks it's online, kept up to date. */
+function useOnline() {
+  const [on, setOn] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const up = () => setOn(true);
+    const down = () => setOn(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => {
+      window.removeEventListener('online', up);
+      window.removeEventListener('offline', down);
+    };
+  }, []);
+  return on;
 }
 
 /** A toast when today's log first passes the energy or protein target. */
