@@ -6,7 +6,7 @@ import { goalProgress, projectedDate, trendLine, weeklyNudge, weeklyRate, withKc
 
 import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
-import { records, weekStats } from '../lib/meals';
+import { records, weekStats, weekSummary } from '../lib/meals';
 import { hasAi } from '../lib/ai';
 import { Bar, Icon, Sheet, toast, useGame, useRoute, useToday } from '../components/ui';
 
@@ -230,6 +230,27 @@ function WeekCompare({ today }: { today: string }) {
     <section className="card">
       <div className="between" style={{ marginBottom: 4 }}>
         <h2 className="h2">This week vs last</h2>
+        <button
+          className="btn sm"
+          onClick={async () => {
+            const rate = weeklyRate(useStore.getState().weighIns, today);
+            const text = weekSummary(`Week of ${fmtDate(weekStart(today), { day: 'numeric', month: 'long' })}`, thisWk, lastWk, rate, (k) => `${energy(k, unit)} ${unit}`);
+            try {
+              if (navigator.share) await navigator.share({ text });
+              else {
+                await navigator.clipboard.writeText(text);
+                toast('Week summary copied');
+              }
+            } catch (e) {
+              if ((e as Error).name !== 'AbortError') toast('Could not share. Try again.');
+            }
+          }}
+        >
+          <Icon name="copy" size={14} /> Share
+        </button>
+      </div>
+      <div className="between" style={{ marginBottom: 2 }}>
+        <span />
         <span className="mono dim">Last · This</span>
       </div>
       {row('Avg energy', thisWk.kcal, lastWk.kcal, (v) => `${energy(v, unit)}`)}
