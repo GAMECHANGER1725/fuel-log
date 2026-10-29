@@ -3,7 +3,7 @@ import { dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCr
 import { foodDue, hourLabel, waterDue } from '../src/lib/reminders';
 import { FOODS, browseFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
-import { addDays, atOn, hhmmOf, weekStart } from '../src/lib/dates';
+import { addDays, atOn, daysSinceWeighIn, hhmmOf, weekStart } from '../src/lib/dates';
 import { suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
 import { computeGame, levelFromXp, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
 import { DEFAULT_DATA, exportCsv, exportText, normalize, parseBackup } from '../src/lib/backup';
@@ -509,14 +509,14 @@ describe('energy split', () => {
 
 describe('card order', () => {
   it('keeps a saved order and slots in cards it does not know yet', () => {
-    expect(cleanOrder(['log', 'water', 'quick'])).toEqual(['log', 'note', 'water', 'quality', 'tips', 'quick', 'week', 'quests', 'gap']);
+    expect(cleanOrder(['log', 'water', 'quick'])).toEqual(['weigh', 'log', 'note', 'water', 'quality', 'tips', 'quick', 'week', 'quests', 'gap']);
     expect(cleanOrder(undefined)).toEqual([...ORDER]);
     expect(cleanOrder(['nope', 'log', 'log'])).toHaveLength(ORDER.length);
   });
   it('moves a card one place and stops at the ends', () => {
     const o = [...ORDER];
     expect(moveIn(o, 'log', -1).indexOf('log')).toBe(o.indexOf('log') - 1);
-    expect(moveIn(o, 'quick', -1)).toEqual(o);
+    expect(moveIn(o, o[0], -1)).toEqual(o);
     expect(moveIn(o, 'tips', 1)).toEqual(o);
   });
 });
@@ -571,5 +571,12 @@ describe('your foods first and week stats', () => {
     };
     expect(weekStats(days, start, '2026-10-29', { kcal: 3000, protein: 115 })).toEqual({ logged: 2, hit: 1, kcal: 2500, protein: 100 });
     expect(weekStats({}, start, '2026-10-29', { kcal: 3000, protein: 115 }).kcal).toBeNull();
+  });
+});
+
+describe('weigh-in reminder', () => {
+  it('counts days since the last weigh-in', () => {
+    expect(daysSinceWeighIn([], '2026-10-29')).toBeNull();
+    expect(daysSinceWeighIn([{ date: '2026-10-15' }, { date: '2026-10-22' }], '2026-10-29')).toBe(7);
   });
 });

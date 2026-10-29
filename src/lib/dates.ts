@@ -44,6 +44,9 @@ export function atOn(k: string, hhmm: string): number {
   return d.getTime();
 }
 
+/** Days since the last weigh-in (dates sorted ascending), or null with none. */
+export const daysSinceWeighIn = (weighIns: { date: string }[], today: string) => (weighIns.length ? daysBetween(weighIns[weighIns.length - 1].date, today) : null);
+
 /** Simple string hash, used to seed daily quests. */
 export function hash(s: string): number {
   let h = 2166136261;

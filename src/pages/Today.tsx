@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useStore } from '../lib/store';
-import { addDays, fmtDate, hhmmOf, weekStart } from '../lib/dates';
+import { addDays, daysSinceWeighIn, fmtDate, hhmmOf, weekStart } from '../lib/dates';
 import { KJ, dayTotals, energy, energySplit, entryMacros, fmt, paceGap, sinceLast, timeOf } from '../lib/nutrition';
 import { FOCUS_LABEL, FOODS, MOMENT_LABEL, gapFocus, gapSuggestions, momentOf, remaining } from '../lib/foods';
 import { XP } from '../lib/game';
@@ -92,6 +92,17 @@ export default function Today() {
 
   // Today's movable cards, keyed by id; their order and visibility come from per-device prefs.
   const cards: Record<OrderCard, ReactNode> = {
+    weigh: isToday && show('weigh') && (() => {
+      const since = daysSinceWeighIn(s.weighIns, today);
+      if (since !== null && since < 7) return null;
+      return (
+        <a href="#/progress?weigh=1" className="card tight" style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--ink)', textDecoration: 'none' }}>
+          <span className="pro"><Icon name="trend" size={22} /></span>
+          <span className="grow small">{since === null ? 'Log your first weigh-in to start your trend line.' : `It’s been ${since} days since your last weigh-in. Time for a quick one?`}</span>
+          <Icon name="right" size={18} />
+        </a>
+      );
+    })(),
     quick: show('quick') && <QuickLog date={date} />,
     week: show('week') && <WeekStrip date={date} today={today} onPick={setDate} />,
     quests: (
