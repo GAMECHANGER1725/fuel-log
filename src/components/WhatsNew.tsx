@@ -2,7 +2,7 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29zf';
+export const NEWS_ID = '2026-10-29zg';
 
 const NEWS: [title: string, body: string, href?: string][] = [
   ['Fold a meal', 'Tap Breakfast, Lunch or any meal heading in the log to fold it away; its totals stay. Tap again to open it.'],
@@ -15,7 +15,7 @@ const NEWS: [title: string, body: string, href?: string][] = [
   ['Don’t go too long without eating', 'With reminders on, pick 3, 4 or 5 hours in Profile and the app nudges you with a food idea until you hit your energy target.', '#/profile?open=reminders'],
   ['Shopping list', 'Under a recipe’s ingredients, tap Shopping list, or tap the cart on any food. The list is on Add food; tick things off as you shop, add your own items, or share it.', '#/food?list=1'],
   ['Black theme', 'A true-black theme for OLED screens, easier on the eyes at night. Pick Black in Profile, under Look.', '#/profile?open=look'],
-  ['Water this week', 'The water card shows your average over the last 7 days and how often you hit the goal.'],
+  ['Water this week', 'The water card shows your average over the last 7 days and how often you hit the goal, and Weekly averages on Progress has a water column.', '#/progress'],
   ['Usually now', 'Quick log puts the foods you often have around this time first, marked with a clock.'],
   ['This month vs last', 'Progress’s comparison card now switches between week and month.', '#/progress'],
   ['Open straight to Add food', 'Pick which page the app opens on in Profile, so logging is one tap from the home screen.', '#/profile?open=look'],

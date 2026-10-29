@@ -54,6 +54,11 @@ export default function Progress() {
       n: logged.length,
       kcal: t.length ? t.reduce((a, b) => a + b.kcal, 0) / t.length : null,
       protein: t.length ? t.reduce((a, b) => a + b.protein, 0) / t.length : null,
+      // Litres a day over days with water logged (an unlogged day isn't a dry one).
+      water: (() => {
+        const g = Array.from({ length: 7 }, (_, i) => s.days[addDays(w, i)]?.water ?? 0).filter((x) => x > 0);
+        return g.length ? (g.reduce((a, b) => a + b, 0) * 0.25) / g.length : null;
+      })(),
     };
   });
 
@@ -190,12 +195,12 @@ export default function Progress() {
         {on('averages') && (
           <section className="card">
             <h2 className="h2" style={{ marginBottom: 8 }}>Weekly averages</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr .8fr', fontSize: 14 }}>
-              {['Week of', unit, 'Protein', 'Days'].map((h, i) => (
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr .8fr .7fr', fontSize: 14 }}>
+              {['Week of', unit, 'Protein', 'Water', 'Days'].map((h, i) => (
                 <span key={h} className="mono dim" style={{ padding: '8px 0', fontSize: 10, textAlign: i ? 'right' : 'left' }}>{h}</span>
               ))}
               {weeks.map((w) => (
-                <WeekRow key={w.w} label={w.w === weekStart(today) ? 'This week' : fmtDate(w.w)} cells={[w.kcal === null ? '–' : energy(w.kcal, unit), w.protein === null ? '–' : `${fmt(w.protein)} g`, `${w.n}/7`]} />
+                <WeekRow key={w.w} label={w.w === weekStart(today) ? 'This week' : fmtDate(w.w)} cells={[w.kcal === null ? '–' : energy(w.kcal, unit), w.protein === null ? '–' : `${fmt(w.protein)} g`, w.water === null ? '–' : `${w.water.toFixed(1)} L`, `${w.n}/7`]} />
               ))}
             </div>
           </section>
@@ -564,7 +569,7 @@ function WeekRow({ label, cells }: { label: string; cells: string[] }) {
     <>
       <span style={b}>{label}</span>
       {cells.map((c, i) => (
-        <span key={i} className="num" style={{ ...b, textAlign: 'right', fontSize: 18 }}>{c}</span>
+        <span key={i} className="num" style={{ ...b, textAlign: 'right', fontSize: 16 }}>{c}</span>
       ))}
     </>
   );
