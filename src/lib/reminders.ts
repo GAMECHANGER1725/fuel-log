@@ -65,8 +65,8 @@ export const foodDue = (now: number, lastDate: string): boolean => {
 
 // ----- Showing them -------------------------------------------------------------------------
 
-async function notify(title: string, body: string, tag: string) {
-  const opts: NotificationOptions = { body, tag, icon: `${import.meta.env.BASE_URL}pwa-192x192.png`, badge: `${import.meta.env.BASE_URL}pwa-64x64.png` };
+async function notify(title: string, body: string, tag: string, path = 'today') {
+  const opts: NotificationOptions = { body, tag, data: { path }, icon: `${import.meta.env.BASE_URL}pwa-192x192.png`, badge: `${import.meta.env.BASE_URL}pwa-64x64.png` };
   try {
     const reg = await navigator.serviceWorker.getRegistration();
     if (reg) await reg.showNotification(title, opts);
@@ -74,6 +74,11 @@ async function notify(title: string, body: string, tag: string) {
   } catch {
     /* blocked or unsupported: nothing to do */
   }
+}
+
+/** Show a notification now if reminders are on (used for the morning brief and nightly digest). */
+export function notifyIfOn(title: string, body: string, tag: string, path: string) {
+  if (remindersOn()) void notify(title, body, tag, path);
 }
 
 /** Text for the 5 PM nudge, based on what is lowest today. null = nothing left to eat. */

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { dataOf, useStore } from '../lib/store';
-import { applyCheckIn, checkIn, MAX_STEP, runChat, runIdeas, undoCheckIn, useCoach, type ChatMsg, type Idea, type Review } from '../lib/coach';
+import { applyCheckIn, checkIn, DIGEST_AT, makeBrief, makeDigest, MAX_STEP, runChat, runIdeas, undoCheckIn, useCoach, type ChatMsg, type DayReport, type Idea, type Review } from '../lib/coach';
 import { friendlyError, hasAi } from '../lib/ai';
 import { dayTotals, energy, fmt } from '../lib/nutrition';
 import { fmtDate } from '../lib/dates';
@@ -34,6 +34,7 @@ export default function Coach() {
           </section>
         ) : (
           <>
+            <Daily />
             <CheckIn />
             <Ideas />
             <Chat />
@@ -41,6 +42,162 @@ export default function Coach() {
         )}
       </div>
     </>
+  );
+}
+
+// ----- Morning brief and nightly digest ----------------------------------------------
+
+const clock12 = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
+};
+
+function Numbers({ r, unit }: { r: DayReport; unit: 'kcal' | 'kJ' }) {
+  const cell = (label: string, value: string, of: string, ok: boolean | null, color?: string) => (
+    <div className="stack" style={{ gap: 0, background: 'var(--s2)', borderRadius: 14, padding: '8px 10px' }}>
+      <span className="mono mut">{label}</span>
+      <span className="num" style={{ fontSize: 20, color }}>{value}</span>
+      <span className="small" style={{ color: ok == null ? 'var(--mut)' : ok ? 'var(--pro)' : 'var(--fuel)' }}>{of}</span>
+    </div>
+  );
+  return (
+    <div className="grid3" style={{ gap: 8 }}>
+      {cell('Energy', energy(r.kcal, unit), `of ${energy(r.target.kcal, unit)}`, r.hitKcal, 'var(--fuel)')}
+      {cell('Protein', `${fmt(r.protein)} g`, `of ${r.target.protein} g`, r.hitProtein, 'var(--pro)')}
+      {cell('Water', `${r.waterL} L`, `of ${r.waterGoalL} L`, r.waterL >= r.waterGoalL)}
+    </div>
+  );
+}
+
+function Daily() {
+  const today = useToday();
+  const { brief, digest } = useCoach();
+  const hasDigest = digest?.date === today;
+  const late = (() => {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` >= DIGEST_AT;
+  })();
+  // In the evening the digest comes first; during the day the brief does.
+  return hasDigest || late ? (
+    <>
+      <DigestCard />
+      {brief?.date === today && <BriefCard />}
+    </>
+  ) : (
+    <BriefCard />
+  );
+}
+
+function useRunner<T>(fn: () => Promise<T>) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const run = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await fn();
+    } catch (e) {
+      setError(friendlyError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { busy, error, run };
+}
+
+function BriefCard() {
+  const today = useToday();
+  const brief = useCoach((c) => c.brief);
+  const unit = useStore((s) => s.settings.unit);
+  const { busy, error, run } = useRunner(makeBrief);
+  const fresh = brief?.date === today;
+  return (
+    <section className="card stack" style={{ gap: 12 }} aria-label="Morning brief">
+      <div className="between" style={{ alignItems: 'center' }}>
+        <h2 className="h2">Morning brief</h2>
+        <button className="btn sm icon" aria-label={fresh ? 'New morning brief' : 'Make my morning brief'} disabled={busy} onClick={run}>
+          <Icon name="refresh" size={18} />
+        </button>
+      </div>
+      {fresh && brief ? (
+        <>
+          <p style={{ fontSize: 17, fontWeight: 700 }}>{brief.headline}</p>
+          <div className="stack" style={{ gap: 8 }}>
+            {brief.focus.map((f, i) => (
+              <div key={f} className="row" style={{ alignItems: 'flex-start', gap: 12 }}>
+                <span className="num fuel" style={{ fontSize: 20, width: 16, lineHeight: 1.2 }}>{i + 1}</span>
+                <p className="small" style={{ fontSize: 15 }}>{f}</p>
+              </div>
+            ))}
+          </div>
+          {brief.yesterday && (
+            <div className="stack" style={{ gap: 8 }}>
+              <span className="mono mut">Yesterday</span>
+              <Numbers r={brief.report} unit={unit} />
+              <p className="small mut">{brief.yesterday}</p>
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="small mut">{busy ? 'Reading yesterday and planning your day…' : 'Your brief for today shows up here when you open the app in the morning. Tap refresh to make it now.'}</p>
+      )}
+      {error && <p className="small" style={{ color: 'var(--danger)' }}>{error}</p>}
+      <p className="small dim">Nightly digest at {clock12(DIGEST_AT)}.</p>
+    </section>
+  );
+}
+
+function DigestCard() {
+  const today = useToday();
+  const digest = useCoach((c) => c.digest);
+  const unit = useStore((s) => s.settings.unit);
+  const { busy, error, run } = useRunner(makeDigest);
+  const fresh = digest?.date === today;
+  return (
+    <section className="card stack" style={{ gap: 12 }} aria-label="Nightly digest">
+      <div className="between" style={{ alignItems: 'center' }}>
+        <h2 className="h2">Nightly digest</h2>
+        <button className="btn sm icon" aria-label={fresh ? 'New nightly digest' : 'Make my nightly digest'} disabled={busy} onClick={run}>
+          <Icon name="refresh" size={18} />
+        </button>
+      </div>
+      {fresh && digest ? (
+        <>
+          <p style={{ fontSize: 17, fontWeight: 700 }}>{digest.headline}</p>
+          <Numbers r={digest.report} unit={unit} />
+          <p className="small mut">
+            {digest.report.meals} {digest.report.meals === 1 ? 'meal' : 'meals'} logged{digest.report.last ? ` · last food at ${clock12(digest.report.last)}` : ''}
+          </p>
+          {digest.wins.map((w) => (
+            <p key={w} className="row small" style={{ alignItems: 'flex-start', gap: 10, fontSize: 15 }}>
+              <span className="pro" style={{ flex: 'none' }}><Icon name="check" size={18} stroke={3} /></span>
+              {w}
+            </p>
+          ))}
+          {digest.fix.map((f) => (
+            <p key={f} className="row small" style={{ alignItems: 'flex-start', gap: 10, fontSize: 15 }}>
+              <span className="fuel" style={{ flex: 'none' }}><Icon name="right" size={18} stroke={3} /></span>
+              {f}
+            </p>
+          ))}
+          {digest.beforeBed && (
+            <div className="stack" style={{ gap: 4, background: 'var(--fuel-soft)', borderRadius: 18, padding: '12px 14px' }}>
+              <span className="mono fuel">Before bed</span>
+              <p className="small" style={{ fontSize: 15 }}>{digest.beforeBed}</p>
+            </div>
+          )}
+          {digest.tomorrow && (
+            <div className="stack" style={{ gap: 4 }}>
+              <span className="mono mut">Tomorrow</span>
+              <p style={{ fontWeight: 600 }}>{digest.tomorrow}</p>
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="small mut">{busy ? 'Wrapping up your day…' : `Your digest of today arrives at ${clock12(DIGEST_AT)}. Tap refresh to make it now.`}</p>
+      )}
+      {error && <p className="small" style={{ color: 'var(--danger)' }}>{error}</p>}
+    </section>
   );
 }
 

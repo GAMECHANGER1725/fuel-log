@@ -526,6 +526,185 @@ export async function runChat(cfg: AiConfig, d: AppData, history: ChatMsg[]): Pr
   return raw.replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#+\s*/gm, '').trim();
 }
 
+// ----- Morning brief and nightly digest --------------------------------------------
+// The brief is made the first time the app is open from 5 am; the digest at 9:30 pm (DIGEST_AT).
+// ponytail: no server, so both only happen while the app is open or alive in the background.
+
+export const BRIEF_FROM_HOUR = 5;
+export const DIGEST_AT = '21:30';
+const minutesOf = (d: Date) => d.getHours() * 60 + d.getMinutes();
+const DIGEST_MIN = (() => {
+  const [h, m] = DIGEST_AT.split(':').map(Number);
+  return h * 60 + m;
+})();
+
+/** Is the morning brief due? From 5 am until the digest time, once a day. */
+export const briefDue = (now: Date, lastDate: string | null | undefined) => {
+  const m = minutesOf(now);
+  return m >= BRIEF_FROM_HOUR * 60 && m < DIGEST_MIN && lastDate !== keyOf(now);
+};
+
+/** Is the nightly digest due? From 9:30 pm until midnight, once a day. */
+export const digestDue = (now: Date, lastDate: string | null | undefined) => minutesOf(now) >= DIGEST_MIN && lastDate !== keyOf(now);
+
+/** The numbers for one day, worked out in code (the AI only writes the words around them). */
+export interface DayReport extends Macros {
+  date: string;
+  /** The targets that day. */
+  target: Macros;
+  items: number;
+  meals: number;
+  /** Share of the kcal and protein targets eaten, 0–1+. */
+  kcalPct: number;
+  proteinPct: number;
+  waterL: number;
+  waterGoalL: number;
+  /** Clock time of the last food, e.g. "19:40", or "". */
+  last: string;
+  /** Targets hit (95% counts). */
+  hitKcal: boolean;
+  hitProtein: boolean;
+}
+
+export function dayReport(d: AppData, date: string): DayReport {
+  const day = d.days[date] ?? { entries: [], water: 0, checks: {} };
+  const s = summarise(date, day);
+  const T = d.settings.targets;
+  return {
+    date,
+    target: T,
+    kcal: s.kcal,
+    protein: s.protein,
+    carbs: s.carbs,
+    fat: s.fat,
+    items: s.items,
+    meals: s.meals,
+    kcalPct: T.kcal ? Math.round((s.kcal / T.kcal) * 100) / 100 : 0,
+    proteinPct: T.protein ? Math.round((s.protein / T.protein) * 100) / 100 : 0,
+    waterL: s.waterL,
+    waterGoalL: d.settings.waterL,
+    last: s.last,
+    hitKcal: s.kcal >= T.kcal * 0.95,
+    hitProtein: s.protein >= T.protein * 0.95,
+  };
+}
+
+export const BRIEF_PROMPT = [
+  ...WHO,
+  'TASK: his morning brief for today. He reads it when he wakes up at about 6 am.',
+  'Use "yesterday" (worked out by the app) and the last two weeks in the snapshot. Find what will help most TODAY: the meal or time of day where he usually falls short, protein if it is lower than calories, water, logging gaps.',
+  'headline: one short sentence (max 12 words) that sets up the day.',
+  'focus: exactly 3 specific things to do today, in the order of the day (breakfast first). Each one names real food with an amount and when (e.g. "Before school: 400 ml milk with 2 tbsp milk powder and a banana"). At least one is a drink or shake. On a school day (weekday is Monday to Friday) make sure one of them is something to pack for school.',
+  'yesterday: one sentence on how yesterday went, quoting its numbers. If yesterday has no food logged, say so kindly and remind him to log as he goes.',
+].join('\n');
+
+export const BRIEF_SCHEMA = {
+  type: 'object',
+  properties: {
+    headline: { type: 'string' },
+    yesterday: { type: 'string' },
+    focus: { type: 'array', items: { type: 'string' }, minItems: 3, maxItems: 3 },
+  },
+  required: ['headline', 'yesterday', 'focus'],
+} as const;
+
+export const DIGEST_PROMPT = [
+  ...WHO,
+  'TASK: his nightly digest at 9:30 pm: a short, honest wrap-up of TODAY from the "today" block (worked out by the app) and the snapshot.',
+  'headline: one short sentence (max 12 words) on how the day went.',
+  'wins: 1–2 specific things that went well today (quote numbers). If almost nothing was logged, praise anything real or leave it empty; never invent.',
+  'fix: 1–2 specific things that fell short and why, from the data (e.g. "Only 900 kcal before 3 pm", "Protein 70 of 115 g").',
+  'beforeBed: ONLY if he is more than 300 kcal or 20 g protein short, ONE small, easy, non-heavy option he can have in the next 30 minutes (e.g. a glass of warm milk with a spoon of honey), with amount and rough kcal and protein. Otherwise an empty string. Never suggest a big meal this late.',
+  'tomorrow: ONE concrete change for tomorrow that fixes today\'s biggest miss, with food, amount and time.',
+].join('\n');
+
+export const DIGEST_SCHEMA = {
+  type: 'object',
+  properties: {
+    headline: { type: 'string' },
+    wins: { type: 'array', items: { type: 'string' }, maxItems: 2 },
+    fix: { type: 'array', items: { type: 'string' }, maxItems: 2 },
+    beforeBed: { type: 'string' },
+    tomorrow: { type: 'string' },
+  },
+  required: ['headline', 'wins', 'fix', 'beforeBed', 'tomorrow'],
+} as const;
+
+export interface Brief {
+  date: string;
+  at: number;
+  headline: string;
+  yesterday: string;
+  focus: string[];
+  /** Yesterday's numbers, from code. */
+  report: DayReport;
+  model: string;
+}
+
+export interface Digest {
+  date: string;
+  at: number;
+  headline: string;
+  wins: string[];
+  fix: string[];
+  beforeBed: string;
+  tomorrow: string;
+  /** Today's numbers, from code. */
+  report: DayReport;
+  model: string;
+}
+
+const list = (v: unknown, max: number, len = 200) => (Array.isArray(v) ? v : []).map((x) => text(x, len)).filter(Boolean).slice(0, max);
+
+export function parseBrief(raw: string, report: DayReport, date: string, model: string, at = Date.now()): Brief {
+  const r = obj(json(raw));
+  const focus = list(r.focus, 3, 220);
+  if (!focus.length) throw new Error('No focus');
+  return { date, at, headline: text(r.headline, 100) || 'Your day', yesterday: text(r.yesterday, 300), focus, report, model };
+}
+
+export function parseDigest(raw: string, report: DayReport, model: string, at = Date.now()): Digest {
+  const r = obj(json(raw));
+  const tomorrow = text(r.tomorrow, 300);
+  const headline = text(r.headline, 100);
+  if (!headline && !tomorrow) throw new Error('Empty digest');
+  // A before-bed snack only when he is really short; the app decides, not the model.
+  const short = report.target.kcal - report.kcal > 300 || report.target.protein - report.protein > 20;
+  return {
+    date: report.date,
+    at,
+    headline: headline || 'Today',
+    wins: list(r.wins, 2),
+    fix: list(r.fix, 2),
+    beforeBed: short ? text(r.beforeBed, 300) : '',
+    tomorrow,
+    report,
+    model,
+  };
+}
+
+export async function runBrief(cfg: AiConfig, d: AppData, now = new Date()): Promise<Brief> {
+  const s = snapshot(d, now);
+  const yesterday = dayReport(d, addDays(s.today, -1));
+  const [raw, used] = await complete(cfg, body(BRIEF_PROMPT, `${snapText({ ...s, yesterday })}\n\nGive me my morning brief.`, BRIEF_SCHEMA));
+  try {
+    return parseBrief(raw, yesterday, s.today, used);
+  } catch {
+    throw new AiError('bad-reply', 'Unreadable reply');
+  }
+}
+
+export async function runDigest(cfg: AiConfig, d: AppData, now = new Date()): Promise<Digest> {
+  const s = snapshot(d, now);
+  const today = dayReport(d, s.today);
+  const [raw, used] = await complete(cfg, body(DIGEST_PROMPT, `${snapText({ ...s, today })}\n\nGive me my nightly digest.`, DIGEST_SCHEMA));
+  try {
+    return parseDigest(raw, today, used);
+  } catch {
+    throw new AiError('bad-reply', 'Unreadable reply');
+  }
+}
+
 // ----- Recipe edits ---------------------------------------------------------------
 
 export const RECIPE_PROMPT = [
@@ -613,6 +792,11 @@ interface CoachState {
   /** The optional note for meal ideas, kept so it is still there for the next try. */
   note: string;
   chat: ChatMsg[];
+  brief: Brief | null;
+  digest: Digest | null;
+  /** Epoch ms of the last automatic try of each, so a failing one waits before retrying. */
+  briefTried: number;
+  digestTried: number;
   set: (patch: Partial<Omit<CoachState, 'set'>>) => void;
 }
 
@@ -625,6 +809,10 @@ export const useCoach = create<CoachState>()(
       ideas: null,
       note: '',
       chat: [],
+      brief: null,
+      digest: null,
+      briefTried: 0,
+      digestTried: 0,
       set: (patch) => set(patch),
     }),
     { name: 'fuel-log-coach', version: 1, partialize: ({ set: _set, ...rest }) => rest },
@@ -696,4 +884,45 @@ export function applyCheckIn(): boolean {
   useStore.getState().setTargets(review.to);
   useCoach.getState().set({ review: { ...review, applied: true } });
   return true;
+}
+
+// ----- Brief and digest: running them --------------------------------------------------
+
+const DAILY_RETRY_MS = 30 * 60_000;
+let briefRun: Promise<Brief> | null = null;
+let digestRun: Promise<Digest> | null = null;
+
+/** Make today's morning brief (one at a time) and keep it. */
+export function makeBrief(): Promise<Brief> {
+  briefRun ??= (async () => {
+    const st = useStore.getState();
+    const b = await runBrief(st.settings, dataOf(st));
+    useCoach.getState().set({ brief: b });
+    return b;
+  })().finally(() => {
+    briefRun = null;
+  });
+  return briefRun;
+}
+
+/** Make today's nightly digest (one at a time) and keep it. */
+export function makeDigest(): Promise<Digest> {
+  digestRun ??= (async () => {
+    const st = useStore.getState();
+    const g = await runDigest(st.settings, dataOf(st));
+    useCoach.getState().set({ digest: g });
+    return g;
+  })().finally(() => {
+    digestRun = null;
+  });
+  return digestRun;
+}
+
+/** Which one the app should make by itself right now, if any. */
+export function dailyDue(now = new Date()): 'brief' | 'digest' | null {
+  const c = useCoach.getState();
+  const t = now.getTime();
+  if (digestDue(now, c.digest?.date) && t - c.digestTried > DAILY_RETRY_MS) return 'digest';
+  if (briefDue(now, c.brief?.date) && t - c.briefTried > DAILY_RETRY_MS) return 'brief';
+  return null;
 }
