@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { isValidBarcode, lookupBarcode } from '../lib/off';
+import { findByBarcode, isValidBarcode, lookupBarcode } from '../lib/off';
 import type { Food } from '../lib/types';
 import { Icon, Sheet } from './ui';
 
@@ -14,13 +14,20 @@ async function makeDetector(): Promise<Detector> {
   return new BarcodeDetector({ formats: FORMATS as never }) as unknown as Detector;
 }
 
-export default function Scanner({ onClose, onFound, onReadLabel }: { onClose: () => void; onFound: (f: Food) => void; onReadLabel: () => void }) {
+export default function Scanner({ onClose, onFound, onReadLabel, onManual, known = [] }: { onClose: () => void; onFound: (f: Food) => void; onReadLabel: () => void; onManual?: () => void; known?: Food[] }) {
   const video = useRef<HTMLVideoElement>(null);
   const [state, setState] = useState<'starting' | 'scanning' | 'looking' | 'not-found' | 'no-camera' | 'offline' | 'error'>('starting');
   const [code, setCode] = useState('');
 
   const lookup = async (barcode: string) => {
     setCode(barcode);
+    // Scanned before: use the saved product straight away, even offline.
+    const saved = findByBarcode(known, barcode);
+    if (saved) {
+      navigator.vibrate?.(40);
+      onFound(saved);
+      return;
+    }
     setState('looking');
     const r = await lookupBarcode(barcode);
     if (r.ok) {
@@ -73,7 +80,7 @@ export default function Scanner({ onClose, onFound, onReadLabel }: { onClose: ()
     starting: 'Starting camera…',
     scanning: 'Point at the barcode. Hold steady.',
     looking: `Looking up ${code}…`,
-    'not-found': `${code} isn’t in Open Food Facts yet. Read the label with AI instead?`,
+    'not-found': `${code} isn’t in Open Food Facts yet. Read the label with AI, or enter the numbers yourself.`,
     'no-camera': 'Camera not available. Type the numbers under the barcode instead.',
     offline: 'You’re offline. Barcode lookups need the internet.',
     error: 'Lookup failed. Try again.',
@@ -88,6 +95,7 @@ export default function Scanner({ onClose, onFound, onReadLabel }: { onClose: ()
       {state !== 'no-camera' && <video ref={video} className="video" playsInline muted aria-label="Camera preview" />}
       <p className="small mut" role="status">{message}</p>
       {state === 'not-found' && <button className="btn primary block" onClick={onReadLabel}><Icon name="label" size={18} /> Read the label with AI</button>}
+      {(state === 'not-found' || state === 'offline') && onManual && <button className="btn block" onClick={onManual}><Icon name="pencil" size={18} /> Enter numbers yourself</button>}
       <form
         className="row"
         onSubmit={(e) => {

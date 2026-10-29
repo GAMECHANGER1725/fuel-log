@@ -239,6 +239,8 @@ export default function FoodPage() {
             setPicked({ food, source: 'scan' });
           }}
           onReadLabel={() => setSheet('label')}
+          onManual={() => setSheet('manual')}
+          known={[...s.favourites, ...s.recents]}
         />
       )}
       {(sheet === 'photo' || sheet === 'label' || sheet === 'text') && <AiSheet mode={sheet} date={date} initialText={sheet === 'text' ? q : ''} onClose={closeSheet} />}

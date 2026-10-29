@@ -7,7 +7,7 @@ import { addDays, atOn, daysSinceWeighIn, hhmmOf, weekStart } from '../src/lib/d
 import { suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
 import { computeGame, levelFromXp, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
 import { DEFAULT_DATA, exportCsv, exportText, normalize, parseBackup } from '../src/lib/backup';
-import { parseProduct } from '../src/lib/off';
+import { findByBarcode, parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
@@ -602,5 +602,13 @@ describe('coverage', () => {
   });
   it('caps at 100, skips a target already hit, and flags a big overshoot', () => {
     expect(coverage(m(1500, 10), m(2000, 130), T)).toEqual({ kcal: 100, protein: null, overKcal: true });
+  });
+});
+
+describe('known barcodes', () => {
+  it('finds a product scanned before by its barcode', () => {
+    const foods = [{ id: 'a', name: 'Yoghurt', serving: '170 g', kcal: 150, protein: 15, carbs: 6, fat: 7, barcode: '9300601000000' }, { id: 'b', name: 'Toast', serving: '2', kcal: 190, protein: 8, carbs: 32, fat: 2 }];
+    expect(findByBarcode(foods, ' 9300601000000 ')?.name).toBe('Yoghurt');
+    expect(findByBarcode(foods, '123')).toBeUndefined();
   });
 });
