@@ -146,6 +146,10 @@ export function addShopping(list: ShopItem[], lines: [amount: string, item: stri
   return out.slice(-60);
 }
 
+/** The unticked items as plain text for sharing, one per line. */
+export const shoppingText = (list: ShopItem[]): string =>
+  ['Shopping list', ...list.filter((x) => !x.done).map((x) => `- ${x.item}${x.amounts.length ? `: ${x.amounts.join(' + ')}` : ''}`)].join('\n');
+
 /** Saved list (untrusted): known shape only. */
 export const cleanShopping = (v: unknown): ShopItem[] =>
   Array.isArray(v)

@@ -13,7 +13,7 @@ import { hasAi, type AiMode } from '../lib/ai';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { foodHistory, lastQty, mealGroups, type MealGroup } from '../lib/meals';
-import { usePrefs } from '../lib/prefs';
+import { addShopping, shoppingText, usePrefs } from '../lib/prefs';
 
 type Picked = { food: Food; source: Source };
 
@@ -500,16 +500,33 @@ function StillToGo({ date }: { date: string }) {
   );
 }
 
-/** Ingredients added from recipes; tap to tick off, then clear the ticked ones. Hidden while empty. */
+/** Ingredients added from recipes, or typed in; tap to tick off, then clear the ticked ones. Folded until opened. */
 function ShoppingList({ open }: { open: boolean }) {
   const list = usePrefs((p) => p.shopping);
   const setList = usePrefs((p) => p.setShopping);
-  if (!list.length) return null;
+  const [text, setText] = useState('');
   const done = list.filter((x) => x.done).length;
+  const add = () => {
+    if (!text.trim()) return;
+    setList(addShopping(list, [['', text]]));
+    setText('');
+  };
+  const share = async () => {
+    const t = shoppingText(list);
+    try {
+      if (navigator.share) await navigator.share({ text: t });
+      else {
+        await navigator.clipboard.writeText(t);
+        toast('Shopping list copied');
+      }
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') toast('Could not share. Try again.');
+    }
+  };
   return (
     <details className="card tight" open={open || undefined}>
       <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontWeight: 600 }}>
-        Shopping list <span className="mono mut">{done} / {list.length}</span>
+        Shopping list <span className="mono mut">{list.length ? `${done} / ${list.length}` : 'Empty'}</span>
       </summary>
       <div className="stack" style={{ gap: 0, paddingBottom: 6 }}>
         {list.map((x, i) => (
@@ -526,9 +543,15 @@ function ShoppingList({ open }: { open: boolean }) {
           </button>
         ))}
         <div className="row" style={{ marginTop: 8 }}>
+          <input className="input grow" value={text} maxLength={60} placeholder="Add an item" aria-label="Add a shopping item" onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+          <button className="btn sm" disabled={!text.trim()} onClick={add}>Add</button>
+        </div>
+        <div className="row" style={{ marginTop: 8, flexWrap: 'wrap' }}>
+          <button className="btn sm" disabled={done === list.length} onClick={share}><Icon name="copy" size={14} /> Share</button>
           <button className="btn sm grow" disabled={!done} onClick={() => setList(list.filter((x) => !x.done))}>Clear ticked</button>
           <button
             className="btn sm danger"
+            disabled={!list.length}
             onClick={() => {
               setList([]);
               toast('Shopping list cleared', 0, { label: 'Undo', run: () => usePrefs.getState().setShopping(list) });
