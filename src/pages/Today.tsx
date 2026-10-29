@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
-import { SECTION_LABEL, combineAsFood, hasTag, toggleTag, daySummary, drinkMl, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals, topFoods } from '../lib/meals';
+import { SECTION_LABEL, combineAsFood, hasTag, toggleTag, daySummary, drinkMl, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals, topFoods, weekBalance } from '../lib/meals';
 
 export default function Today() {
   const today = useToday();
@@ -713,8 +713,12 @@ function QuickChip({ food, unit, onTap, onHold }: { food: Food; unit: 'kcal' | '
 function WeekStrip({ date, today, onPick }: { date: string; today: string; onPick: (k: string) => void }) {
   const days = useStore((s) => s.days);
   const T = useStore((s) => s.settings.targets);
+  const unit = useStore((s) => s.settings.unit);
   const start = weekStart(date);
   const H = 56;
+  // Only for the current week: where the past days leave you, and what catches up.
+  const bal = start === weekStart(today) ? weekBalance(days, start, today, T.kcal) : null;
+  const near = bal && Math.abs(bal.kcal) < 100 * bal.days;
   const bar = (frac: number, color: string) => <i style={{ height: Math.max(3, Math.min(1, frac) * H), background: color }} />;
   return (
     <section className="card tight">
@@ -742,6 +746,14 @@ function WeekStrip({ date, today, onPick }: { date: string; today: string; onPic
           );
         })}
       </div>
+      {bal && (
+        <p className="small" style={{ margin: '8px 0 0' }}>
+          <span className="mut">Week so far: </span>
+          {near ? 'on target.' : bal.kcal < 0
+            ? <>{energy(-bal.kcal, unit)} {unit} behind. <span className="mut">About</span> +{energy(bal.perDay, unit)} {unit} <span className="mut">a day catches up.</span></>
+            : <>{energy(bal.kcal, unit)} {unit} ahead.</>}
+        </p>
+      )}
     </section>
   );
 }

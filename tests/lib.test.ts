@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanTags, pushSearch, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, foodHistory, hasTag, searchLog, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
+import { daySummary, foodHistory, hasTag, searchLog, weekBalance, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -608,6 +608,24 @@ describe('custom tags', () => {
     expect(cleanTags([' Gym ', 'gym', 'a,b', '', 3, 'x'.repeat(40)])).toEqual(['Gym', 'a b', 'x'.repeat(24)]);
     expect(cleanTags(Array.from({ length: 20 }, (_, i) => `t${i}`))).toHaveLength(12);
     expect(cleanTags([])).toEqual([]);
+  });
+});
+
+describe('week balance', () => {
+  it('sums the gap on past logged days and spreads a shortfall over the days left', () => {
+    const start = '2026-10-26'; // Monday
+    const today = '2026-10-29'; // Thursday: 4 days left
+    const days: Record<string, DayLog> = {
+      '2026-10-26': day([entry(2500, 100)]),
+      '2026-10-27': { ...day([entry(2900, 100)]), boost: 300 },
+      // Wednesday not logged: left out rather than counted as zero.
+      [today]: day([entry(5000, 100)]),
+    };
+    expect(weekBalance(days, start, today, 3000)).toEqual({ kcal: -900, days: 2, left: 4, perDay: 230 });
+    expect(weekBalance({ '2026-10-26': day([entry(3500, 1)]) }, start, today, 3000)).toEqual({ kcal: 500, days: 1, left: 4, perDay: 0 });
+    expect(weekBalance({ '2026-10-26': day([entry(0.1, 1)]) }, start, '2026-11-01', 3000)?.perDay).toBe(500);
+    expect(weekBalance({}, start, today, 3000)).toBeNull();
+    expect(weekBalance(days, start, start, 3000)).toBeNull();
   });
 });
 

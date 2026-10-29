@@ -109,6 +109,40 @@ export function searchLog(days: Record<string, DayLog>, q: string, max = 30): { 
   return { hits: all.slice(0, max), total: all.length };
 }
 
+export interface WeekBalance {
+  /** Energy eaten minus target over the week's logged days before today (negative = behind). */
+  kcal: number;
+  /** Logged days that went in. */
+  days: number;
+  /** Days left in the week, today included. */
+  left: number;
+  /** Extra kcal a day for the days left to make up a shortfall (capped at `cap`), 0 if not behind. */
+  perDay: number;
+}
+
+/**
+ * How the week is going against the energy target (training-day boosts included), from the week's logged days before today.
+ * null before there's a past logged day this week.
+ */
+export function weekBalance(days: Record<string, DayLog>, start: string, today: string, targetKcal: number, cap = 500): WeekBalance | null {
+  let kcal = 0;
+  let n = 0;
+  let left = 0;
+  for (let i = 0; i < 7; i++) {
+    const k = addDays(start, i);
+    if (k >= today) {
+      left++;
+      continue;
+    }
+    const d = days[k];
+    if (!d?.entries.length) continue;
+    kcal += sumEntries(d.entries).kcal - (targetKcal + (d.boost ?? 0));
+    n++;
+  }
+  if (!n || !left) return null;
+  return { kcal, days: n, left, perDay: kcal < 0 ? Math.min(cap, Math.round(-kcal / left / 10) * 10) : 0 };
+}
+
 export interface MealGroup {
   /** Same foods and amounts give the same key. */
   key: string;

@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29l';
+export const NEWS_ID = '2026-10-29m';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Week so far', 'This week on Today says how far ahead or behind your energy target the week is, and how much a day catches up.'],
   ['Search your log', 'On Progress, type a food to see every time you logged it and when. Tap one to open that day.', '#/progress'],
   ['Where it came from', 'Under the log, open Where it came from to see which foods gave the day’s protein or energy.'],
   ['Tag the day', 'Tap Gym, Rest day, Eating out and more under the day note to add them without typing. Tap again to take one off. Progress then compares those days with the rest. Make your own tags in Profile.', '#/profile?open=display'],
