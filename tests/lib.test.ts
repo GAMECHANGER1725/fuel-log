@@ -11,7 +11,7 @@ import { findByBarcode, parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
-import { ORDER, cleanOrderOf, addShopping, autoBoostDue, cleanShopping, shoppingText, cleanTags, pushSearch, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
+import { ORDER, cleanOrderOf, lookDefaults, addShopping, autoBoostDue, cleanShopping, shoppingText, cleanTags, pushSearch, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
 import { daySummary, rangeStats, usualNow, waterWeek, foodHistory, hasTag, searchLog, weekBalance, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
@@ -640,6 +640,16 @@ describe('recipe scaling', () => {
     expect(scaleItem('rolled oats (½ cup)', 2)).toBe('rolled oats (1 cup)');
     expect(scaleItem('banana (about 120 g)', 2)).toBe('banana (about 240 g)');
     expect(scaleItem('tofu (firm)', 2)).toBe('tofu (firm)');
+  });
+});
+
+describe('reset look', () => {
+  it('gives fresh defaults each time and leaves the shopping list out', () => {
+    const a = lookDefaults();
+    a.tags.push('x');
+    expect(lookDefaults().tags).not.toContain('x');
+    expect(lookDefaults()).toMatchObject({ accent: 'ember', quickCount: 10, weighEvery: 7, start: 'today' });
+    expect('shopping' in lookDefaults()).toBe(false);
   });
 });
 

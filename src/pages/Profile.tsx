@@ -11,7 +11,7 @@ import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { EAT_GAPS, FOOD_HOURS, WATER_GAPS, hourLabel, pauseToday, pausedToday, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
-import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, PROGRESS_CARDS, QUICK_COUNTS, STARTS, WEEK_GOALS, WEIGH_EVERY, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
+import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, PROGRESS_CARDS, QUICK_COUNTS, STARTS, WEEK_GOALS, lookDefaults, WEIGH_EVERY, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
 import { NOTE_TAGS } from '../lib/meals';
 import WhatsNew from '../components/WhatsNew';
 
@@ -147,6 +147,17 @@ export default function ProfilePage() {
           Talk to a parent and your GP before big target changes, before starting any supplement, or if your weight is dropping despite eating more. These numbers are starting points, not rules.
         </p>
         <button className="btn block" onClick={() => setNews(true)}>What’s new</button>
+        <button
+          className="btn block"
+          onClick={() => {
+            const p = usePrefs.getState();
+            const before = Object.fromEntries(Object.keys(lookDefaults()).map((k) => [k, p[k as keyof typeof p]]));
+            p.resetLook();
+            toast('This device’s settings are back to the defaults', 0, { label: 'Undo', run: () => usePrefs.setState(before) });
+          }}
+        >
+          Reset this device’s settings
+        </button>
         <button className="btn block" onClick={() => useAuth.getState().lock()}>Log out</button>
         <p className="mono dim" style={{ paddingBottom: 12 }}>Fuel Log · your data stays on this phone</p>
       </div>

@@ -263,52 +263,63 @@ interface Prefs {
   flipRing: () => void;
   move: (id: OrderCard, dir: -1 | 1) => void;
   resetOrder: () => void;
+  /** Put every look and layout setting back to its default (see lookDefaults). */
+  resetLook: () => void;
   markNews: (id: string) => void;
   setAccent: (a: Accent) => void;
   setSize: (s: TextSize) => void;
 }
 
+/**
+ * The look and layout settings that "Reset this device's settings" puts back. Not reset: the shopping list, recent
+ * searches, hidden suggestions and What's new / auto-boost bookkeeping.
+ */
+export const lookDefaults = () => ({
+  hidden: [] as Card[],
+  accent: 'ember' as Accent,
+  size: 'normal' as TextSize,
+  order: [...ORDER] as OrderCard[],
+  ring: 'left' as 'left' | 'eaten',
+  boostKcal: 300,
+  bottleMl: 500,
+  badge: 'off' as BadgeMode,
+  weighEvery: 7,
+  weekGoal: 0,
+  quietLevelUp: false,
+  progressHidden: [] as ProgressCard[],
+  progressOrder: [...PROGRESS_IDS] as ProgressCard[],
+  quickCount: 10,
+  quickWrap: false,
+  trainDays: [] as number[],
+  start: 'today' as Start,
+  tags: [...NOTE_TAGS],
+  foodSort: 'match' as FoodSort,
+});
+
 export const usePrefs = create<Prefs>()(
   persist(
     (set) => ({
-      hidden: [],
-      accent: 'ember',
-      size: 'normal',
+      ...lookDefaults(),
+      resetLook: () => set(lookDefaults()),
       newsSeen: '',
-      order: [...ORDER],
-      ring: 'left',
-      boostKcal: 300,
       noSuggest: [],
-      bottleMl: 500,
-      badge: 'off',
-      weighEvery: 7,
-      weekGoal: 0,
       setWeekGoal: (weekGoal) => set({ weekGoal }),
-      quietLevelUp: false,
       setQuietLevelUp: (quietLevelUp) => set({ quietLevelUp }),
-      progressHidden: [],
-      progressOrder: [...PROGRESS_IDS],
       moveProgress: (id, dir) => set((s) => ({ progressOrder: moveIn(s.progressOrder, id, dir) })),
       toggleProgress: (c) => set((s) => ({ progressHidden: s.progressHidden.includes(c) ? s.progressHidden.filter((x) => x !== c) : [...s.progressHidden, c] })),
-      quickCount: 10,
-      quickWrap: false,
       setQuick: (p) => set(p),
-      trainDays: [],
       setTrainDays: (trainDays) => set({ trainDays }),
       lastAutoBoost: '',
       setLastAutoBoost: (lastAutoBoost) => set({ lastAutoBoost }),
-      start: 'today',
       shopping: [],
       setShopping: (shopping) => set({ shopping }),
       setStart: (start) => set({ start }),
       setWeighEvery: (weighEvery) => set({ weighEvery }),
-      tags: [...NOTE_TAGS],
       searches: [],
       addSearch: (q) => set((s) => ({ searches: pushSearch(s.searches, q) })),
       clearSearches: () => set({ searches: [] }),
       setTags: (tags) => set({ tags: cleanTags(tags) }),
       setBadge: (badge) => set({ badge }),
-      foodSort: 'match',
       setFoodSort: (foodSort) => set({ foodSort }),
       setBottleMl: (bottleMl) => set({ bottleMl }),
       toggleSuggest: (name) =>
