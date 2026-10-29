@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useStore, dataOf } from '../lib/store';
 import { RANKS, BOSS_XP, computeGame } from '../lib/game';
 import { suggestTargets } from '../lib/targets';
-import { exportText, parseBackup } from '../lib/backup';
+import { exportCsv, exportText, parseBackup } from '../lib/backup';
 import { AI_MODELS, GEMINI_MODELS, PROVIDER_NAME, friendlyError, hasAi, testKey, type Provider } from '../lib/ai';
 import { fmt, KJ } from '../lib/nutrition';
 import { todayKey, fmtDate } from '../lib/dates';
@@ -506,17 +506,23 @@ function BackupForm() {
   const [pending, setPending] = useState<AppData | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
 
-  const doExport = () => {
-    const blob = new Blob([exportText(dataOf(s))], { type: 'application/json' });
+  const download = (name: string, text: string, type: string) => {
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `fuel-log-backup-${todayKey()}.json`;
+    a.href = URL.createObjectURL(new Blob([text], { type }));
+    a.download = name;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  const doExport = () => {
+    download(`fuel-log-backup-${todayKey()}.json`, exportText(dataOf(s)), 'application/json');
     s.markExported();
     toast('Backup downloaded');
+  };
+  const doCsv = () => {
+    download(`fuel-log-${todayKey()}.csv`, exportCsv(dataOf(s)), 'text/csv');
+    toast('Spreadsheet downloaded');
   };
   const check = (t: string) => {
     try {
@@ -531,6 +537,8 @@ function BackupForm() {
     <>
       <p className="small mut">Your log lives only in this browser. Export now and then so a cleared browser or new phone doesn’t cost you your history. Backups from the original Fuel Log artifact import here too.</p>
       <button className="btn primary" onClick={doExport}>Export backup</button>
+      <button className="btn" onClick={doCsv}>Download log as a spreadsheet (CSV)</button>
+      <p className="small mut" style={{ margin: 0 }}>The spreadsheet is for reading (Excel, Numbers, Google Sheets); only the backup file can be imported again.</p>
       <span className="mono mut">Import</span>
       <input
         type="file"

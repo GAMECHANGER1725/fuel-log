@@ -6,7 +6,7 @@ import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
 import { addDays, atOn, hhmmOf, weekStart } from '../src/lib/dates';
 import { suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
 import { computeGame, levelFromXp, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
-import { DEFAULT_DATA, exportText, normalize, parseBackup } from '../src/lib/backup';
+import { DEFAULT_DATA, exportCsv, exportText, normalize, parseBackup } from '../src/lib/backup';
 import { parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
@@ -518,5 +518,18 @@ describe('card order', () => {
     expect(moveIn(o, 'log', -1).indexOf('log')).toBe(o.indexOf('log') - 1);
     expect(moveIn(o, 'quick', -1)).toEqual(o);
     expect(moveIn(o, 'tips', 1)).toEqual(o);
+  });
+});
+
+describe('csv export', () => {
+  it('writes a row per food and a day row with totals, water and note', () => {
+    const k = '2026-10-29';
+    const e = (name: string, hhmm: string, qty = 1): Entry => ({ id: name, name, serving: '1 cup', base: { kcal: 200, protein: 10, carbs: 30, fat: 5 }, qty, source: 'db', at: atOn(k, hhmm) });
+    const data = { ...structuredClone(DEFAULT_DATA), days: { [k]: { entries: [e('Dal, "home"', '19:00'), e('=Toast', '07:30', 2)], water: 6, checks: {}, note: 'gym, legs' } } };
+    const lines = exportCsv(data).trim().split('\r\n');
+    expect(lines[0]).toBe('type,date,time,food,serving,servings,kcal,protein_g,carbs_g,fat_g,water_l,note');
+    expect(lines[1]).toBe("food,2026-10-29,07:30,'=Toast,1 cup,2,400,20,60,10,,");
+    expect(lines[2]).toBe('food,2026-10-29,19:00,"Dal, ""home""",1 cup,1,200,10,30,5,,');
+    expect(lines[3]).toBe('day,2026-10-29,,,,,600,30,90,15,1.5,"gym, legs"');
   });
 });
