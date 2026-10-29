@@ -135,3 +135,23 @@ export function weekStats(days: Record<string, DayLog>, start: string, today: st
     protein: avg((t) => t.protein),
   };
 }
+
+export interface Records {
+  kcal: { date: string; value: number } | null;
+  protein: { date: string; value: number } | null;
+  /** Glasses of water. */
+  water: { date: string; value: number } | null;
+}
+
+/** Best single days in the log: most energy, most protein, most water (earliest date wins a tie). */
+export function records(days: Record<string, DayLog>): Records {
+  const out: Records = { kcal: null, protein: null, water: null };
+  for (const date of Object.keys(days).sort()) {
+    const d = days[date];
+    const t = sumEntries(d.entries);
+    if (t.kcal > 0 && (!out.kcal || t.kcal > out.kcal.value)) out.kcal = { date, value: t.kcal };
+    if (t.protein > 0 && (!out.protein || t.protein > out.protein.value)) out.protein = { date, value: t.protein };
+    if (d.water > 0 && (!out.water || d.water > out.water.value)) out.water = { date, value: d.water };
+  }
+  return out;
+}

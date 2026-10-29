@@ -49,7 +49,7 @@ export default function Today() {
   // On a keyboard, ← and → do the same (not while typing or with a sheet open).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.altKey || e.ctrlKey || e.metaKey || (e.target as HTMLElement).closest('input, textarea, select, [role=dialog]')) return;
+      if (e.altKey || e.ctrlKey || e.metaKey || document.querySelector('[role=dialog]') || (e.target as HTMLElement).closest('input, textarea, select')) return;
       if (e.key === 'ArrowLeft') setDate(addDays(date, -1));
       else if (e.key === 'ArrowRight' && !isToday) setDate(addDays(date, 1));
     };
