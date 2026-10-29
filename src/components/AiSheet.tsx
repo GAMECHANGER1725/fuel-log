@@ -13,7 +13,7 @@ const COPY: Record<AiMode, { title: string; take: string; hint: string; source: 
   text: { title: 'Describe it', take: '', hint: 'e.g. 3 rotli with ghee, a bowl of toor dal and a glass of milk', source: 'ai-text' },
 };
 
-export default function AiSheet({ mode, date, initialText = '', onClose }: { mode: AiMode; date: string; initialText?: string; onClose: () => void }) {
+export default function AiSheet({ mode, date, initialText = '', at, onClose }: { mode: AiMode; date: string; initialText?: string; at?: number; onClose: () => void }) {
   const s = useStore();
   const c = COPY[mode];
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -30,7 +30,7 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
   const [sizing, setSizing] = useState<number | null>(null); // row whose serving picker is open
 
   const noKey = !hasAi(s.settings);
-  const when = useEatenAt(date);
+  const when = useEatenAt(date, at);
 
   const run = async () => {
     setBusy(true);

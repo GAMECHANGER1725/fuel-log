@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useStore } from '../lib/store';
-import { daysBetween, fmtDate, todayKey } from '../lib/dates';
+import { atOn, daysBetween, fmtDate, todayKey } from '../lib/dates';
 import { BROWSE, FOODS, FOOD_SORTS, browseFoods, foodMacros, proteinPer100kcal, searchFoods, sortFoods, type Browse } from '../lib/foods';
 import { searchProducts } from '../lib/off';
-import { coverage, dayTargets, dayTotals, energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
+import { coverage, dayTargets, dayTotals, energy, fmt, forGrams, scale, timeOf, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
 import type { Food, Macros, Source } from '../lib/types';
 import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, toastAdded, useDictation, useEatenAt, useRoute, useToday } from '../components/ui';
@@ -21,6 +21,8 @@ export default function FoodPage() {
   const today = useToday();
   const { params } = useRoute();
   const date = params.get('d') ?? today;
+  // #/food?at=12:30 (a meal's + on Today) logs at that time instead of now.
+  const atParam = /^\d{2}:\d{2}$/.test(params.get('at') ?? '') ? atOn(date, params.get('at')!) : undefined;
   const [q, setQ] = useState('');
   const [browse, setBrowse] = useState<Browse | null>(null);
   const sort = usePrefs((p) => p.foodSort);
@@ -94,7 +96,7 @@ export default function FoodPage() {
   );
   const usual = useMemo(() => mealGroups(s.days, today), [s.days, today]);
   const logMeal = (g: MealGroup) => {
-    const ids = s.addEntries(date, g.items.map(({ name, serving, base, qty, source, foodId }) => ({ name, serving, base, qty, source, foodId })));
+    const ids = s.addEntries(date, g.items.map(({ name, serving, base, qty, source, foodId }) => ({ name, serving, base, qty, source, foodId })), [], atParam);
     toastAdded(`Added ${g.items.length} items`, Math.min(g.items.length, XP.mealCap) * XP.meal, date, ids);
     back();
   };
@@ -105,7 +107,7 @@ export default function FoodPage() {
     keepSearch();
     const f = withEdit(food, s.recipeEdits);
     const qty = lastQty(s.days, today, f.name, f.serving);
-    const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: foodMacros(f), qty, source, foodId: f.id }], [f]);
+    const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: foodMacros(f), qty, source, foodId: f.id }], [f], atParam);
     toastAdded(`Added ${qty !== 1 ? `${qty}× ` : ''}${f.name}`, XP.meal + (source === 'scan' ? XP.scan : 0), date, ids);
   };
   const row = (f: Food, source: Source, remove?: () => void, onOpen?: () => void, move?: { up: boolean; down: boolean }) => (
@@ -155,7 +157,9 @@ export default function FoodPage() {
     <>
       <header className="head">
         <div className="stack" style={{ gap: 2 }}>
-          <span className="mono mut">{date === today ? 'Logging now' : `Adding to ${fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short' })}`}</span>
+          <span className="mono mut">
+            {date === today ? (atParam ? `Logging at ${timeOf(atParam)}` : 'Logging now') : `Adding to ${fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short' })}${atParam ? ` at ${timeOf(atParam)}` : ''}`}
+          </span>
           <h1 className="title">Add food</h1>
           <StillToGo date={date} />
         </div>
@@ -283,13 +287,14 @@ export default function FoodPage() {
         <AddSheet
           date={date}
           picked={picked}
+          at={atParam}
           onClose={() => {
             setPicked(null);
             if (fromLink.current) back();
           }}
         />
       )}
-      {sheet === 'manual' && <ManualSheet date={date} initialName={q.trim()} onClose={closeSheet} />}
+      {sheet === 'manual' && <ManualSheet date={date} initialName={q.trim()} at={atParam} onClose={closeSheet} />}
       {sheet === 'scan' && (
         <Scanner
           onClose={closeSheet}
@@ -302,12 +307,12 @@ export default function FoodPage() {
           known={[...s.favourites, ...s.recents]}
         />
       )}
-      {(sheet === 'photo' || sheet === 'label' || sheet === 'text') && <AiSheet mode={sheet} date={date} initialText={sheet === 'text' ? q : ''} onClose={closeSheet} />}
+      {(sheet === 'photo' || sheet === 'label' || sheet === 'text') && <AiSheet mode={sheet} date={date} initialText={sheet === 'text' ? q : ''} at={atParam} onClose={closeSheet} />}
     </>
   );
 }
 
-function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onClose: () => void }) {
+function AddSheet({ date, picked, at, onClose }: { date: string; picked: Picked; at?: number; onClose: () => void }) {
   const s = useStore();
   const { source } = picked;
   // Live, so saving a recipe edit here updates the numbers straight away.
@@ -321,7 +326,7 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
   const fav = s.favourites.some((f) => f.name.toLowerCase() === food.name.toLowerCase());
   const xp = XP.meal + (source === 'scan' ? XP.scan : 0);
   const recipe = recipeFor(food, s.recipeEdits);
-  const when = useEatenAt(date);
+  const when = useEatenAt(date, at);
   const hist = useMemo(() => foodHistory(s.days, todayKey(), food.name), [s.days, food.name]);
   const ago = hist.last && daysBetween(hist.last, todayKey());
 
@@ -394,14 +399,14 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
   );
 }
 
-function ManualSheet({ date, initialName = '', onClose }: { date: string; initialName?: string; onClose: () => void }) {
+function ManualSheet({ date, initialName = '', at, onClose }: { date: string; initialName?: string; at?: number; onClose: () => void }) {
   const s = useStore();
   const unit = s.settings.unit;
   const [f, setF] = useState({ name: initialName.slice(0, 60), serving: '', energy: '', protein: '', carbs: '', fat: '', fav: false });
   const n = (v: string) => Math.max(0, parseFloat(v) || 0);
   const kcal = unit === 'kJ' ? n(f.energy) / KJ : n(f.energy);
   const ok = kcal > 0;
-  const when = useEatenAt(date);
+  const when = useEatenAt(date, at);
   const set = (k: keyof typeof f) => (e: ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: k === 'fav' ? e.target.checked : e.target.value });
 
   const build = (): Food => ({

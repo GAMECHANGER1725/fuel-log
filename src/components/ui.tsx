@@ -94,7 +94,7 @@ export function Sheet({ onClose, children, label }: { onClose: () => void; child
 
 /** Quick serving sizes shown under a servings Stepper. */
 /** The "when did you eat it" time for a log sheet: starts at the current time, as epoch ms on `date`. */
-export function useEatenAt(date: string, initial = Date.now()) {
+export function useEatenAt(date: string, initial: number = Date.now()) {
   const [hhmm, setHhmm] = useState(() => hhmmOf(initial));
   return { hhmm, setHhmm, at: atOn(date, hhmm) };
 }

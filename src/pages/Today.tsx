@@ -288,28 +288,40 @@ export default function Today() {
             <div className="card tight">
               {sections.map((sec, si) => (
                 <div key={sec.entries[0].id} style={si ? { borderTop: '1px solid var(--line2)', marginTop: 4, paddingTop: 4 } : undefined}>
-                  <button
-                    className="between"
-                    aria-expanded={!folded.has(sec.entries[0].id)}
-                    style={{ width: '100%', padding: '8px 0 2px', background: 'none', border: 0, color: 'inherit', font: 'inherit', cursor: 'pointer', textAlign: 'left' }}
-                    onClick={() => {
-                      const next = new Set(folded);
-                      if (!next.delete(sec.entries[0].id)) next.add(sec.entries[0].id);
-                      setFolded(next);
-                    }}
-                  >
-                    <span className="mono fuel" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ display: 'flex', transform: folded.has(sec.entries[0].id) ? undefined : 'rotate(90deg)', transition: 'transform .15s' }}><Icon name="right" size={12} stroke={2.6} /></span>
-                      {SECTION_LABEL[sec.moment]}
-                      {folded.has(sec.entries[0].id) && <span className="mut"> · {sec.entries.length}</span>}
-                    </span>
-                    <span className="mono dim">
-                      {energy(sec.kcal, unit)} {unit} ·{' '}
-                      <span style={sec.protein >= mealGoal ? { color: 'var(--pro)' } : undefined} title={sec.protein >= mealGoal ? `${mealGoal} g+ protein` : undefined}>
-                        {fmt(sec.protein)} g{sec.protein >= mealGoal ? ' ✓' : ''}
+                  <div className="row" style={{ gap: 4 }}>
+                    <button
+                      className="between grow"
+                      aria-expanded={!folded.has(sec.entries[0].id)}
+                      style={{ padding: '8px 0 2px', background: 'none', border: 0, color: 'inherit', font: 'inherit', cursor: 'pointer', textAlign: 'left' }}
+                      onClick={() => {
+                        const next = new Set(folded);
+                        if (!next.delete(sec.entries[0].id)) next.add(sec.entries[0].id);
+                        setFolded(next);
+                      }}
+                    >
+                      <span className="mono fuel" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ display: 'flex', transform: folded.has(sec.entries[0].id) ? undefined : 'rotate(90deg)', transition: 'transform .15s' }}><Icon name="right" size={12} stroke={2.6} /></span>
+                        {SECTION_LABEL[sec.moment]}
+                        {folded.has(sec.entries[0].id) && <span className="mut"> · {sec.entries.length}</span>}
                       </span>
-                    </span>
-                  </button>
+                      <span className="mono dim">
+                        {energy(sec.kcal, unit)} {unit} ·{' '}
+                        <span style={sec.protein >= mealGoal ? { color: 'var(--pro)' } : undefined} title={sec.protein >= mealGoal ? `${mealGoal} g+ protein` : undefined}>
+                          {fmt(sec.protein)} g{sec.protein >= mealGoal ? ' ✓' : ''}
+                        </span>
+                      </span>
+                    </button>
+                    {!picked && (
+                      <a
+                        className="btn icon sm"
+                        style={{ width: 32, minHeight: 32, marginTop: 4 }}
+                        aria-label={`Add to ${SECTION_LABEL[sec.moment].toLowerCase()}`}
+                        href={`#/food?at=${hhmmOf(sec.entries[sec.entries.length - 1].at)}${isToday ? '' : `&d=${date}`}`}
+                      >
+                        <Icon name="plus" size={16} />
+                      </a>
+                    )}
+                  </div>
                   {!folded.has(sec.entries[0].id) && sec.entries.map((e, i) => (
                     <button
                       key={e.id}
