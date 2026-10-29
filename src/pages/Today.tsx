@@ -241,6 +241,22 @@ export default function Today() {
               <h2 className="h2">Log</h2>
               {ago && <span className="mono mut">Last ate {ago}{ago === 'just now' ? '' : ' ago'}</span>}
             </div>
+            <div className="row" style={{ gap: 6 }}>
+            <label className="btn sm date-pick">
+              <Icon name="copy" size={16} /> Copy from…
+              <input
+                type="date"
+                aria-label="Copy everything from another day"
+                max={addDays(date, -1)}
+                value=""
+                onChange={(e) => {
+                  const from = e.target.value;
+                  if (!from || from >= date) return;
+                  const n = s.copyDay(from, date);
+                  toast(n ? `Copied ${n} item${n === 1 ? '' : 's'} from ${fmtDate(from, { weekday: 'short', day: 'numeric', month: 'short' })}` : 'Nothing logged that day', Math.min(n, XP.mealCap) * XP.meal);
+                }}
+              />
+            </label>
             {(s.days[addDays(date, -1)]?.entries.length ?? 0) > 0 && (
               <button
                 className="btn sm"
@@ -249,9 +265,10 @@ export default function Today() {
                   toast(`Copied ${n} item${n === 1 ? '' : 's'} from the day before`, Math.min(n, XP.mealCap) * XP.meal);
                 }}
               >
-                <Icon name="copy" size={16} /> Copy yesterday
+                Yesterday
               </button>
             )}
+            </div>
           </div>
           {sections.length > 0 ? (
             <div className="card tight">
