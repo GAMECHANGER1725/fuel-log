@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, lastQty, logSections, mealGroups, weekStats } from '../src/lib/meals';
+import { daySummary, lastQty, logSections, mealGroups, records, weekStats } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -578,5 +578,18 @@ describe('weigh-in reminder', () => {
   it('counts days since the last weigh-in', () => {
     expect(daysSinceWeighIn([], '2026-10-29')).toBeNull();
     expect(daysSinceWeighIn([{ date: '2026-10-15' }, { date: '2026-10-22' }], '2026-10-29')).toBe(7);
+  });
+});
+
+describe('records', () => {
+  it('finds the best day for energy, protein and water', () => {
+    const e = (k: string, kcal: number, protein: number): Entry => ({ id: k, name: 'x', serving: '', base: { kcal, protein, carbs: 0, fat: 0 }, qty: 1, source: 'db', at: atOn(k, '12:00') });
+    const days = {
+      '2026-10-20': { entries: [e('2026-10-20', 3400, 100)], water: 6, checks: {} },
+      '2026-10-21': { entries: [e('2026-10-21', 3000, 140)], water: 9, checks: {} },
+      '2026-10-22': { entries: [e('2026-10-22', 3400, 90)], water: 2, checks: {} },
+    };
+    expect(records(days)).toEqual({ kcal: { date: '2026-10-20', value: 3400 }, protein: { date: '2026-10-21', value: 140 }, water: { date: '2026-10-21', value: 9 } });
+    expect(records({})).toEqual({ kcal: null, protein: null, water: null });
   });
 });

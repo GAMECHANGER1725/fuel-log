@@ -6,7 +6,7 @@ import { projectedDate, trendLine, weeklyNudge, weeklyRate, withKcal } from '../
 
 import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
-import { weekStats } from '../lib/meals';
+import { records, weekStats } from '../lib/meals';
 import { hasAi } from '../lib/ai';
 import { Icon, Sheet, toast, useGame, useRoute, useToday } from '../components/ui';
 
@@ -125,6 +125,29 @@ export default function Progress() {
         <WeekCompare today={today} />
 
         <DailyChart today={today} />
+
+        {(() => {
+          const r = records(s.days);
+          if (!r.kcal && !r.water) return null;
+          const tile = (label: string, value: string, date: string | undefined) => (
+            <a href={date ? (date === today ? '#/today' : `#/today?d=${date}`) : undefined} className="card stack" style={{ padding: 12, gap: 2, color: 'var(--ink)', textDecoration: 'none', background: 'var(--s2)' }}>
+              <span className="num" style={{ fontSize: 24, lineHeight: 1 }}>{value}</span>
+              <span className="mono mut" style={{ fontSize: 10 }}>{label}</span>
+              {date && <span className="mono dim" style={{ fontSize: 10 }}>{fmtDate(date, { day: 'numeric', month: 'short' })}</span>}
+            </a>
+          );
+          return (
+            <section className="card">
+              <h2 className="h2" style={{ marginBottom: 10 }}>Personal records</h2>
+              <div className="grid2" style={{ gap: 8 }}>
+                {tile(`Most ${unit} in a day`, r.kcal ? energy(r.kcal.value, unit) : '–', r.kcal?.date)}
+                {tile('Most protein in a day', r.protein ? `${fmt(r.protein.value)} g` : '–', r.protein?.date)}
+                {tile('Most water in a day', r.water ? `${(r.water.value * 0.25).toFixed(2).replace(/0$/, '')} L` : '–', r.water?.date)}
+                {tile('Best streak', `${g.streak.best} day${g.streak.best === 1 ? '' : 's'}`, undefined)}
+              </div>
+            </section>
+          );
+        })()}
 
         <section className="card">
           <h2 className="h2" style={{ marginBottom: 8 }}>Weekly averages</h2>

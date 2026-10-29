@@ -26,7 +26,7 @@ export default function FoodPage() {
   const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== '/' || (e.target as HTMLElement).closest('input, textarea, select, [role=dialog]')) return;
+      if (e.key !== '/' || document.querySelector('[role=dialog]') || (e.target as HTMLElement).closest('input, textarea, select')) return;
       e.preventDefault();
       searchRef.current?.focus();
     };
