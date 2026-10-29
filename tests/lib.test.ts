@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayTotals, energy, energySplit, forGrams, paceGap, sinceLast } from '../src/lib/nutrition';
+import { dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCrossed } from '../src/lib/nutrition';
 import { foodDue, hourLabel, waterDue } from '../src/lib/reminders';
 import { FOODS, browseFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, logSections, mealGroups } from '../src/lib/meals';
+import { daySummary, lastQty, logSections, mealGroups } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -531,5 +531,24 @@ describe('csv export', () => {
     expect(lines[1]).toBe("food,2026-10-29,07:30,'=Toast,1 cup,2,400,20,60,10,,");
     expect(lines[2]).toBe('food,2026-10-29,19:00,"Dal, ""home""",1 cup,1,200,10,30,5,,');
     expect(lines[3]).toBe('day,2026-10-29,,,,,600,30,90,15,1.5,"gym, legs"');
+  });
+});
+
+describe('usual amount and targets crossed', () => {
+  const k = '2026-10-29';
+  const e = (name: string, serving: string, qty: number, at: number): Entry => ({ id: name + at, name, serving, base: { kcal: 100, protein: 3, carbs: 0, fat: 0 }, qty, source: 'db', at });
+  it('remembers the last amount for the same food and serving', () => {
+    const days = {
+      [addDays(k, -3)]: { entries: [e('Rotli, plain', '1 rotli', 3, atOn(addDays(k, -3), '19:00'))], water: 0, checks: {} },
+      [addDays(k, -1)]: { entries: [e('rotli, plain', '1 rotli', 2, atOn(addDays(k, -1), '19:00')), e('Rotli, plain', '120 g', 1, atOn(addDays(k, -1), '20:00'))], water: 0, checks: {} },
+    };
+    expect(lastQty(days, k, 'Rotli, plain', '1 rotli')).toBe(2);
+    expect(lastQty(days, k, 'Dal', '1 bowl')).toBe(1);
+    expect(lastQty(days, addDays(k, 40), 'Rotli, plain', '1 rotli')).toBe(1);
+  });
+  it('spots a target just passed', () => {
+    const T = { kcal: 3000, protein: 115, carbs: 0, fat: 0 };
+    expect(targetsCrossed({ kcal: 2900, protein: 100, carbs: 0, fat: 0 }, { kcal: 3100, protein: 110, carbs: 0, fat: 0 }, T)).toEqual({ kcal: true, protein: false });
+    expect(targetsCrossed({ kcal: 3100, protein: 120, carbs: 0, fat: 0 }, { kcal: 3300, protein: 130, carbs: 0, fat: 0 }, T)).toEqual({ kcal: false, protein: false });
   });
 });

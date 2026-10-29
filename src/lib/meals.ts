@@ -6,6 +6,19 @@ import { addDays } from './dates';
 import { energy, sumEntries } from './nutrition';
 import { momentOf, type Moment } from './foods';
 
+/**
+ * How many servings of a food you had the last time you logged it (same name and serving) in the
+ * last `lookback` days, so the amount starts where you usually are. 1 if never.
+ */
+export function lastQty(days: Record<string, DayLog>, today: string, name: string, serving: string, lookback = 30): number {
+  const n = name.trim().toLowerCase();
+  for (let i = 0; i < lookback; i++) {
+    const hits = (days[addDays(today, -i)]?.entries ?? []).filter((e) => e.name.trim().toLowerCase() === n && e.serving === serving);
+    if (hits.length) return hits.reduce((a, b) => (b.at > a.at ? b : a)).qty;
+  }
+  return 1;
+}
+
 export interface MealGroup {
   /** Same foods and amounts give the same key. */
   key: string;

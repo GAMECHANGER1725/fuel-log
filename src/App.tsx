@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from './lib/store';
 import { hasAi } from './lib/ai';
 import { Icon, Toast, toast, useGame, useRoute, useToday } from './components/ui';
@@ -15,6 +15,7 @@ import { startSync, useSync } from './lib/sync';
 import { autoDue, checkIn, useCoach } from './lib/coach';
 import { startReminders } from './lib/reminders';
 import { usePrefs } from './lib/prefs';
+import { dayTotals, targetsCrossed } from './lib/nutrition';
 
 export default function App() {
   const theme = useStore((s) => s.settings.theme);
@@ -89,6 +90,7 @@ export default function App() {
       <Nav path={path} />
       <Celebrations />
       <WhatsNewOnce />
+      <TargetCheer />
       <Toast />
     </div>
   );
@@ -114,6 +116,27 @@ function Nav({ path }: { path: string }) {
       </div>
     </nav>
   );
+}
+
+/** A toast when today's log first passes the energy or protein target. */
+function TargetCheer() {
+  const today = useToday();
+  const day = useStore((s) => s.days[today]);
+  const T = useStore((s) => s.settings.targets);
+  const t = dayTotals(day);
+  const prev = useRef<{ date: string; kcal: number; protein: number } | null>(null);
+  useEffect(() => {
+    const before = prev.current;
+    prev.current = { date: today, kcal: t.kcal, protein: t.protein };
+    if (!before || before.date !== today) return;
+    const hit = targetsCrossed({ ...t, ...before }, t, T);
+    if (!hit.kcal && !hit.protein) return;
+    // After the "+XP" toast for the add that did it.
+    const msg = hit.kcal && hit.protein ? 'Both targets hit today. Great work!' : hit.kcal ? 'Energy target hit for today!' : 'Protein target hit for today!';
+    const timer = setTimeout(() => toast(msg), 1600);
+    return () => clearTimeout(timer);
+  }, [t.kcal, t.protein, today]);
+  return null;
 }
 
 /** Level-ups get a full-screen moment; new badges get a toast. */
