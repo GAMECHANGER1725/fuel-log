@@ -264,3 +264,12 @@ export function lastSection(days: Record<string, DayLog>, today: string, moment:
   }
   return null;
 }
+
+/**
+ * Protein worth aiming for in one sitting: about 0.4 g per kg of body weight, rounded to 5 g,
+ * between 20 and 40 g. Spreading protein over meals this size helps muscle gain more than one big hit.
+ */
+export const mealProteinGoal = (weightKg: number): number => Math.min(40, Math.max(20, Math.round((0.4 * weightKg) / 5) * 5));
+
+/** How many parts of the day reached `goal` grams of protein. */
+export const proteinMeals = (sections: LogSection[], goal: number): number => sections.filter((s) => s.protein >= goal).length;

@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
-import { SECTION_LABEL, daySummary, lastQty, lastSection, logSections } from '../lib/meals';
+import { SECTION_LABEL, daySummary, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals } from '../lib/meals';
 
 export default function Today() {
   const today = useToday();
@@ -81,6 +81,7 @@ export default function Today() {
   };
 
   const sections = logSections(day.entries);
+  const mealGoal = mealProteinGoal(s.profile.weightKg);
   const pace = isToday && kLeft > 0 ? paceGap(t.kcal, T.kcal, hour) : null;
   // Shortcut from the app icon: #/today?add=water adds a glass. The hash check stops StrictMode's re-run adding two.
   const addParam = params.get('add');
@@ -243,7 +244,12 @@ export default function Today() {
                 <div key={sec.entries[0].id} style={si ? { borderTop: '1px solid var(--line2)', marginTop: 4, paddingTop: 4 } : undefined}>
                   <div className="between" style={{ padding: '8px 0 2px' }}>
                     <span className="mono fuel">{SECTION_LABEL[sec.moment]}</span>
-                    <span className="mono dim">{energy(sec.kcal, unit)} {unit} · {fmt(sec.protein)} g</span>
+                    <span className="mono dim">
+                      {energy(sec.kcal, unit)} {unit} ·{' '}
+                      <span style={sec.protein >= mealGoal ? { color: 'var(--pro)' } : undefined} title={sec.protein >= mealGoal ? `${mealGoal} g+ protein` : undefined}>
+                        {fmt(sec.protein)} g{sec.protein >= mealGoal ? ' ✓' : ''}
+                      </span>
+                    </span>
                   </div>
                   {sec.entries.map((e, i) => (
                     <button
@@ -455,6 +461,7 @@ export default function Today() {
                 <span><span className="num" style={{ fontSize: 24 }}>{fmt(t.protein)}</span><span className="mut small"> / {T.protein} g</span></span>
                 <span className="mut small">{pLeft > 0 ? `${fmt(pLeft)} g to go` : 'Target hit'}</span>
                 <span className="mono dim">{(t.protein / s.profile.weightKg).toFixed(1)} g/kg of {(T.protein / s.profile.weightKg).toFixed(1)}</span>
+                {sections.length > 0 && <span className="mono dim">{proteinMeals(sections, mealGoal)} meal{proteinMeals(sections, mealGoal) === 1 ? '' : 's'} with {mealGoal} g+</span>}
               </div>
             </div>
           </div>

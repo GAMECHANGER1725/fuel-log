@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, lastSection, topFoods } from '../src/lib/meals';
+import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -624,6 +624,19 @@ describe('lastSection', () => {
     expect(lastSection(days, '2026-10-29', 'dinner')).toMatchObject({ date: '2026-10-28', kcal: 700 });
     expect(lastSection(days, '2026-10-29', 'lunch')).toBeNull(); // already had lunch today
     expect(lastSection(days, '2026-10-29', 'late')).toBeNull();
+  });
+});
+
+describe('protein per meal', () => {
+  it('aims for about 0.4 g/kg a sitting, 20 to 40 g', () => {
+    expect(mealProteinGoal(62)).toBe(25);
+    expect(mealProteinGoal(40)).toBe(20);
+    expect(mealProteinGoal(120)).toBe(40);
+  });
+  it('counts the parts of the day that reached it', () => {
+    const e = (hhmm: string, protein: number): Entry => ({ id: hhmm, name: 'x', serving: '', base: { kcal: 100, protein, carbs: 0, fat: 0 }, qty: 1, source: 'db', at: atOn('2026-10-29', hhmm) });
+    const secs = logSections([e('07:00', 15), e('07:10', 12), e('13:00', 20), e('19:00', 30)]);
+    expect(proteinMeals(secs, 25)).toBe(2);
   });
 });
 
