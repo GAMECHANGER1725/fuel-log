@@ -152,6 +152,14 @@ export default function Today() {
           </div>}
         </section>
 
+        {isToday && hour >= 18 && !day.entries.length && g.streak.current > 0 && (
+          <a href="#/food" className="card tight" style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--ink)', textDecoration: 'none', boxShadow: 'inset 0 0 0 1.5px var(--fuel)' }}>
+            <span className="fuel"><Icon name="flame" size={22} stroke={2.2} /></span>
+            <span className="grow small">Nothing logged today. Add anything to keep your {g.streak.current}-day streak.</span>
+            <Icon name="right" size={18} />
+          </a>
+        )}
+
         {show('quick') && <QuickLog date={date} />}
 
         {show('week') && <WeekStrip date={date} today={today} onPick={setDate} />}

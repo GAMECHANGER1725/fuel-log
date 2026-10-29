@@ -119,6 +119,8 @@ export default function Progress() {
           </div>
         </section>
 
+        <DailyChart today={today} />
+
         <section className="card">
           <h2 className="h2" style={{ marginBottom: 8 }}>Weekly averages</h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr .8fr', fontSize: 14 }}>
@@ -147,6 +149,49 @@ export default function Progress() {
 
       {weighing && <WeighSheet today={today} onClose={() => setWeighing(false)} />}
     </>
+  );
+}
+
+/** Last 14 days as bars against the target line; energy or protein. Each bar opens that day. */
+function DailyChart({ today }: { today: string }) {
+  const days = useStore((s) => s.days);
+  const T = useStore((s) => s.settings.targets);
+  const unit = useStore((s) => s.settings.unit);
+  const [what, setWhat] = useState<'kcal' | 'protein'>('kcal');
+  const keys = Array.from({ length: 14 }, (_, i) => addDays(today, i - 13));
+  const vals = keys.map((k) => dayTotals(days[k])[what]);
+  const target = T[what];
+  const top = Math.max(target * 1.25, ...vals);
+  const H = 120;
+  const color = what === 'kcal' ? 'var(--fuel)' : 'var(--pro)';
+  const logged = vals.filter((v, i) => v > 0 && keys[i] < today);
+  const avg = logged.length ? logged.reduce((a, b) => a + b, 0) / logged.length : null;
+  const show = (v: number) => (what === 'kcal' ? `${energy(v, unit)} ${unit}` : `${fmt(v)} g`);
+  return (
+    <section className="card">
+      <div className="between" style={{ marginBottom: 10, alignItems: 'center' }}>
+        <h2 className="h2">Last 14 days</h2>
+        <div className="row" style={{ gap: 6 }}>
+          <button className="chip" aria-pressed={what === 'kcal'} onClick={() => setWhat('kcal')}>Energy</button>
+          <button className="chip" aria-pressed={what === 'protein'} onClick={() => setWhat('protein')}>Protein</button>
+        </div>
+      </div>
+      <div className="chart14" style={{ height: H }}>
+        <span className="chart14-target" style={{ bottom: (target / top) * H }} />
+        {keys.map((k, i) => (
+          <a key={k} href={k === today ? '#/today' : `#/today?d=${k}`} aria-label={`${fmtDate(k, { weekday: 'long', day: 'numeric', month: 'short' })}: ${show(vals[i])}`}>
+            <i style={{ height: Math.max(vals[i] ? 3 : 0, (vals[i] / top) * H), background: vals[i] >= target ? color : `color-mix(in srgb, ${color} 55%, var(--track))` }} />
+          </a>
+        ))}
+      </div>
+      <div className="between" style={{ marginTop: 6 }}>
+        <span className="mono dim" style={{ fontSize: 10 }}>{fmtDate(keys[0])}</span>
+        <span className="mono dim" style={{ fontSize: 10 }}>Today</span>
+      </div>
+      <p className="small mut" style={{ marginTop: 6 }}>
+        Line = target ({show(target)}). {avg === null ? 'Log a few days to see your average.' : `Average on logged days: ${show(avg)}, ${logged.filter((v) => v >= target).length} of ${logged.length} hit.`}
+      </p>
+    </section>
   );
 }
 
