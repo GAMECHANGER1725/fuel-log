@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { coverage, dayTargets, dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCrossed } from '../src/lib/nutrition';
 import { foodDue, hourLabel, waterDue, wrapDue, wrapText } from '../src/lib/reminders';
-import { FOODS, browseFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
+import { FOODS, browseFoods, proteinPer100kcal, sortFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
 import { addDays, atOn, daysSinceWeighIn, hhmmOf, weekStart } from '../src/lib/dates';
 import { chartWindow, goalProgress, suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
@@ -657,6 +657,22 @@ describe('chartWindow', () => {
   });
   it('falls back to the last two when the span has fewer', () => {
     expect(chartWindow(line.slice(0, 2), '2026-10-29', 56).map((p) => p.date)).toEqual(['2026-01-01', '2026-06-01']);
+  });
+});
+
+describe('sortFoods', () => {
+  const f = (name: string, kcal: number, protein: number) => ({ id: name, name, serving: '', kcal, protein, carbs: 0, fat: 0 });
+  const list = [f('Rice', 400, 8), f('Whey', 120, 24), f('Paneer', 300, 20)];
+  it('orders by protein, density or energy, and leaves best match alone', () => {
+    expect(sortFoods(list, 'match')).toBe(list);
+    expect(sortFoods(list, 'protein').map((x) => x.name)).toEqual(['Whey', 'Paneer', 'Rice']);
+    expect(sortFoods(list, 'lean').map((x) => x.name)).toEqual(['Whey', 'Paneer', 'Rice']);
+    expect(sortFoods(list, 'kcal').map((x) => x.name)).toEqual(['Rice', 'Paneer', 'Whey']);
+    expect(list.map((x) => x.name)).toEqual(['Rice', 'Whey', 'Paneer']); // not mutated
+  });
+  it('measures protein per 100 kcal', () => {
+    expect(proteinPer100kcal(f('Whey', 120, 24))).toBe(20);
+    expect(proteinPer100kcal(f('Water', 0, 0))).toBe(0);
   });
 });
 
