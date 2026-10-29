@@ -9,7 +9,7 @@ import { useCoach } from '../lib/coach';
 import { rangeStats, records, searchLog, tagStats, topFoods, weekdayAverages, weekStats, weekSummary } from '../lib/meals';
 import { hasAi } from '../lib/ai';
 import { usePrefs } from '../lib/prefs';
-import { Bar, Icon, Sheet, toast, useGame, useRoute, useToday } from '../components/ui';
+import { Bar, Icon, Sheet, toast, toastAdded, useGame, useRoute, useToday } from '../components/ui';
 
 export default function Progress() {
   const today = useToday();
@@ -375,11 +375,25 @@ function LogSearch({ today }: { today: string }) {
               {total} time{total === 1 ? '' : 's'}{total > hits.length ? `, newest ${hits.length} shown` : ` on ${dayCount} day${dayCount === 1 ? '' : 's'}`}
             </span>
             {shown.map(({ date, entry: e }) => (
-              <a key={e.id} href={date === today ? '#/today' : `#/today?d=${date}`} className="item" style={{ padding: '8px 0', color: 'var(--ink)', textDecoration: 'none', gap: 8 }}>
-                <span className="mono dim" style={{ width: 92, flex: 'none' }}>{fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short' })}<br />{timeOf(e.at)}</span>
-                <span className="grow" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
-                <span className="mono mut" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)} · {fmt(entryMacros(e).protein)} g</span>
-              </a>
+              <div key={e.id} className="item" style={{ padding: '4px 0', gap: 4 }}>
+                <a href={date === today ? '#/today' : `#/today?d=${date}`} className="grow" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, padding: '4px 0', color: 'var(--ink)', textDecoration: 'none' }}>
+                  <span className="mono dim" style={{ width: 92, flex: 'none' }}>{fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short' })}<br />{timeOf(e.at)}</span>
+                  <span className="grow" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
+                  <span className="mono mut" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)} · {fmt(entryMacros(e).protein)} g</span>
+                </a>
+                <button
+                  className="btn icon sm"
+                  style={{ width: 36 }}
+                  aria-label={`Log ${e.name} again now`}
+                  onClick={() => {
+                    const { name, serving, base, qty, source, foodId } = e;
+                    const ids = useStore.getState().addEntries(today, [{ name, serving, base, qty, source, foodId }]);
+                    toastAdded(`Logged ${qty !== 1 ? `${qty}× ` : ''}${name} now`, XP.meal, today, ids);
+                  }}
+                >
+                  +
+                </button>
+              </div>
             ))}
             {shown.length < hits.length && <button className="btn sm" style={{ marginTop: 6 }} onClick={() => setMore(true)}>Show {hits.length - shown.length} more</button>}
           </div>

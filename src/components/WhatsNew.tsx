@@ -2,7 +2,7 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29q';
+export const NEWS_ID = '2026-10-29r';
 
 const NEWS: [title: string, body: string, href?: string][] = [
   ['Usually now', 'Quick log puts the foods you often have around this time first, marked with a clock.'],
@@ -10,7 +10,7 @@ const NEWS: [title: string, body: string, href?: string][] = [
   ['Open straight to Add food', 'Pick which page the app opens on in Profile, so logging is one tap from the home screen.', '#/profile?open=display'],
   ['Weigh-in reminder', 'Choose daily, every 3 days, weekly or fortnightly for the weigh-in reminder on Today, in Profile.', '#/profile?open=display'],
   ['Week so far', 'This week on Today says how far ahead or behind your energy target the week is, and how much a day catches up.'],
-  ['Search your log', 'On Progress, type a food to see every time you logged it and when. Tap one to open that day.', '#/progress'],
+  ['Search your log', 'On Progress, type a food to see every time you logged it and when. Tap one to open that day, or + to have it again now.', '#/progress'],
   ['Where it came from', 'Under the log, open Where it came from to see which foods gave the day’s protein or energy.'],
   ['Tag the day', 'Tap Gym, Rest day, Eating out and more under the day note to add them without typing. Tap again to take one off. Progress then compares those days with the rest. Make your own tags in Profile.', '#/profile?open=display'],
   ['Badge on the app icon', 'Show protein or energy still to eat on the home-screen icon. Turn it on in Profile, under Reminders.', '#/profile?open=display'],
