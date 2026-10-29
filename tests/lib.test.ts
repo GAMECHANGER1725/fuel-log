@@ -12,6 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { cleanHidden, toggleIn } from '../src/lib/prefs';
+import { mealGroups } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -375,5 +376,27 @@ describe('since last meal', () => {
     expect(sinceLast([at(now - 60 * 60_000), at(now + 60 * 60_000)], now)).toBe('1 h');
     expect(sinceLast([at(now + 60_000)], now)).toBeNull();
     expect(sinceLast([], now)).toBeNull();
+  });
+});
+
+describe('usual meals', () => {
+  const t = '2026-10-29';
+  const e = (name: string, at: number, qty = 1): Entry => ({ id: name + at, name, serving: '', base: { kcal: 100, protein: 5, carbs: 0, fat: 0 }, qty, source: 'db', at });
+  const day = (entries: Entry[]): DayLog => ({ entries, water: 0, checks: {} });
+  const h = (k: string, hh: number, mm = 0) => atOn(k, `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`);
+  const y = addDays(t, -1);
+  const days = {
+    [t]: day([e('Toast', h(t, 7)), e('Milk', h(t, 7, 5)), e('Apple', h(t, 13))]),
+    [y]: day([e('milk', h(y, 7, 30)), e('Toast', h(y, 7, 40)), e('Dal', h(y, 19)), e('Rice', h(y, 19, 2), 2)]),
+  };
+  it('groups foods logged close together and counts repeats regardless of order or case', () => {
+    const g = mealGroups(days, t);
+    expect(g.map((x) => x.count)).toEqual([2, 1]);
+    expect(g[0].items.map((x) => x.name)).toEqual(['Toast', 'Milk']); // the latest time it was eaten
+    expect(g[1].kcal).toBe(300);
+  });
+  it('skips single foods and days outside the lookback', () => {
+    expect(mealGroups({ [t]: day([e('Apple', h(t, 13))]) }, t)).toEqual([]);
+    expect(mealGroups(days, addDays(t, 20))).toEqual([]);
   });
 });

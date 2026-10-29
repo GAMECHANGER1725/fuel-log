@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useStore } from '../lib/store';
 import { FOODS, foodMacros, searchFoods } from '../lib/foods';
 import { searchProducts } from '../lib/off';
-import { energy, forGrams, scale, KJ } from '../lib/nutrition';
+import { energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
 import type { Food, Source } from '../lib/types';
 import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, useEatenAt, useRoute, useToday } from '../components/ui';
@@ -11,6 +11,7 @@ import AiSheet from '../components/AiSheet';
 import type { AiMode } from '../lib/ai';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
+import { mealGroups, type MealGroup } from '../lib/meals';
 
 type Picked = { food: Food; source: Source };
 
@@ -46,6 +47,13 @@ export default function FoodPage() {
       ctl.abort();
     };
   }, [q]);
+
+  const usual = useMemo(() => mealGroups(s.days, today), [s.days, today]);
+  const logMeal = (g: MealGroup) => {
+    s.addEntries(date, g.items.map(({ name, serving, base, qty, source, foodId }) => ({ name, serving, base, qty, source, foodId })));
+    toast(`Added ${g.items.length} items`, Math.min(g.items.length, XP.mealCap) * XP.meal);
+    back();
+  };
 
   const back = () => go(date === today ? 'today' : `today?d=${date}`);
   const row = (f: Food, source: Source) => (
@@ -110,6 +118,23 @@ export default function FoodPage() {
           </section>
         ) : (
           <>
+            {usual.length > 0 && (
+              <section>
+                <div className="between" style={{ marginBottom: 6 }}>
+                  <h2 className="h2">Usual meals</h2>
+                  <span className="mono mut">Foods you log together</span>
+                </div>
+                {usual.map((g) => (
+                  <div key={g.key} className="item">
+                    <button className="item-btn" onClick={() => logMeal(g)}>
+                      <span>{g.items.map((e) => (e.qty !== 1 ? `${e.qty}× ${e.name}` : e.name)).join(' + ')}</span>
+                      <span className="mono mut">{energy(g.kcal, unit)} {unit} · {fmt(g.protein)} g P{g.count > 1 ? ` · ${g.count}× in 2 weeks` : ''}</span>
+                    </button>
+                    <button className="btn icon" aria-label={`Log ${g.items.map((e) => e.name).join(', ')}`} onClick={() => logMeal(g)}>+</button>
+                  </div>
+                ))}
+              </section>
+            )}
             {s.favourites.length > 0 && (
               <section>
                 <h2 className="h2" style={{ marginBottom: 6 }}>Favourites</h2>
