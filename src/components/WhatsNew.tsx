@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29zg';
+export const NEWS_ID = '2026-10-29zh';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Quieter level-ups', 'Prefer no full-screen moment? Pick Just a message under Level-ups in Profile, Look.', '#/profile?open=look'],
   ['Fold a meal', 'Tap Breakfast, Lunch or any meal heading in the log to fold it away; its totals stay. Tap again to open it.'],
   ['Notes in Share this day', 'Sharing a day now includes the day note and any notes on foods.'],
   ['Choose your Progress cards', 'Hide the Progress cards you don’t use: tap Customise this page at the bottom of Progress.', '#/profile?open=progress'],

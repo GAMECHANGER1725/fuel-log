@@ -212,6 +212,9 @@ interface Prefs {
   /** Weekdays (0 = Sunday) that get the training-day boost by themselves, and the last day it was switched on that way. */
   /** Quick log: how many foods, and whether the chips wrap onto lines instead of scrolling sideways. */
   /** Progress cards hidden on this device. */
+  /** Level-ups as the full-screen moment, or just a toast. */
+  quietLevelUp: boolean;
+  setQuietLevelUp: (q: boolean) => void;
   progressHidden: ProgressCard[];
   toggleProgress: (c: ProgressCard) => void;
   quickCount: number;
@@ -266,6 +269,8 @@ export const usePrefs = create<Prefs>()(
       bottleMl: 500,
       badge: 'off',
       weighEvery: 7,
+      quietLevelUp: false,
+      setQuietLevelUp: (quietLevelUp) => set({ quietLevelUp }),
       progressHidden: [],
       toggleProgress: (c) => set((s) => ({ progressHidden: s.progressHidden.includes(c) ? s.progressHidden.filter((x) => x !== c) : [...s.progressHidden, c] })),
       quickCount: 10,
@@ -305,9 +310,9 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches, weighEvery: s.weighEvery, start: s.start, shopping: s.shopping, trainDays: s.trainDays, lastAutoBoost: s.lastAutoBoost, quickCount: s.quickCount, quickWrap: s.quickWrap, progressHidden: s.progressHidden }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches, weighEvery: s.weighEvery, start: s.start, shopping: s.shopping, trainDays: s.trainDays, lastAutoBoost: s.lastAutoBoost, quickCount: s.quickCount, quickWrap: s.quickWrap, progressHidden: s.progressHidden, quietLevelUp: s.quietLevelUp }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown; weighEvery?: unknown; start?: unknown; shopping?: unknown; trainDays?: unknown; lastAutoBoost?: unknown; quickCount?: unknown; quickWrap?: unknown; progressHidden?: unknown };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown; weighEvery?: unknown; start?: unknown; shopping?: unknown; trainDays?: unknown; lastAutoBoost?: unknown; quickCount?: unknown; quickWrap?: unknown; progressHidden?: unknown; quietLevelUp?: unknown };
         return {
           ...cur,
           hidden: cleanHidden(saved.hidden),
@@ -323,6 +328,7 @@ export const usePrefs = create<Prefs>()(
           trainDays: Array.isArray(saved.trainDays) ? [...new Set(saved.trainDays.filter((x): x is number => Number.isInteger(x) && x >= 0 && x <= 6))] : [],
           quickCount: QUICK_COUNTS.includes(saved.quickCount as number) ? (saved.quickCount as number) : 10,
           quickWrap: saved.quickWrap === true,
+          quietLevelUp: saved.quietLevelUp === true,
           progressHidden: Array.isArray(saved.progressHidden) ? PROGRESS_CARDS.map(([id]) => id).filter((id) => (saved.progressHidden as unknown[]).includes(id)) : [],
           lastAutoBoost: typeof saved.lastAutoBoost === 'string' ? saved.lastAutoBoost.slice(0, 10) : '',
           start: STARTS.find(([id]) => id === saved.start)?.[0] ?? 'today',

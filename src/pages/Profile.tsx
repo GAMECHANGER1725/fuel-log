@@ -365,6 +365,8 @@ function LookForm() {
       <AccentPicker />
       <span className="mono mut">Text size (this device)</span>
       <TextSizePicker />
+      <span className="mono mut">Level-ups (this device)</span>
+      <LevelUpPicker />
     </>
   );
 }
@@ -550,6 +552,16 @@ function TrainDaysPicker() {
       </div>
       <span className="small mut">On these days the boost switches on by itself when you open the app. Turn it off on Today if you skip a session.</span>
     </>
+  );
+}
+
+function LevelUpPicker() {
+  const { quietLevelUp, setQuietLevelUp } = usePrefs();
+  return (
+    <div className="row" style={{ flexWrap: 'wrap' }} role="group" aria-label="Level-ups">
+      <button className="chip" aria-pressed={!quietLevelUp} onClick={() => setQuietLevelUp(false)}>Full screen</button>
+      <button className="chip" aria-pressed={quietLevelUp} onClick={() => setQuietLevelUp(true)}>Just a message</button>
+    </div>
   );
 }
 

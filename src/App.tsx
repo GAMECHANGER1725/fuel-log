@@ -8,6 +8,7 @@ import Progress from './pages/Progress';
 import ProfilePage from './pages/Profile';
 import Coach from './pages/Coach';
 import LevelUp from './components/LevelUp';
+import { rankFor } from './lib/game';
 import { WhatsNewOnce } from './components/WhatsNew';
 import Lock from './pages/Lock';
 import { useAuth } from './lib/auth';
@@ -199,8 +200,14 @@ function Celebrations() {
   const earned = g.badges.filter((b) => b.earned).map((b) => b.id);
   const fresh = g.badges.filter((b) => b.earned && !seen.badges.includes(b.id));
 
+  const quiet = usePrefs((p) => p.quietLevelUp);
   useEffect(() => {
-    if (g.level > seen.level) setShow(g.level);
+    if (g.level > seen.level && quiet) {
+      markSeen(g.level, earned);
+      const names = fresh.map((b) => b.name);
+      const badges = names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2} more` : names.join(', ');
+      setTimeout(() => toast(`Level ${g.level}: ${rankFor(g.level).name}${names.length ? ` · new badge${names.length === 1 ? '' : 's'}: ${badges}` : ''}`), 1600);
+    } else if (g.level > seen.level) setShow(g.level);
     else if (fresh.length) {
       markSeen(Math.max(seen.level, g.level), earned);
       // Let the "+XP" toast for the action that earned it show first.
