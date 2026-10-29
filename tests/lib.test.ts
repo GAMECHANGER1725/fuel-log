@@ -625,3 +625,13 @@ describe('training day targets', () => {
     expect(computeGame(data(500), k).byDate.get(k)?.hitKcal).toBe(false);
   });
 });
+
+describe('week stats with training days', () => {
+  it('judges a training day against its higher target', () => {
+    const k = '2026-10-27';
+    const e: Entry = { id: 'a', name: 'x', serving: '', base: { kcal: 3100, protein: 120, carbs: 0, fat: 0 }, qty: 1, source: 'db', at: atOn(k, '12:00') };
+    const T = { kcal: 3000, protein: 115 };
+    expect(weekStats({ [k]: { entries: [e], water: 0, checks: {} } }, '2026-10-26', '2026-10-29', T).hit).toBe(1);
+    expect(weekStats({ [k]: { entries: [e], water: 0, checks: {}, boost: 300 } }, '2026-10-26', '2026-10-29', T).hit).toBe(0);
+  });
+});
