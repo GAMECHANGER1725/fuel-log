@@ -33,15 +33,21 @@ export default function FoodPage() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
+  const s0 = useStore.getState();
   const [tidy, setTidy] = useState<'fav' | 'recent' | null>(null); // which list shows remove buttons
   const [editingFav, setEditingFav] = useState<Food | null>(null);
   const [allRecent, setAllRecent] = useState(false);
-  const [picked, setPicked] = useState<Picked | null>(null);
+  // #/food?add=<name> opens the amount sheet for that food (holding a Quick log chip on Today).
+  const [picked, setPicked] = useState<Picked | null>(() => {
+    const n = params.get('add')?.toLowerCase();
+    const f = n ? [...s0.favourites, ...s0.recents, ...FOODS].find((x) => x.name.toLowerCase() === n) : undefined;
+    return f ? { food: f, source: f.barcode ? 'off' : 'db' } : null;
+  });
   // #/food?open=scan|manual|photo|label|text opens that sheet straight away (app-icon shortcut, Today's quick
   // actions); closing it goes back to Today, since that's where the tap came from.
   const opened = (['scan', 'manual', 'photo', 'label', 'text'] as const).find((m) => m === params.get('open')) ?? null;
   const [sheet, setSheet] = useState<'scan' | 'manual' | AiMode | null>(opened);
-  const fromLink = useRef(!!opened);
+  const fromLink = useRef(!!opened || !!picked);
   const closeSheet = () => {
     setSheet(null);
     if (fromLink.current) back();

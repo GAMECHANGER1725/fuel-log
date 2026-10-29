@@ -290,6 +290,34 @@ export function useRoute(): { path: string; params: URLSearchParams } {
   return { path: path || 'today', params: new URLSearchParams(query) };
 }
 
+/**
+ * Press and hold (or right-click) runs `onLong`; `wasLong()` tells the click handler to skip the normal tap.
+ * Scrolling a row cancels it (the browser sends pointercancel).
+ */
+export function useLongPress(onLong: () => void, ms = 500) {
+  const timer = useRef<number | undefined>(undefined);
+  const fired = useRef(false);
+  const clear = () => window.clearTimeout(timer.current);
+  return {
+    handlers: {
+      onPointerDown: () => {
+        fired.current = false;
+        clear();
+        timer.current = window.setTimeout(() => ((fired.current = true), onLong()), ms);
+      },
+      onPointerUp: clear,
+      onPointerLeave: clear,
+      onPointerCancel: clear,
+      onContextMenu: (e: { preventDefault: () => void }) => {
+        e.preventDefault();
+        clear();
+        if (!fired.current) ((fired.current = true), onLong());
+      },
+    },
+    wasLong: () => fired.current,
+  };
+}
+
 export const go = (to: string) => {
   window.location.hash = `/${to}`;
 };
