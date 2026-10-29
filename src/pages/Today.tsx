@@ -67,8 +67,17 @@ export default function Today() {
   const need = remaining(T, t);
   const focus = gapFocus(need, T);
   const hour = now.getHours() + now.getMinutes() / 60;
+  const noSuggest = usePrefs((p) => p.noSuggest);
+  const toggleSuggest = usePrefs((p) => p.toggleSuggest);
   const gap = isToday && show('gap')
-    ? gapSuggestions(need, T, [...s.favourites, ...FOODS.filter((f) => f.tags)].map((f) => withEdit(f, s.recipeEdits)), { wheyOk: s.settings.wheyOk, atSchool, hour }, 3, round)
+    ? gapSuggestions(
+        need,
+        T,
+        [...s.favourites, ...FOODS.filter((f) => f.tags)].filter((f) => !noSuggest.includes(f.name.toLowerCase())).map((f) => withEdit(f, s.recipeEdits)),
+        { wheyOk: s.settings.wheyOk, atSchool, hour },
+        3,
+        round,
+      )
     : [];
 
   const addFood = (f: Food) => {
@@ -166,6 +175,17 @@ export default function Today() {
                       </span>
                     </button>
                     <button className="btn dark icon" aria-label={`Log ${f.name}`} onClick={() => addFood(f)}>+</button>
+                    <button
+                      className="btn dark icon sm"
+                      style={{ width: 34 }}
+                      aria-label={`Don't suggest ${f.name}`}
+                      onClick={() => {
+                        toggleSuggest(f.name);
+                        toast(`Won't suggest ${f.name}`, 0, { label: 'Undo', run: () => usePrefs.getState().toggleSuggest(f.name) });
+                      }}
+                    >
+                      <Icon name="close" size={16} stroke={2.6} />
+                    </button>
                   </div>
                   {isOpen && (
                     <div className="stack" style={{ background: 'var(--s1)', color: 'var(--ink)', borderRadius: 18, padding: 14, gap: 12 }}>

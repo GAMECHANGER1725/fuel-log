@@ -344,6 +344,7 @@ function DisplayForm() {
         <input type="checkbox" checked={s.settings.wheyOk} onChange={(e) => s.setSettings({ wheyOk: e.target.checked })} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
         Include whey protein in “Close the gap” (off by default; whey can make acne worse for some people)
       </label>
+      <HiddenSuggestions />
       <span className="mono mut">Reminders</span>
       <ReminderToggle />
     </>
@@ -361,6 +362,21 @@ function AccentPicker() {
         </button>
       ))}
     </div>
+  );
+}
+
+function HiddenSuggestions() {
+  const { noSuggest, toggleSuggest } = usePrefs();
+  if (!noSuggest.length) return null;
+  return (
+    <>
+      <span className="small mut">Not suggested in Close the gap (tap to bring back)</span>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+        {noSuggest.map((n) => (
+          <button key={n} className="chip" onClick={() => toggleSuggest(n)} style={{ textTransform: 'capitalize' }}>{n} ✕</button>
+        ))}
+      </div>
+    </>
   );
 }
 
