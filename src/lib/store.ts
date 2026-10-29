@@ -95,7 +95,8 @@ export const useStore = create<AppData & Actions>()(
           editDay(to, (d) => ({ ...d, entries: [...d.entries, ...src.map((e, i) => ({ ...e, id: uid(), at: now + i }))] }));
           return src.length;
         },
-        setWater: (date, glasses) => editDay(date, (d) => ({ ...d, water: Math.max(0, Math.min(40, glasses)), m: Date.now() })),
+        // Glasses of 250 ml; a bottle can add part of one (600 ml = 2.4), rounded to avoid float noise.
+        setWater: (date, glasses) => editDay(date, (d) => ({ ...d, water: Math.round(Math.max(0, Math.min(40, glasses)) * 100) / 100, m: Date.now() })),
         setBoost: (date, kcal) =>
           editDay(date, (d) => {
             const { boost: _old, ...rest } = d;
