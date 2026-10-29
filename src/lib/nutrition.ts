@@ -43,6 +43,18 @@ export function energy(kcal: number, unit: 'kcal' | 'kJ'): string {
 
 export const fmt = (n: number) => Math.round(n).toLocaleString('en-AU');
 
+/** Share of energy from protein, carbs and fat (4/4/9 kcal per g), as whole percents; null with nothing eaten. */
+export function energySplit(m: Macros): { protein: number; carbs: number; fat: number } | null {
+  const p = m.protein * 4;
+  const c = m.carbs * 4;
+  const f = m.fat * 9;
+  const sum = p + c + f;
+  if (sum <= 0) return null;
+  const protein = Math.round((p / sum) * 100);
+  const fat = Math.round((f / sum) * 100);
+  return { protein, carbs: 100 - protein - fat, fat };
+}
+
 /** Eating window for pace: the day's target spread evenly from 7 am to 9 pm. */
 const PACE_FROM = 7;
 const PACE_TO = 21;

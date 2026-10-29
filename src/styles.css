@@ -275,3 +275,7 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .chart14 > a { display: flex; align-items: flex-end; height: 100%; }
 .chart14 > a > i { display: block; width: 100%; border-radius: 6px 6px 3px 3px; }
 .chart14-target { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--mut); pointer-events: none; }
+
+/* Energy split bar on Today */
+.split { display: flex; height: 8px; border-radius: 999px; overflow: hidden; gap: 2px; background: var(--track); }
+.split > i { display: block; height: 100%; }

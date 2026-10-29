@@ -133,6 +133,22 @@ export default function Progress() {
           </div>
         </section>
 
+        {(() => {
+          const notes = Object.entries(s.days).filter(([, d]) => d.note).sort(([a], [b]) => (a < b ? 1 : -1)).slice(0, 10);
+          return notes.length > 0 && (
+            <section className="card">
+              <h2 className="h2" style={{ marginBottom: 4 }}>Recent notes</h2>
+              {notes.map(([k, d]) => (
+                <a key={k} href={k === today ? '#/today' : `#/today?d=${k}`} className="item" style={{ padding: '8px 0', color: 'var(--ink)', textDecoration: 'none' }}>
+                  <span className="mono dim" style={{ width: 84, flex: 'none' }}>{fmtDate(k, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                  <span className="grow">{d.note}</span>
+                  <span className="mono mut" style={{ flex: 'none' }}>{energy(dayTotals(d).kcal, unit)}</span>
+                </a>
+              ))}
+            </section>
+          );
+        })()}
+
         {s.weighIns.length > 0 && (
           <section className="card">
             <h2 className="h2" style={{ marginBottom: 4 }}>Weigh-ins</h2>

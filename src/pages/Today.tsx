@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../lib/store';
 import { addDays, fmtDate, hhmmOf, weekStart } from '../lib/dates';
-import { KJ, dayTotals, energy, entryMacros, fmt, paceGap, sinceLast, timeOf } from '../lib/nutrition';
+import { KJ, dayTotals, energy, energySplit, entryMacros, fmt, paceGap, sinceLast, timeOf } from '../lib/nutrition';
 import { FOCUS_LABEL, FOODS, MOMENT_LABEL, gapFocus, gapSuggestions, momentOf, remaining } from '../lib/foods';
 import { XP } from '../lib/game';
 import type { Entry, Food } from '../lib/types';
@@ -150,6 +150,19 @@ export default function Today() {
               <Bar value={t.fat} max={T.fat} color="var(--fat)" />
             </div>
           </div>}
+          {show('macros') && energySplit(t) && (() => {
+            const sp = energySplit(t)!;
+            return (
+              <div className="stack" style={{ gap: 6, marginTop: 12 }}>
+                <div className="split" role="img" aria-label={`Energy from protein ${sp.protein}%, carbs ${sp.carbs}%, fat ${sp.fat}%`}>
+                  <i style={{ width: `${sp.protein}%`, background: 'var(--pro)' }} />
+                  <i style={{ width: `${sp.carbs}%`, background: 'var(--carb)' }} />
+                  <i style={{ width: `${sp.fat}%`, background: 'var(--fat)' }} />
+                </div>
+                <div className="between"><span className="mono pro">Protein {sp.protein}%</span><span className="mono" style={{ color: 'var(--carb)' }}>Carbs {sp.carbs}%</span><span className="mono mut">Fat {sp.fat}%</span></div>
+              </div>
+            );
+          })()}
         </section>
 
         {isToday && hour >= 18 && !day.entries.length && g.streak.current > 0 && (
