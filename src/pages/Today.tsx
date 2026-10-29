@@ -152,6 +152,8 @@ export default function Today() {
           </div>}
         </section>
 
+        {show('quick') && <QuickLog date={date} />}
+
         {show('week') && <WeekStrip date={date} today={today} onPick={setDate} />}
 
         {isToday && show('quests') && (
@@ -331,6 +333,37 @@ export default function Today() {
 
       {editing && <EditSheet date={date} entry={editing} onClose={() => setEditing(null)} />}
     </>
+  );
+}
+
+/** Favourites, topped up with recent foods, as one-tap chips (one serving each, with Undo). */
+function QuickLog({ date }: { date: string }) {
+  const favourites = useStore((s) => s.favourites);
+  const recents = useStore((s) => s.recents);
+  const unit = useStore((s) => s.settings.unit);
+  const addEntries = useStore((s) => s.addEntries);
+  const seen = new Set<string>();
+  const foods = [...favourites, ...recents].filter((f) => !seen.has(f.name.toLowerCase()) && seen.add(f.name.toLowerCase())).slice(0, 10);
+  if (!foods.length) return null;
+  return (
+    <section className="stack" style={{ gap: 6 }}>
+      <span className="mono mut">Quick log · tap to add one serving</span>
+      <div className="quick">
+        {foods.map((f) => (
+          <button
+            key={f.id + f.name}
+            className="chip"
+            onClick={() => {
+              const ids = addEntries(date, [{ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty: 1, source: f.barcode ? 'off' : 'db', foodId: f.id }], [f]);
+              toastAdded(`Added ${f.name}`, XP.meal, date, ids);
+            }}
+          >
+            {f.name.length > 22 ? `${f.name.slice(0, 21)}…` : f.name}
+            <span className="mono fuel" style={{ fontSize: 11 }}>{energy(f.kcal, unit)}</span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 

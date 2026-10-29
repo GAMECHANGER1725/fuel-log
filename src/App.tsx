@@ -18,6 +18,7 @@ import { usePrefs } from './lib/prefs';
 export default function App() {
   const theme = useStore((s) => s.settings.theme);
   const accent = usePrefs((p) => p.accent);
+  const size = usePrefs((p) => p.size);
   const unlocked = useAuth((s) => s.unlocked);
   const { path } = useRoute();
 
@@ -33,6 +34,11 @@ export default function App() {
     if (accent === 'ember') document.documentElement.removeAttribute('data-accent');
     else document.documentElement.setAttribute('data-accent', accent);
   }, [accent]);
+
+  useEffect(() => {
+    if (size === 'normal') document.documentElement.removeAttribute('data-size');
+    else document.documentElement.setAttribute('data-size', size);
+  }, [size]);
 
   useEffect(() => {
     // Ask the browser not to evict our data under storage pressure.

@@ -5,6 +5,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export const CARDS = [
+  ['quick', 'Quick log'],
   ['macros', 'Carbs and fat'],
   ['week', 'This week'],
   ['quests', 'Daily quests'],
@@ -26,6 +27,14 @@ export const ACCENTS = [
   ['gold', 'Gold', '#f5c542'],
 ] as const;
 export type Accent = (typeof ACCENTS)[number][0];
+export const SIZES = [
+  ['normal', 'Normal'],
+  ['large', 'Large'],
+  ['xl', 'Extra large'],
+] as const;
+export type TextSize = (typeof SIZES)[number][0];
+export const cleanSize = (v: unknown): TextSize => SIZES.find(([id]) => id === v)?.[0] ?? 'normal';
+
 export const cleanAccent = (v: unknown): Accent => ACCENTS.find(([id]) => id === v)?.[0] ?? 'ember';
 
 /** Keep only known card ids, once each (saved prefs are untrusted). */
@@ -36,8 +45,10 @@ export const toggleIn = (hidden: Card[], c: Card): Card[] => (hidden.includes(c)
 interface Prefs {
   hidden: Card[];
   accent: Accent;
+  size: TextSize;
   toggle: (c: Card) => void;
   setAccent: (a: Accent) => void;
+  setSize: (s: TextSize) => void;
 }
 
 export const usePrefs = create<Prefs>()(
@@ -45,15 +56,17 @@ export const usePrefs = create<Prefs>()(
     (set) => ({
       hidden: [],
       accent: 'ember',
+      size: 'normal',
       toggle: (c) => set((s) => ({ hidden: toggleIn(s.hidden, c) })),
       setAccent: (accent) => set({ accent }),
+      setSize: (size) => set({ size }),
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown };
-        return { ...cur, hidden: cleanHidden(saved.hidden), accent: cleanAccent(saved.accent) };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown };
+        return { ...cur, hidden: cleanHidden(saved.hidden), accent: cleanAccent(saved.accent), size: cleanSize(saved.size) };
       },
     },
   ),

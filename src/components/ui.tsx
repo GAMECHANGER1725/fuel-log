@@ -241,8 +241,8 @@ export function useSwipe(onLeft: () => void, onRight: () => void) {
   return {
     onTouchStart: (e: TouchEvent) => {
       const t = e.touches[0];
-      // Leave sideways gestures in inputs alone.
-      start.current = e.touches.length === 1 && !(e.target as HTMLElement).closest('input, textarea, select') ? { x: t.clientX, y: t.clientY, t: Date.now() } : null;
+      // Leave sideways gestures in inputs and side-scrolling rows alone.
+      start.current = e.touches.length === 1 && !(e.target as HTMLElement).closest('input, textarea, select, .quick') ? { x: t.clientX, y: t.clientY, t: Date.now() } : null;
     },
     onTouchEnd: (e: TouchEvent) => {
       const s = start.current;
