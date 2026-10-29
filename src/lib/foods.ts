@@ -174,6 +174,33 @@ export function searchFoods(list: Food[], query: string, limit = 30): Food[] {
     .slice(0, limit);
 }
 
+export const BROWSE = [
+  ['protein', 'High protein'],
+  ['dense', 'Big calories'],
+  ['b', 'Breakfast'],
+  ['m', 'Mains'],
+  ['s', 'Snacks'],
+  ['d', 'Drinks'],
+  ['p', 'For school'],
+] as const;
+export type Browse = (typeof BROWSE)[number][0];
+
+/**
+ * Foods of one kind for browsing without a search: high protein (at least 15 g, or a quarter of the
+ * energy from protein), big calories (400+ kcal), or a time/packable tag. Sorted by what the kind is about.
+ */
+export function browseFoods(list: Food[], kind: Browse, limit = 40): Food[] {
+  const seen = new Set<string>();
+  const unique = list.filter((f) => f.kcal > 0 && !seen.has(f.name.toLowerCase()) && seen.add(f.name.toLowerCase()));
+  const picked =
+    kind === 'protein'
+      ? unique.filter((f) => f.protein >= 15 || (f.protein * 4) / f.kcal >= 0.25).sort((a, b) => b.protein - a.protein)
+      : kind === 'dense'
+        ? unique.filter((f) => f.kcal >= 400).sort((a, b) => b.kcal - a.kcal)
+        : unique.filter((f) => f.tags?.includes(kind)).sort((a, b) => b.kcal - a.kcal);
+  return picked.slice(0, limit);
+}
+
 /** What is still to eat today (negative once a target is passed). */
 export const remaining = (targets: Macros, eaten: Macros): Macros => ({
   kcal: targets.kcal - eaten.kcal,

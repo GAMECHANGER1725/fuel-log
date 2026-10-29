@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useStore } from '../lib/store';
-import { FOODS, foodMacros, searchFoods } from '../lib/foods';
+import { BROWSE, FOODS, browseFoods, foodMacros, searchFoods, type Browse } from '../lib/foods';
 import { searchProducts } from '../lib/off';
 import { energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
@@ -20,6 +20,7 @@ export default function FoodPage() {
   const { params } = useRoute();
   const date = params.get('d') ?? today;
   const [q, setQ] = useState('');
+  const [browse, setBrowse] = useState<Browse | null>(null);
   const [tidy, setTidy] = useState<'fav' | 'recent' | null>(null); // which list shows remove buttons
   const [picked, setPicked] = useState<Picked | null>(null);
   // #/food?open=scan comes from the app-icon shortcut.
@@ -50,6 +51,10 @@ export default function FoodPage() {
     };
   }, [q]);
 
+  const browsed = useMemo(
+    () => (browse ? browseFoods([...s.favourites, ...FOODS.map((f) => withEdit(f, s.recipeEdits))].filter((f) => s.settings.wheyOk || !f.tags?.includes('w')), browse) : []),
+    [browse, s.favourites, s.recipeEdits, s.settings.wheyOk],
+  );
   const usual = useMemo(() => mealGroups(s.days, today), [s.days, today]);
   const logMeal = (g: MealGroup) => {
     const ids = s.addEntries(date, g.items.map(({ name, serving, base, qty, source, foodId }) => ({ name, serving, base, qty, source, foodId })));
@@ -118,6 +123,14 @@ export default function FoodPage() {
               {tile('text', 'chat', 'Describe it', 'Type what you ate')}
             </div>
             <button className="btn dashed" onClick={() => setSheet('manual')}><Icon name="pencil" size={16} /> Enter numbers yourself</button>
+            <div className="stack" style={{ gap: 6 }}>
+              <span className="mono mut">Browse</span>
+              <div className="quick" role="group" aria-label="Browse foods">
+                {BROWSE.map(([id, label]) => (
+                  <button key={id} className="chip" aria-pressed={browse === id} onClick={() => setBrowse(browse === id ? null : id)}>{label}</button>
+                ))}
+              </div>
+            </div>
           </>
         )}
 
@@ -133,6 +146,14 @@ export default function FoodPage() {
               {off.loading ? 'Searching Australian products…' : off.failed ? 'Product search failed. Try again.' : !navigator.onLine ? 'Offline: showing built-in foods only.' : !local.length && !off.foods.length && q.trim().length >= 3 ? 'No matches.' : ''}
             </p>
             <button className="btn dashed" style={{ width: '100%' }} onClick={() => setSheet('text')}>Not here? Describe “{q}” to the AI</button>
+          </section>
+        ) : browse ? (
+          <section>
+            <div className="between" style={{ marginBottom: 6, alignItems: 'center' }}>
+              <h2 className="h2">{BROWSE.find(([id]) => id === browse)?.[1]}</h2>
+              <button className="btn sm" onClick={() => setBrowse(null)}>Close</button>
+            </div>
+            {browsed.length ? browsed.map((f) => row(f, f.barcode ? 'off' : 'db')) : <p className="empty">Nothing here yet.</p>}
           </section>
         ) : (
           <>
