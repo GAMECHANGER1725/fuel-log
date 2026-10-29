@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useStore } from '../lib/store';
 import { addDays, daysSinceWeighIn, fmtDate, hhmmOf, weekStart } from '../lib/dates';
-import { KJ, dayTotals, energy, energySplit, entryMacros, fmt, paceGap, sinceLast, timeOf } from '../lib/nutrition';
+import { KJ, dayTargets, dayTotals, energy, energySplit, entryMacros, fmt, paceGap, sinceLast, timeOf } from '../lib/nutrition';
 import { FOCUS_LABEL, FOODS, MOMENT_LABEL, gapFocus, gapSuggestions, momentOf, remaining } from '../lib/foods';
 import { XP } from '../lib/game';
 import type { Entry, Food } from '../lib/types';
@@ -32,11 +32,13 @@ export default function Today() {
   const order = usePrefs((p) => p.order);
   const ring = usePrefs((p) => p.ring);
   const flipRing = usePrefs((p) => p.flipRing);
+  const boostKcal = usePrefs((p) => p.boostKcal);
   const show = (c: Card) => !hidden.includes(c);
 
   const day = s.days[date] ?? { entries: [], water: 0, checks: {} };
   const t = dayTotals(day);
-  const T = s.settings.targets;
+  // The day's targets, including a training-day boost.
+  const T = dayTargets(s.settings.targets, day);
   const unit = s.settings.unit;
   const kLeft = T.kcal - t.kcal;
   const pLeft = T.protein - t.protein;
@@ -413,6 +415,14 @@ export default function Today() {
               </div>
             );
           })()}
+          {show('train') && (
+            <div className="between rule" style={{ marginTop: 12, paddingTop: 12, alignItems: 'center', gap: 10 }}>
+              <span className="small mut">{day.boost ? `Training day: target +${energy(day.boost, unit)} ${unit}` : 'Training today? Your target can go up.'}</span>
+              <button className="chip" aria-pressed={!!day.boost} onClick={() => s.setBoost(date, day.boost ? 0 : boostKcal)}>
+                <Icon name="bolt" size={14} /> Training day
+              </button>
+            </div>
+          )}
         </section>
 
         {isToday && hour >= 18 && !day.entries.length && g.streak.current > 0 && (
@@ -529,7 +539,7 @@ function WeekStrip({ date, today, onPick }: { date: string; today: string; onPic
           return (
             <button key={k} className="week-day" aria-current={k === date ? 'date' : undefined} disabled={future} aria-label={`${fmtDate(k, { weekday: 'long' })}: ${fmt(t.kcal)} kcal, ${fmt(t.protein)} g protein`} onClick={() => onPick(k)}>
               <span className="week-bars" style={{ height: H }}>
-                {bar(t.kcal / T.kcal, 'var(--fuel)')}
+                {bar(t.kcal / dayTargets(T, days[k]).kcal, 'var(--fuel)')}
                 {bar(t.protein / T.protein, 'var(--pro)')}
               </span>
               <span className="mono" style={{ fontSize: 11 }}>{fmtDate(k, { weekday: 'narrow' })}</span>

@@ -61,6 +61,9 @@ export function targetsCrossed(before: Macros, after: Macros, target: Macros): {
   return { kcal: before.kcal < target.kcal && after.kcal >= target.kcal, protein: before.protein < target.protein && after.protein >= target.protein };
 }
 
+/** A day's targets: the usual ones plus that day's training-day boost on energy. */
+export const dayTargets = (targets: Macros, d: DayLog | undefined): Macros => (d?.boost ? { ...targets, kcal: targets.kcal + d.boost } : targets);
+
 /** Share of energy from protein, carbs and fat (4/4/9 kcal per g), as whole percents; null with nothing eaten. */
 export function energySplit(m: Macros): { protein: number; carbs: number; fat: number } | null {
   const p = m.protein * 4;

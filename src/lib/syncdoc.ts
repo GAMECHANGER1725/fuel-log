@@ -3,7 +3,7 @@
 // Merge rules (so two devices can both log offline and nothing is lost):
 //  - Food entries: union by id. A deleted id is kept in `tomb` so it stays deleted everywhere.
 //    If both sides have the same id, the more recently edited copy wins.
-//  - Water, food-quality checks and the day note: per day, the side with the newer `m` timestamp wins.
+//  - Water, food-quality checks, the day note and a training-day boost: per day, the side with the newer `m` timestamp wins.
 //  - Profile, targets, weigh-ins, favourites, edited recipes: the whole block from whichever device changed it last wins.
 //  - Never synced (stay per device): AI key and model, theme, recents, backup date, celebration state.
 
@@ -45,6 +45,7 @@ function canon(doc: { days: Record<string, DayLog>; tomb: Record<string, number>
     const entries = [...d.entries].sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
     const out: DayLog = { entries, water: d.water, checks: Object.fromEntries(Object.entries(d.checks).sort()) };
     if (d.note) out.note = d.note;
+    if (d.boost) out.boost = d.boost;
     if (d.m) out.m = d.m;
     days[k] = out;
   }
@@ -93,21 +94,24 @@ function mergeDay(a: DayLog | undefined, b: DayLog | undefined, tomb: Record<str
   let water: number;
   let checks: Record<string, boolean>;
   let note: string | undefined;
+  let boost: number | undefined;
   let m: number | undefined;
   if (am !== bm) {
     const w = am > bm ? a : b;
     water = w.water;
     checks = w.checks;
     note = w.note;
+    boost = w.boost;
     m = w.m;
   } else {
     water = Math.max(a.water, b.water);
     checks = { ...a.checks };
     for (const [k, v] of Object.entries(b.checks)) checks[k] = checks[k] || v;
     note = [a.note, b.note].filter(Boolean).sort().pop();
+    boost = Math.max(a.boost ?? 0, b.boost ?? 0) || undefined;
     m = a.m;
   }
-  return { entries, water, checks, ...(note ? { note } : {}), m };
+  return { entries, water, checks, ...(note ? { note } : {}), ...(boost ? { boost } : {}), m };
 }
 
 const sortBy = <T>(xs: T[], key: (x: T) => string) => [...xs].sort((p, q) => (key(p) + stable(p) < key(q) + stable(q) ? -1 : 1));
@@ -149,7 +153,7 @@ export function mergeDocs(a: SyncDoc, b: SyncDoc, now = Date.now()): SyncDoc {
   for (const k of new Set([...Object.keys(a.days), ...Object.keys(b.days)])) {
     const d = mergeDay(a.days[k], b.days[k], tomb);
     // Keep a day if it has anything in it, or a timestamp that records a deliberate "cleared".
-    if (d.entries.length || d.water || Object.values(d.checks).some(Boolean) || d.note || d.m) days[k] = d;
+    if (d.entries.length || d.water || Object.values(d.checks).some(Boolean) || d.note || d.boost || d.m) days[k] = d;
   }
   return canon({ days, tomb, mod: Math.max(a.mod, b.mod), small: mergeSmall(a, b) });
 }

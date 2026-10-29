@@ -222,7 +222,7 @@ export function computeGame(d: AppData, today: string) {
   const changes = [...d.targetChanges].sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0));
   const kcalOn = (k: string) => changes.find((c) => c.date > k)?.from ?? ctx.targets.kcal;
   for (let k = start; k <= today; k = addDays(k, 1)) {
-    const kcal = kcalOn(k);
+    const kcal = kcalOn(k) + (d.days[k]?.boost ?? 0);
     stats.push(dayStats(k, d.days[k], kcal === ctx.targets.kcal ? ctx : { ...ctx, targets: { ...ctx.targets, kcal } }, weighed.has(k)));
   }
   const byDate = new Map(stats.map((s) => [s.date, s]));

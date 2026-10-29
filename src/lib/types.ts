@@ -47,6 +47,8 @@ export interface DayLog {
   checks: Record<string, boolean>;
   /** A short free-text note about the day ("gym day", "felt full"). */
   note?: string;
+  /** Extra kcal on this day's energy target (a training day). */
+  boost?: number;
   /** Epoch ms of the last water/checks/note change, for syncing. */
   m?: number;
 }
