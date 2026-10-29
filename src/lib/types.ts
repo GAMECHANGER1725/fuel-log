@@ -86,6 +86,8 @@ export interface Settings {
   /** Which provider to try first; the other is the fallback. */
   aiFirst: 'deepseek' | 'gemini';
   wheyOk: boolean;
+  /** Food-quality checks on Today: [key, label]. Keys are a-z only (they're stored in DayLog.checks). */
+  checks: [string, string][];
 }
 
 export interface TargetChange {

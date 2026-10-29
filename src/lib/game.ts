@@ -49,6 +49,8 @@ export function rankFor(level: number) {
 interface Ctx {
   targets: Macros;
   waterGlasses: number;
+  /** How many food-quality checks are set up (the quest asks for all of them). */
+  checks: number;
 }
 
 export interface QuestDef {
@@ -76,7 +78,7 @@ export const QUESTS: QuestDef[] = [
   { id: 'p3', title: 'Get 20 g+ protein at 3 different times', xp: 30, done: (d) => hoursWith(d, (m) => m.protein >= 20) >= 3 },
   { id: 'big-am', title: 'Eat 600+ kcal before 10 am', xp: 25, done: (d) => between(d, 0, 10).kcal >= 600 },
   { id: 'ai', title: 'Log a meal with the AI scanner', xp: 20, done: (d) => d.entries.some((e) => e.source.startsWith('ai-')) },
-  { id: 'quality', title: 'Tick all 4 food-quality checks', xp: 20, done: (d) => Object.values(d.checks).filter(Boolean).length >= 4 },
+  { id: 'quality', title: 'Tick all your food-quality checks', xp: 20, done: (d, c) => Object.values(d.checks).filter(Boolean).length >= c.checks },
   { id: 'both', title: 'Hit your kcal and protein today', xp: 40, done: (d, c) => hits(dayTotals(d), c.targets).both },
 ];
 
@@ -211,7 +213,7 @@ export interface Badge {
 // ----- Everything at once -------------------------------------------------------
 
 export function computeGame(d: AppData, today: string) {
-  const ctx: Ctx = { targets: d.settings.targets, waterGlasses: Math.round(d.settings.waterL * 4) };
+  const ctx: Ctx = { targets: d.settings.targets, waterGlasses: Math.round(d.settings.waterL * 4), checks: d.settings.checks.length };
   const weighed = new Set(d.weighIns.map((w) => w.date));
   const logged = Object.keys(d.days).filter((k) => d.days[k].entries.length).sort();
   const first = [logged[0], d.weighIns.map((w) => w.date).sort()[0]].filter(Boolean).sort()[0] ?? today;

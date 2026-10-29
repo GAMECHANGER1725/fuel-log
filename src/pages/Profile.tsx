@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useStore, dataOf } from '../lib/store';
 import { RANKS, BOSS_XP, computeGame } from '../lib/game';
 import { suggestTargets } from '../lib/targets';
-import { exportCsv, exportText, parseBackup } from '../lib/backup';
+import { DEFAULT_CHECKS, MAX_CHECKS, exportCsv, exportText, parseBackup } from '../lib/backup';
 import { AI_MODELS, GEMINI_MODELS, PROVIDER_NAME, friendlyError, hasAi, testKey, type Provider } from '../lib/ai';
 import { fmt, KJ } from '../lib/nutrition';
 import { todayKey, fmtDate } from '../lib/dates';
@@ -103,6 +103,9 @@ export default function ProfilePage() {
         </Section>
         <Section title="Sync between devices" hint={syncHint} hintColor={sync.status === 'error' && sync.kind !== 'offline' ? 'var(--danger)' : sync.conn ? 'var(--pro)' : undefined} open={open === 'sync'}>
           <SyncForm />
+        </Section>
+        <Section title="Food-quality checks" hint={`${s.settings.checks.length} checks`} open={open === 'checks'}>
+          <ChecksForm />
         </Section>
         <Section title="Display and food" hint={`${s.settings.unit} · ${s.settings.theme === 'auto' ? 'match device' : s.settings.theme}`} open={open === 'display'}>
           <DisplayForm />
@@ -375,6 +378,35 @@ function HiddenSuggestions() {
         {noSuggest.map((n) => (
           <button key={n} className="chip" onClick={() => toggleSuggest(n)} style={{ textTransform: 'capitalize' }}>{n} ✕</button>
         ))}
+      </div>
+    </>
+  );
+}
+
+/** Rename, add (up to MAX_CHECKS) or remove the food-quality checks on Today. Synced with settings. */
+function ChecksForm() {
+  const checks = useStore((s) => s.settings.checks);
+  const setSettings = useStore((s) => s.setSettings);
+  const [rows, setRows] = useState(checks);
+  const save = (next: [string, string][]) => {
+    setRows(next);
+    const valid = next.filter(([, l]) => l.trim());
+    if (valid.length) setSettings({ checks: valid.map(([k, l]) => [k, l.trim().slice(0, 30)] as [string, string]) });
+  };
+  // New keys are random letters, since DayLog.checks keys are a-z only.
+  const newKey = () => 'x' + Array.from({ length: 6 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
+  return (
+    <>
+      <p className="small mut" style={{ margin: 0 }}>Daily ticks on Today, worth 5 XP each. Up to {MAX_CHECKS}.</p>
+      {rows.map(([k, label], i) => (
+        <div key={k} className="row" style={{ gap: 8 }}>
+          <input className="input grow" value={label} maxLength={30} aria-label={`Check ${i + 1}`} onChange={(e) => save(rows.map((r, j) => (j === i ? [r[0], e.target.value] : r)))} />
+          <button className="btn icon danger" aria-label={`Remove ${label}`} disabled={rows.length <= 1} onClick={() => save(rows.filter((_, j) => j !== i))}><Icon name="close" size={16} /></button>
+        </div>
+      ))}
+      <div className="row">
+        {rows.length < MAX_CHECKS && <button className="btn sm" onClick={() => setRows([...rows, [newKey(), '']])}><Icon name="plus" size={14} /> Add a check</button>}
+        <button className="btn sm" onClick={() => save(DEFAULT_CHECKS)}>Reset to default</button>
       </div>
     </>
   );

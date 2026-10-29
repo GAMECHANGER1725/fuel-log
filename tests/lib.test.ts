@@ -6,7 +6,7 @@ import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
 import { addDays, atOn, daysSinceWeighIn, hhmmOf, weekStart } from '../src/lib/dates';
 import { suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
 import { computeGame, levelFromXp, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
-import { DEFAULT_DATA, exportCsv, exportText, normalize, parseBackup } from '../src/lib/backup';
+import { DEFAULT_CHECKS, DEFAULT_DATA, cleanChecks, exportCsv, exportText, normalize, parseBackup } from '../src/lib/backup';
 import { findByBarcode, parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
@@ -633,5 +633,21 @@ describe('week stats with training days', () => {
     const T = { kcal: 3000, protein: 115 };
     expect(weekStats({ [k]: { entries: [e], water: 0, checks: {} } }, '2026-10-26', '2026-10-29', T).hit).toBe(1);
     expect(weekStats({ [k]: { entries: [e], water: 0, checks: {}, boost: 300 } }, '2026-10-26', '2026-10-29', T).hit).toBe(0);
+  });
+});
+
+describe('custom checks', () => {
+  it('keeps valid checks, drops bad keys and duplicates, caps at 6, falls back to defaults', () => {
+    expect(cleanChecks([['veg', 'Fruit'], ['bad key', 'x'], ['veg', 'dup'], ['xab', 'Breakfast']])).toEqual([['veg', 'Fruit'], ['xab', 'Breakfast']]);
+    expect(cleanChecks(Array.from({ length: 9 }, (_, i) => ['k' + 'abcdefghi'[i], 'L' + i]))).toHaveLength(6);
+    expect(cleanChecks(undefined)).toEqual(DEFAULT_CHECKS);
+    expect(normalize({}).settings.checks).toEqual(DEFAULT_CHECKS);
+  });
+  it('asks the quality quest for all of your checks', () => {
+    const k = '2026-10-29';
+    const data = { ...structuredClone(DEFAULT_DATA), settings: { ...DEFAULT_DATA.settings, checks: [['veg', 'Veg'], ['xab', 'Breakfast']] as [string, string][] }, days: { [k]: { entries: [], water: 0, checks: { veg: true, xab: true } } } };
+    const g = computeGame(data, k);
+    const q = g.quests.find((x) => x.id === 'quality');
+    if (q) expect(q.isDone).toBe(true);
   });
 });

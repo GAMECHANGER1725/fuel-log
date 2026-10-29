@@ -11,13 +11,6 @@ import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
 import { SECTION_LABEL, daySummary, lastQty, logSections } from '../lib/meals';
 
-const CHECKS: [string, string][] = [
-  ['veg', 'Fruit or veg'],
-  ['protein', 'Protein each meal'],
-  ['grains', 'Whole grains'],
-  ['nosugar', 'No sugary drinks'],
-];
-
 export default function Today() {
   const today = useToday();
   const { params } = useRoute();
@@ -366,9 +359,9 @@ export default function Today() {
     ),
     quality: (
       show('quality') && <section className="card">
-        <span className="mono mut">Food quality · +5 XP each</span>
+        <div className="between"><span className="mono mut">Food quality · +5 XP each</span><a href="#/profile?open=checks" className="mono mut" style={{ textDecoration: 'none' }}>Edit</a></div>
         <div className="row" style={{ flexWrap: 'wrap', marginTop: 10 }}>
-          {CHECKS.map(([k, label]) => (
+          {s.settings.checks.map(([k, label]) => (
             <button key={k} className="chip" aria-pressed={!!day.checks[k]} onClick={() => s.toggleCheck(date, k)}>{label}</button>
           ))}
         </div>
