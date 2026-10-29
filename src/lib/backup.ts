@@ -128,6 +128,7 @@ function entry(v: unknown): Entry {
     at: num(e.at, Date.now(), 0, 4e12),
     upd: e.upd == null ? undefined : num(e.upd, 0, 0, 4e12),
     foodId: str(e.foodId, 80) || undefined,
+    note: str(e.note, 80) || undefined,
   };
 }
 
@@ -174,7 +175,7 @@ export function normalize(raw: unknown): AppData {
       gainLow,
       gainHigh: Math.max(gainLow, num(s.gainHigh, D.settings.gainHigh, 0, 2)),
       unit: s.unit === 'kJ' ? 'kJ' : 'kcal',
-      theme: s.theme === 'dark' || s.theme === 'light' ? s.theme : 'auto',
+      theme: s.theme === 'dark' || s.theme === 'light' || s.theme === 'black' ? s.theme : 'auto',
       aiKey: str(s.aiKey, 200).trim(),
       aiModel: str(s.aiModel, 60).trim() || DEFAULT_MODEL,
       // Saves from before the switch to DeepSeek still carry geminiKey, so an old backup brings it back.
@@ -269,7 +270,7 @@ export function exportCsv(d: AppData): string {
     const day = d.days[date];
     for (const e of [...day.entries].sort((a, b) => a.at - b.at)) {
       const m = entryMacros(e);
-      rows.push(['food', date, hhmmOf(e.at), e.name, e.serving, e.qty, Math.round(m.kcal), r1(m.protein), r1(m.carbs), r1(m.fat), '', '']);
+      rows.push(['food', date, hhmmOf(e.at), e.name, e.serving, e.qty, Math.round(m.kcal), r1(m.protein), r1(m.carbs), r1(m.fat), '', e.note ?? '']);
     }
     const t = dayTotals(day);
     if (day.entries.length || day.water || day.note) rows.push(['day', date, '', '', '', '', Math.round(t.kcal), r1(t.protein), r1(t.carbs), r1(t.fat), day.water * 0.25, day.note ?? '']);

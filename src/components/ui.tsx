@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import { create } from 'zustand';
 import { useStore, dataOf } from '../lib/store';
 import { computeGame } from '../lib/game';
-import { atOn, hhmmOf, todayKey } from '../lib/dates';
+import { atOn, hhmmOf, shiftHhmm, todayKey } from '../lib/dates';
 
 // ----- Icons (inline stroke SVG, inherit colour) -------------------------------
 
@@ -17,6 +17,8 @@ const paths: Record<string, ReactNode> = {
   camera: <><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></>,
   label: <><rect x="5" y="3" width="14" height="18" rx="1" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
   chat: <><path d="M4 5h16v11H9l-5 4z" /><path d="M8 9h8M8 12h5" /></>,
+  cart: <><path d="M3 4h2l2.4 11h10.2L20 8H6.2" /><circle cx="9" cy="19" r="1.5" /><circle cx="17" cy="19" r="1.5" /></>,
+  mic: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0014 0M12 18v3" /></>,
   pencil: <><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M13 7l4 4" /></>,
   check: <path d="M5 12l5 5 9-10" />,
   left: <path d="M15 5l-7 7 7 7" />,
@@ -92,7 +94,7 @@ export function Sheet({ onClose, children, label }: { onClose: () => void; child
 
 /** Quick serving sizes shown under a servings Stepper. */
 /** The "when did you eat it" time for a log sheet: starts at the current time, as epoch ms on `date`. */
-export function useEatenAt(date: string, initial = Date.now()) {
+export function useEatenAt(date: string, initial: number = Date.now()) {
   const [hhmm, setHhmm] = useState(() => hhmmOf(initial));
   return { hhmm, setHhmm, at: atOn(date, hhmm) };
 }
@@ -106,6 +108,12 @@ export function TimeField({ value, onChange }: { value: string; onChange: (hhmm:
       <div className="row">
         <input className="input" type="time" value={value} onChange={(e) => onChange(e.target.value)} aria-label="Time eaten" style={{ flex: 1 }} />
         {value !== now && <button className="btn" onClick={() => onChange(now)}>Now</button>}
+      </div>
+      {/* Logging something from a bit earlier: one tap back from the time shown. */}
+      <div className="row" style={{ gap: 6 }} role="group" aria-label="Earlier">
+        {[15, 30, 60].map((m) => (
+          <button key={m} className="chip" style={{ minHeight: 34 }} onClick={() => onChange(shiftHhmm(value, -m))}>−{m < 60 ? `${m} min` : '1 h'}</button>
+        ))}
       </div>
     </label>
   );
@@ -171,6 +179,35 @@ export function MacroGrid({ kcal, protein, carbs, fat, unit }: { kcal: number; p
       {cell(String(Math.round(fat)), 'fat')}
     </div>
   );
+}
+
+// ----- Dictation -----------------------------------------------------------------
+
+type Recognition = { lang: string; interimResults: boolean; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: ((e: { error: string }) => void) | null; start: () => void; stop: () => void };
+const Speech = (typeof window !== 'undefined' && ((window as unknown as { SpeechRecognition?: new () => Recognition }).SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: new () => Recognition }).webkitSpeechRecognition)) || null;
+
+/** Speak instead of type, where the browser has speech recognition (Chrome, Safari). `text` gets the words so far. */
+export function useDictation(text: (words: string) => void) {
+  const [on, setOn] = useState(false);
+  const rec = useRef<Recognition | null>(null);
+  useEffect(() => () => rec.current?.stop(), []);
+  const toggle = () => {
+    if (!Speech) return;
+    if (rec.current) return rec.current.stop();
+    const r = new Speech();
+    r.lang = 'en-AU';
+    r.interimResults = true;
+    r.onresult = (e) => text(Array.from(e.results, (x) => x[0].transcript).join('').trim());
+    r.onerror = (e) => e.error !== 'aborted' && e.error !== 'no-speech' && toast(e.error === 'not-allowed' ? 'Allow the microphone to speak a search' : 'Couldn’t hear that. Try again.');
+    r.onend = () => {
+      rec.current = null;
+      setOn(false);
+    };
+    rec.current = r;
+    setOn(true);
+    r.start();
+  };
+  return { ok: !!Speech, on, toggle };
 }
 
 // ----- Toast ---------------------------------------------------------------------

@@ -8,14 +8,16 @@ import Progress from './pages/Progress';
 import ProfilePage from './pages/Profile';
 import Coach from './pages/Coach';
 import LevelUp from './components/LevelUp';
+import { rankFor } from './lib/game';
 import { WhatsNewOnce } from './components/WhatsNew';
 import Lock from './pages/Lock';
 import { useAuth } from './lib/auth';
 import { startSync, useSync } from './lib/sync';
 import { autoDue, checkIn, useCoach } from './lib/coach';
 import { startReminders } from './lib/reminders';
-import { usePrefs } from './lib/prefs';
-import { dayTargets, dayTotals, targetsCrossed } from './lib/nutrition';
+import { autoBoostDue, usePrefs } from './lib/prefs';
+import { atOn, dateOf, todayKey } from './lib/dates';
+import { badgeCount, dayTargets, dayTotals, energy, targetsCrossed } from './lib/nutrition';
 
 export default function App() {
   const theme = useStore((s) => s.settings.theme);
@@ -27,7 +29,9 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'auto') root.removeAttribute('data-theme');
-    else root.setAttribute('data-theme', theme);
+    // Black is the dark theme with blacker surfaces, so every dark rule (accents too) still applies.
+    else root.setAttribute('data-theme', theme === 'black' ? 'dark' : theme);
+    root.toggleAttribute('data-black', theme === 'black');
     const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg || '#14110E');
   }, [theme]);
@@ -72,6 +76,58 @@ export default function App() {
     }, 3000);
     return () => clearTimeout(t);
   }, [unlocked, hasKey, synced, auto, today]);
+
+  // Training days chosen in Profile get the boost by themselves, once a day (turning it off again sticks).
+  const trainDays = usePrefs((p) => p.trainDays);
+  // With sync on, it waits for the first sync and skips a day already changed on any device (it may have been turned off).
+  useEffect(() => {
+    if (!unlocked || !synced) return;
+    const p = usePrefs.getState();
+    const s = useStore.getState();
+    const changed = !!sync.conn && (s.days[today]?.m ?? 0) >= atOn(today, '00:00');
+    if (!autoBoostDue(today, dateOf(today).getDay(), trainDays, p.lastAutoBoost, !!s.days[today]?.boost, changed)) return;
+    s.setBoost(today, p.boostKcal);
+    p.setLastAutoBoost(today);
+  }, [unlocked, synced, today, trainDays]);
+
+  // What's left today on the home-screen icon, where the phone supports app badges (installed PWA).
+  // ponytail: set only while the app runs, so after midnight it shows yesterday's number until it's opened.
+  const badge = usePrefs((p) => p.badge);
+  const badgeNum = useStore((s) => badgeCount(badge, dayTargets(s.settings.targets, s.days[today]), dayTotals(s.days[today]), s.settings.unit));
+  useEffect(() => {
+    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    if (!nav.setAppBadge) return;
+    (unlocked && badgeNum ? nav.setAppBadge(badgeNum) : nav.clearAppBadge?.())?.catch(() => {});
+  }, [unlocked, badgeNum]);
+
+  // Keyboard shortcuts on a laptop: A add food, T today, P progress, W a glass of water (not while typing or in a sheet).
+  useEffect(() => {
+    if (!unlocked) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || document.querySelector('[role=dialog]') || (e.target as HTMLElement).closest('input, textarea, select, [contenteditable]')) return;
+      const k = e.key.toLowerCase();
+      if (k === 'a') window.location.hash = '/food';
+      else if (k === 't') window.location.hash = '/today';
+      else if (k === 'p') window.location.hash = '/progress';
+      else if (k === 'w') {
+        const s = useStore.getState();
+        const d = todayKey();
+        const g = (s.days[d]?.water ?? 0) + 1;
+        s.setWater(d, g);
+        toast(`Glass of water added (${(g * 0.25).toFixed(2).replace(/0$/, '')} L)`);
+      } else return;
+      e.preventDefault();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [unlocked]);
+
+  // The tab shows what's left today (handy with the app open on a laptop).
+  const leftKcal = useStore((s) => Math.round(dayTargets(s.settings.targets, s.days[today]).kcal - dayTotals(s.days[today]).kcal));
+  const unitTitle = useStore((s) => s.settings.unit);
+  useEffect(() => {
+    document.title = !unlocked ? 'Fuel Log' : leftKcal > 0 ? `${energy(leftKcal, unitTitle)} ${unitTitle} to go · Fuel Log` : 'Target hit · Fuel Log';
+  }, [unlocked, leftKcal, unitTitle]);
 
   const online = useOnline();
   if (!unlocked) return <Lock />;
@@ -168,8 +224,14 @@ function Celebrations() {
   const earned = g.badges.filter((b) => b.earned).map((b) => b.id);
   const fresh = g.badges.filter((b) => b.earned && !seen.badges.includes(b.id));
 
+  const quiet = usePrefs((p) => p.quietLevelUp);
   useEffect(() => {
-    if (g.level > seen.level) setShow(g.level);
+    if (g.level > seen.level && quiet) {
+      markSeen(g.level, earned);
+      const names = fresh.map((b) => b.name);
+      const badges = names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2} more` : names.join(', ');
+      setTimeout(() => toast(`Level ${g.level}: ${rankFor(g.level).name}${names.length ? ` · new badge${names.length === 1 ? '' : 's'}: ${badges}` : ''}`), 1600);
+    } else if (g.level > seen.level) setShow(g.level);
     else if (fresh.length) {
       markSeen(Math.max(seen.level, g.level), earned);
       // Let the "+XP" toast for the action that earned it show first.

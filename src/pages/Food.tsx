@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useStore } from '../lib/store';
-import { fmtDate, todayKey } from '../lib/dates';
+import { atOn, daysBetween, fmtDate, todayKey } from '../lib/dates';
 import { BROWSE, FOODS, FOOD_SORTS, browseFoods, foodMacros, proteinPer100kcal, searchFoods, sortFoods, type Browse } from '../lib/foods';
 import { searchProducts } from '../lib/off';
-import { coverage, dayTargets, dayTotals, energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
+import { coverage, dayTargets, dayTotals, energy, fmt, forGrams, scale, timeOf, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
 import type { Food, Macros, Source } from '../lib/types';
-import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, toastAdded, useEatenAt, useRoute, useToday } from '../components/ui';
+import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, toastAdded, useDictation, useEatenAt, useRoute, useToday } from '../components/ui';
 import Scanner from '../components/Scanner';
 import AiSheet from '../components/AiSheet';
 import { hasAi, type AiMode } from '../lib/ai';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
-import { lastQty, mealGroups, type MealGroup } from '../lib/meals';
-import { usePrefs } from '../lib/prefs';
+import { foodHistory, lastQty, mealGroups, type MealGroup } from '../lib/meals';
+import { addShopping, shoppingText, usePrefs } from '../lib/prefs';
 
 type Picked = { food: Food; source: Source };
 
@@ -21,6 +21,8 @@ export default function FoodPage() {
   const today = useToday();
   const { params } = useRoute();
   const date = params.get('d') ?? today;
+  // #/food?at=12:30 (a meal's + on Today) logs at that time instead of now.
+  const atParam = /^\d{2}:\d{2}$/.test(params.get('at') ?? '') ? atOn(date, params.get('at')!) : undefined;
   const [q, setQ] = useState('');
   const [browse, setBrowse] = useState<Browse | null>(null);
   const sort = usePrefs((p) => p.foodSort);
@@ -58,6 +60,10 @@ export default function FoodPage() {
   const [off, setOff] = useState<{ q: string; foods: Food[]; loading: boolean; failed: boolean }>({ q: '', foods: [], loading: false, failed: false });
   const s = useStore();
   const unit = s.settings.unit;
+  const speak = useDictation(setQ);
+  const searches = usePrefs((p) => p.searches);
+  // A search that led to a food is worth offering again.
+  const keepSearch = () => q.trim() && usePrefs.getState().addSearch(q);
 
   const local = useMemo(() => {
     const mine = new Set([...s.favourites, ...s.recents].map((f) => f.name.toLowerCase()));
@@ -90,7 +96,7 @@ export default function FoodPage() {
   );
   const usual = useMemo(() => mealGroups(s.days, today), [s.days, today]);
   const logMeal = (g: MealGroup) => {
-    const ids = s.addEntries(date, g.items.map(({ name, serving, base, qty, source, foodId }) => ({ name, serving, base, qty, source, foodId })));
+    const ids = s.addEntries(date, g.items.map(({ name, serving, base, qty, source, foodId }) => ({ name, serving, base, qty, source, foodId })), [], atParam);
     toastAdded(`Added ${g.items.length} items`, Math.min(g.items.length, XP.mealCap) * XP.meal, date, ids);
     back();
   };
@@ -98,14 +104,15 @@ export default function FoodPage() {
   const back = () => go(date === today ? 'today' : `today?d=${date}`);
   // + logs one serving straight away; tapping the name opens the sheet for amount and time.
   const quickAdd = (food: Food, source: Source) => {
+    keepSearch();
     const f = withEdit(food, s.recipeEdits);
     const qty = lastQty(s.days, today, f.name, f.serving);
-    const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: foodMacros(f), qty, source, foodId: f.id }], [f]);
+    const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: foodMacros(f), qty, source, foodId: f.id }], [f], atParam);
     toastAdded(`Added ${qty !== 1 ? `${qty}× ` : ''}${f.name}`, XP.meal + (source === 'scan' ? XP.scan : 0), date, ids);
   };
   const row = (f: Food, source: Source, remove?: () => void, onOpen?: () => void, move?: { up: boolean; down: boolean }) => (
     <div key={`${source}-${f.id}`} className="item">
-      <button className="item-btn" onClick={onOpen ?? (() => setPicked({ food: f, source }))}>
+      <button className="item-btn" onClick={onOpen ?? (() => { keepSearch(); setPicked({ food: f, source }); })}>
         <span>{f.name}</span>
         <span className="mono mut">
           {f.serving} · {energy(f.kcal, unit)} {unit} · {f.protein} g P{sort === 'lean' && (q || browse) ? ` · ${Math.round(proteinPer100kcal(f))} g per 100 kcal` : ''}{recipeFor(f, s.recipeEdits) ? ' · recipe' : ''}
@@ -150,7 +157,9 @@ export default function FoodPage() {
     <>
       <header className="head">
         <div className="stack" style={{ gap: 2 }}>
-          <span className="mono mut">{date === today ? 'Logging now' : `Adding to ${fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short' })}`}</span>
+          <span className="mono mut">
+            {date === today ? (atParam ? `Logging at ${timeOf(atParam)}` : 'Logging now') : `Adding to ${fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short' })}${atParam ? ` at ${timeOf(atParam)}` : ''}`}
+          </span>
           <h1 className="title">Add food</h1>
           <StillToGo date={date} />
         </div>
@@ -162,7 +171,23 @@ export default function FoodPage() {
           <span className="mut"><Icon name="search" size={20} /></span>
           <input ref={searchRef} aria-label="Search foods" placeholder="Search foods or products" value={q} onChange={(e) => setQ(e.target.value)} enterKeyHint="search" />
           {q && <button className="btn icon sm" style={{ border: 0, width: 32 }} aria-label="Clear search" onClick={() => setQ('')}><Icon name="close" size={18} /></button>}
+          {speak.ok && (!q || speak.on) && (
+            <button className="btn icon sm" style={{ border: 0, width: 32, ...(speak.on ? { color: 'var(--fuel)' } : {}) }} aria-label={speak.on ? 'Stop listening' : 'Speak a search'} aria-pressed={speak.on} onClick={speak.toggle}>
+              <Icon name="mic" size={18} />
+            </button>
+          )}
         </label>
+
+        {!q && searches.length > 0 && (
+          <div className="quick" role="group" aria-label="Recent searches" style={{ marginTop: -4 }}>
+            {searches.map((x) => (
+              <button key={x} className="chip" onClick={() => setQ(x)}>
+                <Icon name="search" size={14} /> {x}
+              </button>
+            ))}
+            <button className="chip" aria-label="Clear recent searches" onClick={() => usePrefs.getState().clearSearches()}><Icon name="close" size={14} /></button>
+          </div>
+        )}
 
         {!q && (
           <>
@@ -173,6 +198,7 @@ export default function FoodPage() {
               {tile('text', 'chat', 'Describe it', 'Type what you ate')}
             </div>
             <button className="btn dashed" onClick={() => setSheet('manual')}><Icon name="pencil" size={16} /> Enter numbers yourself</button>
+            <ShoppingList open={params.get('list') === '1'} />
             <div className="stack" style={{ gap: 6 }}>
               <span className="mono mut">Browse</span>
               <div className="quick" role="group" aria-label="Browse foods">
@@ -261,13 +287,14 @@ export default function FoodPage() {
         <AddSheet
           date={date}
           picked={picked}
+          at={atParam}
           onClose={() => {
             setPicked(null);
             if (fromLink.current) back();
           }}
         />
       )}
-      {sheet === 'manual' && <ManualSheet date={date} initialName={q.trim()} onClose={closeSheet} />}
+      {sheet === 'manual' && <ManualSheet date={date} initialName={q.trim()} at={atParam} onClose={closeSheet} />}
       {sheet === 'scan' && (
         <Scanner
           onClose={closeSheet}
@@ -280,12 +307,12 @@ export default function FoodPage() {
           known={[...s.favourites, ...s.recents]}
         />
       )}
-      {(sheet === 'photo' || sheet === 'label' || sheet === 'text') && <AiSheet mode={sheet} date={date} initialText={sheet === 'text' ? q : ''} onClose={closeSheet} />}
+      {(sheet === 'photo' || sheet === 'label' || sheet === 'text') && <AiSheet mode={sheet} date={date} initialText={sheet === 'text' ? q : ''} at={atParam} onClose={closeSheet} />}
     </>
   );
 }
 
-function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onClose: () => void }) {
+function AddSheet({ date, picked, at, onClose }: { date: string; picked: Picked; at?: number; onClose: () => void }) {
   const s = useStore();
   const { source } = picked;
   // Live, so saving a recipe edit here updates the numbers straight away.
@@ -299,7 +326,9 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
   const fav = s.favourites.some((f) => f.name.toLowerCase() === food.name.toLowerCase());
   const xp = XP.meal + (source === 'scan' ? XP.scan : 0);
   const recipe = recipeFor(food, s.recipeEdits);
-  const when = useEatenAt(date);
+  const when = useEatenAt(date, at);
+  const hist = useMemo(() => foodHistory(s.days, todayKey(), food.name), [s.days, food.name]);
+  const ago = hist.last && daysBetween(hist.last, todayKey());
 
   const add = () => {
     const entry =
@@ -316,6 +345,11 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
       <div className="stack" style={{ gap: 2 }}>
         <span className="mono mut">{source === 'scan' ? `Scanned · ${food.barcode}` : source === 'off' ? 'Open Food Facts' : food.serving}</span>
         <h2 className="h2" style={{ fontSize: 26 }}>{food.name}</h2>
+        <span className="small mut">
+          {hist.last
+            ? `Had on ${hist.days} day${hist.days === 1 ? '' : 's'} in the last month · last ${ago === 0 ? 'today' : ago === 1 ? 'yesterday' : `${ago} days ago`}`
+            : 'New to your log'}
+        </span>
       </div>
       {byGrams && (
         <div className="row">
@@ -347,20 +381,32 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
         >
           <Icon name="star" size={18} />
         </button>
+        <button
+          className="btn"
+          aria-label="Add to shopping list"
+          style={{ width: 52, padding: 0 }}
+          onClick={() => {
+            const p = usePrefs.getState();
+            p.setShopping(addShopping(p.shopping, [['', food.name]]));
+            toast(`${food.name} is on your shopping list`, 0, { label: 'View', run: () => { onClose(); go('food?list=1'); } });
+          }}
+        >
+          <Icon name="cart" size={18} />
+        </button>
         <button className="btn primary grow" style={{ minHeight: 52 }} onClick={add}>Add · +{xp} XP</button>
       </div>
     </Sheet>
   );
 }
 
-function ManualSheet({ date, initialName = '', onClose }: { date: string; initialName?: string; onClose: () => void }) {
+function ManualSheet({ date, initialName = '', at, onClose }: { date: string; initialName?: string; at?: number; onClose: () => void }) {
   const s = useStore();
   const unit = s.settings.unit;
   const [f, setF] = useState({ name: initialName.slice(0, 60), serving: '', energy: '', protein: '', carbs: '', fat: '', fav: false });
   const n = (v: string) => Math.max(0, parseFloat(v) || 0);
   const kcal = unit === 'kJ' ? n(f.energy) / KJ : n(f.energy);
   const ok = kcal > 0;
-  const when = useEatenAt(date);
+  const when = useEatenAt(date, at);
   const set = (k: keyof typeof f) => (e: ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: k === 'fav' ? e.target.checked : e.target.value });
 
   const build = (): Food => ({
@@ -468,5 +514,70 @@ function StillToGo({ date }: { date: string }) {
     <span className="small mut">
       {[k > 0 && `${energy(k, unit)} ${unit}`, p > 0 && `${fmt(p)} g protein`].filter(Boolean).join(' · ')} to go
     </span>
+  );
+}
+
+/** Ingredients added from recipes, or typed in; tap to tick off, then clear the ticked ones. Folded until opened. */
+function ShoppingList({ open }: { open: boolean }) {
+  const list = usePrefs((p) => p.shopping);
+  const setList = usePrefs((p) => p.setShopping);
+  const [text, setText] = useState('');
+  const done = list.filter((x) => x.done).length;
+  const add = () => {
+    if (!text.trim()) return;
+    setList(addShopping(list, [['', text]]));
+    setText('');
+  };
+  const share = async () => {
+    const t = shoppingText(list);
+    try {
+      if (navigator.share) await navigator.share({ text: t });
+      else {
+        await navigator.clipboard.writeText(t);
+        toast('Shopping list copied');
+      }
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') toast('Could not share. Try again.');
+    }
+  };
+  return (
+    <details className="card tight" open={open || undefined}>
+      <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontWeight: 600 }}>
+        Shopping list <span className="mono mut">{list.length ? `${done} / ${list.length}` : 'Empty'}</span>
+      </summary>
+      <div className="stack" style={{ gap: 0, paddingBottom: 6 }}>
+        {list.map((x, i) => (
+          <button
+            key={x.item}
+            className="item-btn"
+            aria-pressed={x.done}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, borderTop: i ? '1px solid var(--line)' : 0 }}
+            onClick={() => setList(list.map((y) => (y === x ? { ...y, done: !y.done } : y)))}
+          >
+            <span className={`check${x.done ? ' on' : ''}`}>{x.done && <Icon name="check" size={14} stroke={3.5} />}</span>
+            <span className="grow" style={x.done ? { color: 'var(--mut)', textDecoration: 'line-through' } : undefined}>{x.item}</span>
+            <span className="mono dim" style={{ maxWidth: '55%', textAlign: 'right' }}>{x.amounts.join(' + ')}</span>
+          </button>
+        ))}
+        <div className="row" style={{ marginTop: 8 }}>
+          <input className="input grow" value={text} maxLength={60} placeholder="Add an item" aria-label="Add a shopping item" onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+          <button className="btn sm" disabled={!text.trim()} onClick={add}>Add</button>
+        </div>
+        <div className="row" style={{ marginTop: 8, flexWrap: 'wrap' }}>
+          <button className="btn sm" disabled={done === list.length} onClick={share}><Icon name="copy" size={14} /> Share</button>
+          <button className="btn sm grow" disabled={!done} onClick={() => setList(list.filter((x) => !x.done))}>Clear ticked</button>
+          <button
+            className="btn sm danger"
+            disabled={!list.length}
+            onClick={() => {
+              setList([]);
+              toast('Shopping list cleared', 0, { label: 'Undo', run: () => usePrefs.getState().setShopping(list) });
+            }}
+          >
+            Clear all
+          </button>
+        </div>
+      </div>
+    </details>
   );
 }

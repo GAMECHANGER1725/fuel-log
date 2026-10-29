@@ -38,6 +38,8 @@ export interface Entry {
   /** Epoch ms of the last edit, for syncing. */
   upd?: number;
   foodId?: string;
+  /** A short note on this one entry ("homemade, extra ghee"). */
+  note?: string;
 }
 
 export interface DayLog {
@@ -76,7 +78,8 @@ export interface Settings {
   gainLow: number;
   gainHigh: number;
   unit: 'kcal' | 'kJ';
-  theme: 'auto' | 'dark' | 'light';
+  /** 'black' is dark with true-black surfaces (for OLED screens). */
+  theme: 'auto' | 'dark' | 'light' | 'black';
   /** TokenHarbor key and model (DeepSeek). */
   aiKey: string;
   aiModel: string;

@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { useStore, dataOf } from '../lib/store';
-import { addDays, dateOf, daysBetween, fmtDate, weekStart } from '../lib/dates';
-import { dayTotals, energy, fmt, r1 } from '../lib/nutrition';
+import { addDays, dateOf, daysBetween, fmtDate, monthRange, weekStart } from '../lib/dates';
+import { dayTotals, energy, entryMacros, fmt, r1, timeOf } from '../lib/nutrition';
 import { chartWindow, goalProgress, projectedDate, trendLine, weeklyNudge, weeklyRate, withKcal } from '../lib/targets';
 
 import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
-import { records, topFoods, weekStats, weekSummary } from '../lib/meals';
+import { rangeStats, records, searchLog, tagStats, topFoods, weekdayAverages, weekStats, weekSummary } from '../lib/meals';
 import { hasAi } from '../lib/ai';
-import { Bar, Icon, Sheet, toast, useGame, useRoute, useToday } from '../components/ui';
+import { usePrefs, type ProgressCard } from '../lib/prefs';
+import { Bar, Icon, Sheet, toast, toastAdded, useGame, useRoute, useToday } from '../components/ui';
 
 export default function Progress() {
   const today = useToday();
@@ -18,6 +19,11 @@ export default function Progress() {
   const { params } = useRoute();
   const [weighing, setWeighing] = useState(params.get('weigh') === '1');
   const unit = s.settings.unit;
+  const tags = usePrefs((p) => p.tags);
+  const progressHidden = usePrefs((p) => p.progressHidden);
+  const on = (c: ProgressCard) => !progressHidden.includes(c);
+  const progressOrder = usePrefs((p) => p.progressOrder);
+  const weekGoal = usePrefs((p) => p.weekGoal);
 
   const line = trendLine(s.weighIns);
   const latest = line[line.length - 1];
@@ -50,8 +56,147 @@ export default function Progress() {
       n: logged.length,
       kcal: t.length ? t.reduce((a, b) => a + b.kcal, 0) / t.length : null,
       protein: t.length ? t.reduce((a, b) => a + b.protein, 0) / t.length : null,
+      // Litres a day over days with water logged (an unlogged day isn't a dry one).
+      water: (() => {
+        const g = Array.from({ length: 7 }, (_, i) => s.days[addDays(w, i)]?.water ?? 0).filter((x) => x > 0);
+        return g.length ? (g.reduce((a, b) => a + b, 0) * 0.25) / g.length : null;
+      })(),
     };
   });
+
+  // Progress's cards, keyed by id; their order and visibility come from per-device prefs.
+  const cards: Record<ProgressCard, ReactNode> = {
+    heat: on('heat') && (
+      <section className="card">
+        <div className="between" style={{ marginBottom: 12 }}>
+          <h2 className="h2">Days hit</h2>
+          <div className="row" style={{ gap: 6 }}>
+            <button className="btn icon sm" style={{ width: 34 }} aria-label="Older weeks" disabled={!olderExists} onClick={() => setPage(page + 1)}><Icon name="left" size={16} /></button>
+            <button className="btn icon sm" style={{ width: 34 }} aria-label="Newer weeks" disabled={page === 0} onClick={() => setPage(page - 1)}><Icon name="right" size={16} /></button>
+          </div>
+        </div>
+        <div className="between" style={{ margin: '-4px 0 10px' }}>
+          <span className="mono dim">{fmtDate(cells[0])} – {fmtDate(cells[34])}</span>
+          <span className="mono mut">{hitBoth} of {elapsed.length} · tap a day</span>
+        </div>
+        <div className="heat" role="img" aria-label={`Hit both targets on ${hitBoth} of the last ${elapsed.length} days`}>
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+            <span key={i} className="mono dim" style={{ textAlign: 'center', fontSize: 10 }}>{d}</span>
+          ))}
+          {cells.map((k) => {
+            const st = g.byDate.get(k);
+            const cls = k > today ? 'future' : k === today ? 'today' : k < firstDay ? 'pre' : st?.hitKcal && st.hitProtein ? 'both' : st?.hitKcal || st?.hitProtein ? 'one' : '';
+            // Past and today's cells open that day's log.
+            return k > today || k < firstDay ? <i key={k} className={cls} /> : <a key={k} className={cls} href={k === today ? '#/today' : `#/today?d=${k}`} aria-label={`Open ${fmtDate(k, { weekday: 'long', day: 'numeric', month: 'long' })}`} />;
+          })}
+        </div>
+        <div className="row" style={{ gap: 14, marginTop: 12, flexWrap: 'wrap' }}>
+          <Legend color="var(--fuel)" label="Kcal + protein" />
+          <Legend color="var(--fuel-dim)" label="One of them" />
+          <Legend color="var(--track)" label="Missed" />
+        </div>
+      </section>
+    ),
+    compare: on('compare') && (
+      <WeekCompare today={today} />
+    ),
+    daily: on('daily') && (
+      <DailyChart today={today} />
+    ),
+    weekday: on('weekday') && (
+      <WeekdayChart today={today} />
+    ),
+    records: on('records') && (() => {
+      const r = records(s.days);
+      if (!r.kcal && !r.water) return null;
+      const tile = (label: string, value: string, date: string | undefined) => (
+        <a href={date ? (date === today ? '#/today' : `#/today?d=${date}`) : undefined} className="card stack" style={{ padding: 12, gap: 2, color: 'var(--ink)', textDecoration: 'none', background: 'var(--s2)' }}>
+          <span className="num" style={{ fontSize: 24, lineHeight: 1 }}>{value}</span>
+          <span className="mono mut" style={{ fontSize: 10 }}>{label}</span>
+          {date && <span className="mono dim" style={{ fontSize: 10 }}>{fmtDate(date, { day: 'numeric', month: 'short' })}</span>}
+        </a>
+      );
+      return (
+        <section className="card">
+          <h2 className="h2" style={{ marginBottom: 10 }}>Personal records</h2>
+          <div className="grid2" style={{ gap: 8 }}>
+            {tile(`Most ${unit} in a day`, r.kcal ? energy(r.kcal.value, unit) : '–', r.kcal?.date)}
+            {tile('Most protein in a day', r.protein ? `${fmt(r.protein.value)} g` : '–', r.protein?.date)}
+            {tile('Most water in a day', r.water ? `${(r.water.value * 0.25).toFixed(2).replace(/0$/, '')} L` : '–', r.water?.date)}
+            {tile('Best streak', `${g.streak.best} day${g.streak.best === 1 ? '' : 's'}`, undefined)}
+          </div>
+        </section>
+      );
+    })(),
+    top: on('top') && (
+      <TopFoods today={today} />
+    ),
+    search: on('search') && (
+      <LogSearch today={today} />
+    ),
+    averages: on('averages') && (
+      <section className="card">
+        <h2 className="h2" style={{ marginBottom: weekGoal ? 2 : 8 }}>Weekly averages</h2>
+        {weekGoal > 0 && <p className="small mut" style={{ margin: '0 0 6px' }}>✓ = weekly goal met ({weekGoal} days on both targets)</p>}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr .8fr .7fr', fontSize: 14 }}>
+          {['Week of', unit, 'Protein', 'Water', 'Days'].map((h, i) => (
+            <span key={h} className="mono dim" style={{ padding: '8px 0', fontSize: 10, textAlign: i ? 'right' : 'left' }}>{h}</span>
+          ))}
+          {weeks.map((w) => (
+            <WeekRow key={w.w} label={`${w.w === weekStart(today) ? 'This week' : fmtDate(w.w)}${weekGoal && weekStats(s.days, w.w, today, s.settings.targets).hit >= weekGoal ? ' ✓' : ''}`} cells={[w.kcal === null ? '–' : energy(w.kcal, unit), w.protein === null ? '–' : `${fmt(w.protein)} g`, w.water === null ? '–' : `${w.water.toFixed(1)} L`, `${w.n}/7`]} />
+          ))}
+        </div>
+      </section>
+    ),
+    notes: on('notes') && (() => {
+      const notes = Object.entries(s.days).filter(([, d]) => d.note).sort(([a], [b]) => (a < b ? 1 : -1)).slice(0, 10);
+      return notes.length > 0 && (
+        <section className="card">
+          <h2 className="h2" style={{ marginBottom: 4 }}>Recent notes</h2>
+          {notes.map(([k, d]) => (
+            <a key={k} href={k === today ? '#/today' : `#/today?d=${k}`} className="item" style={{ padding: '8px 0', color: 'var(--ink)', textDecoration: 'none' }}>
+              <span className="mono dim" style={{ width: 84, flex: 'none' }}>{fmtDate(k, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+              <span className="grow">{d.note}</span>
+              <span className="mono mut" style={{ flex: 'none' }}>{energy(dayTotals(d).kcal, unit)}</span>
+            </a>
+          ))}
+        </section>
+      );
+    })(),
+    tags: on('tags') && (() => {
+      const stats = tagStats(s.days, today, tags);
+      if (!stats.length) return null;
+      const diff = (v: number, show: string) => (Math.abs(v) < 0.5 ? '' : ` (${v > 0 ? '+' : '−'}${show})`);
+      return (
+        <section className="card">
+          <h2 className="h2" style={{ marginBottom: 2 }}>Tagged days</h2>
+          <p className="small mut" style={{ margin: '0 0 6px' }}>Average on days with each tag, against your other logged days (last 8 weeks).</p>
+          {stats.map((x) => (
+            <div key={x.tag} className="item" style={{ padding: '8px 0', gap: 8 }}>
+              <span className="grow">{x.tag} <span className="mono dim">{x.n} days</span></span>
+              <span className="mono mut" style={{ textAlign: 'right' }}>
+                {energy(x.kcal, unit)} {unit}{diff(x.kcal - x.otherKcal, energy(Math.abs(x.kcal - x.otherKcal), unit))}
+                <br />
+                {fmt(x.protein)} g{diff(x.protein - x.otherProtein, `${fmt(Math.abs(x.protein - x.otherProtein))} g`)}
+              </span>
+            </div>
+          ))}
+        </section>
+      );
+    })(),
+    weighins: on('weighins') && s.weighIns.length > 0 && (
+        <section className="card">
+          <h2 className="h2" style={{ marginBottom: 4 }}>Weigh-ins</h2>
+          {[...s.weighIns].reverse().slice(0, 10).map((w) => (
+            <div key={w.date} className="item" style={{ padding: '8px 0' }}>
+              <span className="grow">{fmtDate(w.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+              <span className="num" style={{ fontSize: 20 }}>{w.kg.toFixed(1)} kg</span>
+              <button className="btn icon sm" style={{ width: 36 }} aria-label={`Delete weigh-in ${w.date}`} onClick={() => s.removeWeighIn(w.date)}><Icon name="trash" size={16} /></button>
+            </div>
+          ))}
+        </section>
+    ),
+  };
 
   return (
     <>
@@ -110,105 +255,8 @@ export default function Progress() {
           </section>
         )}
 
-        <section className="card">
-          <div className="between" style={{ marginBottom: 12 }}>
-            <h2 className="h2">Days hit</h2>
-            <div className="row" style={{ gap: 6 }}>
-              <button className="btn icon sm" style={{ width: 34 }} aria-label="Older weeks" disabled={!olderExists} onClick={() => setPage(page + 1)}><Icon name="left" size={16} /></button>
-              <button className="btn icon sm" style={{ width: 34 }} aria-label="Newer weeks" disabled={page === 0} onClick={() => setPage(page - 1)}><Icon name="right" size={16} /></button>
-            </div>
-          </div>
-          <div className="between" style={{ margin: '-4px 0 10px' }}>
-            <span className="mono dim">{fmtDate(cells[0])} – {fmtDate(cells[34])}</span>
-            <span className="mono mut">{hitBoth} of {elapsed.length} · tap a day</span>
-          </div>
-          <div className="heat" role="img" aria-label={`Hit both targets on ${hitBoth} of the last ${elapsed.length} days`}>
-            {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-              <span key={i} className="mono dim" style={{ textAlign: 'center', fontSize: 10 }}>{d}</span>
-            ))}
-            {cells.map((k) => {
-              const st = g.byDate.get(k);
-              const cls = k > today ? 'future' : k === today ? 'today' : k < firstDay ? 'pre' : st?.hitKcal && st.hitProtein ? 'both' : st?.hitKcal || st?.hitProtein ? 'one' : '';
-              // Past and today's cells open that day's log.
-              return k > today || k < firstDay ? <i key={k} className={cls} /> : <a key={k} className={cls} href={k === today ? '#/today' : `#/today?d=${k}`} aria-label={`Open ${fmtDate(k, { weekday: 'long', day: 'numeric', month: 'long' })}`} />;
-            })}
-          </div>
-          <div className="row" style={{ gap: 14, marginTop: 12, flexWrap: 'wrap' }}>
-            <Legend color="var(--fuel)" label="Kcal + protein" />
-            <Legend color="var(--fuel-dim)" label="One of them" />
-            <Legend color="var(--track)" label="Missed" />
-          </div>
-        </section>
-
-        <WeekCompare today={today} />
-
-        <DailyChart today={today} />
-
-        {(() => {
-          const r = records(s.days);
-          if (!r.kcal && !r.water) return null;
-          const tile = (label: string, value: string, date: string | undefined) => (
-            <a href={date ? (date === today ? '#/today' : `#/today?d=${date}`) : undefined} className="card stack" style={{ padding: 12, gap: 2, color: 'var(--ink)', textDecoration: 'none', background: 'var(--s2)' }}>
-              <span className="num" style={{ fontSize: 24, lineHeight: 1 }}>{value}</span>
-              <span className="mono mut" style={{ fontSize: 10 }}>{label}</span>
-              {date && <span className="mono dim" style={{ fontSize: 10 }}>{fmtDate(date, { day: 'numeric', month: 'short' })}</span>}
-            </a>
-          );
-          return (
-            <section className="card">
-              <h2 className="h2" style={{ marginBottom: 10 }}>Personal records</h2>
-              <div className="grid2" style={{ gap: 8 }}>
-                {tile(`Most ${unit} in a day`, r.kcal ? energy(r.kcal.value, unit) : '–', r.kcal?.date)}
-                {tile('Most protein in a day', r.protein ? `${fmt(r.protein.value)} g` : '–', r.protein?.date)}
-                {tile('Most water in a day', r.water ? `${(r.water.value * 0.25).toFixed(2).replace(/0$/, '')} L` : '–', r.water?.date)}
-                {tile('Best streak', `${g.streak.best} day${g.streak.best === 1 ? '' : 's'}`, undefined)}
-              </div>
-            </section>
-          );
-        })()}
-
-        <TopFoods today={today} />
-
-        <section className="card">
-          <h2 className="h2" style={{ marginBottom: 8 }}>Weekly averages</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr .8fr', fontSize: 14 }}>
-            {['Week of', unit, 'Protein', 'Days'].map((h, i) => (
-              <span key={h} className="mono dim" style={{ padding: '8px 0', fontSize: 10, textAlign: i ? 'right' : 'left' }}>{h}</span>
-            ))}
-            {weeks.map((w) => (
-              <WeekRow key={w.w} label={w.w === weekStart(today) ? 'This week' : fmtDate(w.w)} cells={[w.kcal === null ? '–' : energy(w.kcal, unit), w.protein === null ? '–' : `${fmt(w.protein)} g`, `${w.n}/7`]} />
-            ))}
-          </div>
-        </section>
-
-        {(() => {
-          const notes = Object.entries(s.days).filter(([, d]) => d.note).sort(([a], [b]) => (a < b ? 1 : -1)).slice(0, 10);
-          return notes.length > 0 && (
-            <section className="card">
-              <h2 className="h2" style={{ marginBottom: 4 }}>Recent notes</h2>
-              {notes.map(([k, d]) => (
-                <a key={k} href={k === today ? '#/today' : `#/today?d=${k}`} className="item" style={{ padding: '8px 0', color: 'var(--ink)', textDecoration: 'none' }}>
-                  <span className="mono dim" style={{ width: 84, flex: 'none' }}>{fmtDate(k, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-                  <span className="grow">{d.note}</span>
-                  <span className="mono mut" style={{ flex: 'none' }}>{energy(dayTotals(d).kcal, unit)}</span>
-                </a>
-              ))}
-            </section>
-          );
-        })()}
-
-        {s.weighIns.length > 0 && (
-          <section className="card">
-            <h2 className="h2" style={{ marginBottom: 4 }}>Weigh-ins</h2>
-            {[...s.weighIns].reverse().slice(0, 10).map((w) => (
-              <div key={w.date} className="item" style={{ padding: '8px 0' }}>
-                <span className="grow">{fmtDate(w.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-                <span className="num" style={{ fontSize: 20 }}>{w.kg.toFixed(1)} kg</span>
-                <button className="btn icon sm" style={{ width: 36 }} aria-label={`Delete weigh-in ${w.date}`} onClick={() => s.removeWeighIn(w.date)}><Icon name="trash" size={16} /></button>
-              </div>
-            ))}
-          </section>
-        )}
+        {progressOrder.map((id) => <Fragment key={id}>{cards[id]}</Fragment>)}
+        <a href="#/profile?open=progress" className="btn sm" style={{ alignSelf: 'center' }}><Icon name="pencil" size={14} /> Customise this page</a>
       </div>
 
       {weighing && (
@@ -224,14 +272,20 @@ export default function Progress() {
   );
 }
 
-/** This week so far next to last week: averages, days logged and days on target. */
+/** This week (or month) so far next to the last one: averages, days logged and days on target. */
 function WeekCompare({ today }: { today: string }) {
   const days = useStore((s) => s.days);
   const T = useStore((s) => s.settings.targets);
   const unit = useStore((s) => s.settings.unit);
+  const [span, setSpan] = useState<'week' | 'month'>('week');
   const thisWk = weekStats(days, weekStart(today), today, T);
   const lastWk = weekStats(days, addDays(weekStart(today), -7), today, T);
-  if (!thisWk.logged && !lastWk.logged) return null;
+  const m0 = monthRange(today);
+  const m1 = monthRange(today, -1);
+  const thisM = rangeStats(days, m0.start, m0.n, today, T);
+  const lastM = rangeStats(days, m1.start, m1.n, today, T);
+  if (!thisWk.logged && !lastWk.logged && !thisM.logged && !lastM.logged) return null;
+  const [cur, prev] = span === 'week' ? [thisWk, lastWk] : [thisM, lastM];
   const row = (label: string, a: number | null, b: number | null, show: (v: number) => string) => {
     const diff = a !== null && b !== null ? a - b : null;
     return (
@@ -248,8 +302,8 @@ function WeekCompare({ today }: { today: string }) {
   return (
     <section className="card">
       <div className="between" style={{ marginBottom: 4 }}>
-        <h2 className="h2">This week vs last</h2>
-        <button
+        <h2 className="h2">This {span} vs last</h2>
+        {span === 'week' && <button
           className="btn sm"
           onClick={async () => {
             const rate = weeklyRate(useStore.getState().weighIns, today);
@@ -266,16 +320,20 @@ function WeekCompare({ today }: { today: string }) {
           }}
         >
           <Icon name="copy" size={14} /> Share
-        </button>
+        </button>}
+      </div>
+      <div className="row" style={{ gap: 6, margin: '6px 0 4px' }} role="group" aria-label="Compare">
+        <button className="chip" aria-pressed={span === 'week'} onClick={() => setSpan('week')}>Week</button>
+        <button className="chip" aria-pressed={span === 'month'} onClick={() => setSpan('month')}>Month</button>
       </div>
       <div className="between" style={{ marginBottom: 2 }}>
         <span />
         <span className="mono dim">Last · This</span>
       </div>
-      {row('Avg energy', thisWk.kcal, lastWk.kcal, (v) => `${energy(v, unit)}`)}
-      {row('Avg protein', thisWk.protein, lastWk.protein, (v) => `${fmt(v)} g`)}
-      {row('Days logged', thisWk.logged, lastWk.logged, (v) => String(v))}
-      {row('Days on target', thisWk.hit, lastWk.hit, (v) => String(v))}
+      {row('Avg energy', cur.kcal, prev.kcal, (v) => `${energy(v, unit)}`)}
+      {row('Avg protein', cur.protein, prev.protein, (v) => `${fmt(v)} g`)}
+      {row('Days logged', cur.logged, prev.logged, (v) => String(v))}
+      {row('Days on target', cur.hit, prev.hit, (v) => String(v))}
     </section>
   );
 }
@@ -311,6 +369,108 @@ function TopFoods({ today }: { today: string }) {
           </div>
         </div>
       ))}
+    </section>
+  );
+}
+
+/** Find every time you logged a food, newest first; each row opens that day. */
+function LogSearch({ today }: { today: string }) {
+  const days = useStore((s) => s.days);
+  const unit = useStore((s) => s.settings.unit);
+  const [q, setQ] = useState('');
+  const [more, setMore] = useState(false);
+  const { hits, total } = searchLog(days, q);
+  const shown = more ? hits : hits.slice(0, 10);
+  const dayCount = new Set(hits.map((h) => h.date)).size;
+  return (
+    <section className="card stack" style={{ gap: 10 }}>
+      <h2 className="h2">Search your log</h2>
+      <label className="search" style={{ background: 'var(--s2)', boxShadow: 'none' }}>
+        <span className="mut"><Icon name="search" size={20} /></span>
+        <input aria-label="Search your log" placeholder="When did I last have…" value={q} onChange={(e) => { setQ(e.target.value); setMore(false); }} enterKeyHint="search" />
+        {q && <button className="btn icon sm" style={{ border: 0, width: 32 }} aria-label="Clear log search" onClick={() => setQ('')}><Icon name="close" size={18} /></button>}
+      </label>
+      {q.trim().length >= 2 && (
+        total ? (
+          <div className="stack" style={{ gap: 0 }}>
+            <span className="mono mut" style={{ paddingBottom: 4 }}>
+              {total} time{total === 1 ? '' : 's'}{total > hits.length ? `, newest ${hits.length} shown` : ` on ${dayCount} day${dayCount === 1 ? '' : 's'}`}
+            </span>
+            {shown.map(({ date, entry: e }) => (
+              <div key={e.id} className="item" style={{ padding: '4px 0', gap: 4 }}>
+                <a href={date === today ? '#/today' : `#/today?d=${date}`} className="grow" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, padding: '4px 0', color: 'var(--ink)', textDecoration: 'none' }}>
+                  <span className="mono dim" style={{ width: 92, flex: 'none' }}>{fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short' })}<br />{timeOf(e.at)}</span>
+                  <span className="grow stack" style={{ gap: 0, minWidth: 0, overflowWrap: 'anywhere' }}>
+                    <span>{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
+                    {e.note && <span className="small mut">{e.note}</span>}
+                  </span>
+                  <span className="mono mut" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)} · {fmt(entryMacros(e).protein)} g</span>
+                </a>
+                <button
+                  className="btn icon sm"
+                  style={{ width: 36 }}
+                  aria-label={`Log ${e.name} again now`}
+                  onClick={() => {
+                    const { name, serving, base, qty, source, foodId } = e;
+                    const ids = useStore.getState().addEntries(today, [{ name, serving, base, qty, source, foodId }]);
+                    toastAdded(`Logged ${qty !== 1 ? `${qty}× ` : ''}${name} now`, XP.meal, today, ids);
+                  }}
+                >
+                  +
+                </button>
+              </div>
+            ))}
+            {shown.length < hits.length && <button className="btn sm" style={{ marginTop: 6 }} onClick={() => setMore(true)}>Show {hits.length - shown.length} more</button>}
+          </div>
+        ) : <p className="small mut" style={{ margin: 0 }}>Nothing logged called “{q.trim()}”.</p>
+      )}
+    </section>
+  );
+}
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+/** Average energy or protein per weekday over the last 8 weeks, so a habitually light day stands out. */
+function WeekdayChart({ today }: { today: string }) {
+  const days = useStore((s) => s.days);
+  const T = useStore((s) => s.settings.targets);
+  const unit = useStore((s) => s.settings.unit);
+  const [what, setWhat] = useState<'kcal' | 'protein'>('kcal');
+  const avgs = weekdayAverages(days, today);
+  const seen = avgs.filter((a) => a.n);
+  if (avgs.reduce((a, b) => a + b.n, 0) < 7 || seen.length < 3) return null;
+  const target = T[what];
+  const top = Math.max(target * 1.25, ...avgs.map((a) => a[what]));
+  const H = 100;
+  const color = what === 'kcal' ? 'var(--fuel)' : 'var(--pro)';
+  const show = (v: number) => (what === 'kcal' ? `${energy(v, unit)} ${unit}` : `${fmt(v)} g`);
+  const low = seen.reduce((a, b) => (b[what] < a[what] ? b : a));
+  const high = seen.reduce((a, b) => (b[what] > a[what] ? b : a));
+  return (
+    <section className="card">
+      <div className="between" style={{ marginBottom: 10, alignItems: 'center' }}>
+        <h2 className="h2">By weekday</h2>
+        <div className="row" style={{ gap: 6 }}>
+          <button className="chip" aria-pressed={what === 'kcal'} onClick={() => setWhat('kcal')}>Energy</button>
+          <button className="chip" aria-pressed={what === 'protein'} onClick={() => setWhat('protein')}>Protein</button>
+        </div>
+      </div>
+      <div className="chart14" style={{ height: H, gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8 }}>
+        <span className="chart14-target" style={{ bottom: (target / top) * H }} />
+        {avgs.map((a) => (
+          <a key={a.wd} aria-label={`${WEEKDAYS[a.wd]}: ${a.n ? `${show(a[what])} average over ${a.n} day${a.n === 1 ? '' : 's'}` : 'nothing logged'}`}>
+            <i style={{ height: Math.max(a.n ? 3 : 0, (a[what] / top) * H), background: a[what] >= target ? color : `color-mix(in srgb, ${color} 55%, var(--track))` }} />
+          </a>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8, marginTop: 6 }}>
+        {avgs.map((a) => (
+          <span key={a.wd} className="mono dim" style={{ fontSize: 10, textAlign: 'center', fontWeight: a === low ? 800 : undefined }}>{WEEKDAYS[a.wd].slice(0, 3)}</span>
+        ))}
+      </div>
+      <p className="small mut" style={{ marginTop: 6 }}>
+        Last 8 weeks, logged days. {low === high ? '' : `${WEEKDAYS[low.wd]}s are your lightest (${show(low[what])}), ${WEEKDAYS[high.wd]}s your biggest (${show(high[what])}).`}
+      </p>
     </section>
   );
 }
@@ -409,7 +569,7 @@ function WeekRow({ label, cells }: { label: string; cells: string[] }) {
     <>
       <span style={b}>{label}</span>
       {cells.map((c, i) => (
-        <span key={i} className="num" style={{ ...b, textAlign: 'right', fontSize: 18 }}>{c}</span>
+        <span key={i} className="num" style={{ ...b, textAlign: 'right', fontSize: 16 }}>{c}</span>
       ))}
     </>
   );

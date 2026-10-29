@@ -3,7 +3,7 @@ import { useStore } from '../lib/store';
 import { analyse, fileToJpeg, hasAi, friendlyError, MAX_PHOTOS, type AiItem, type AiMode, type AiResult } from '../lib/ai';
 import { sumEntries, energy } from '../lib/nutrition';
 import { XP } from '../lib/game';
-import { go, Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, useEatenAt } from './ui';
+import { go, Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, useDictation, useEatenAt } from './ui';
 
 type Row = AiItem & { qty: number; removed: boolean };
 
@@ -13,13 +13,16 @@ const COPY: Record<AiMode, { title: string; take: string; hint: string; source: 
   text: { title: 'Describe it', take: '', hint: 'e.g. 3 rotli with ghee, a bowl of toor dal and a glass of milk', source: 'ai-text' },
 };
 
-export default function AiSheet({ mode, date, initialText = '', onClose }: { mode: AiMode; date: string; initialText?: string; onClose: () => void }) {
+export default function AiSheet({ mode, date, initialText = '', at, onClose }: { mode: AiMode; date: string; initialText?: string; at?: number; onClose: () => void }) {
   const s = useStore();
   const c = COPY[mode];
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const [imgs, setImgs] = useState<{ base64: string; mimeType: string; url: string }[]>([]);
   const [text, setText] = useState(initialText);
+  // Spoken words go after anything already typed.
+  const typed = useRef('');
+  const speak = useDictation((w) => setText((typed.current + w).slice(0, 500)));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<AiResult | null>(null);
@@ -27,7 +30,7 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
   const [sizing, setSizing] = useState<number | null>(null); // row whose serving picker is open
 
   const noKey = !hasAi(s.settings);
-  const when = useEatenAt(date);
+  const when = useEatenAt(date, at);
 
   const run = async () => {
     setBusy(true);
@@ -138,7 +141,22 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
           <label className="field">
             <span>{mode === 'text' ? 'What did you eat?' : 'Extra details (optional)'}</span>
             {mode === 'text' ? (
-              <textarea className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder={c.hint} maxLength={500} autoFocus />
+              <>
+                <textarea className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder={c.hint} maxLength={500} autoFocus />
+                {speak.ok && (
+                  <button
+                    className="btn sm"
+                    style={{ alignSelf: 'flex-start', ...(speak.on ? { color: 'var(--fuel)', borderColor: 'var(--fuel)' } : {}) }}
+                    aria-pressed={speak.on}
+                    onClick={() => {
+                      typed.current = text.trim() ? `${text.trim()} ` : '';
+                      speak.toggle();
+                    }}
+                  >
+                    <Icon name="mic" size={16} /> {speak.on ? 'Listening… tap to stop' : 'Speak it'}
+                  </button>
+                )}
+              </>
             ) : (
               <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder={c.hint} maxLength={200} />
             )}

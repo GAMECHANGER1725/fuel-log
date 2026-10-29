@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
-import { SECTION_LABEL, combineAsFood, daySummary, drinkMl, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals } from '../lib/meals';
+import { SECTION_LABEL, combineAsFood, hasTag, toggleTag, daySummary, drinkMl, waterWeek, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals, topFoods, usualNow, weekBalance, weekStats } from '../lib/meals';
 
 export default function Today() {
   const today = useToday();
@@ -22,7 +22,12 @@ export default function Today() {
   // Select mode on the log: ids of ticked entries, or null when off.
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [saving, setSaving] = useState<Entry[] | null>(null);
-  useEffect(() => setPicked(null), [date]);
+  // Meal sections folded on the log (by their first entry's id); all open again on another day.
+  const [folded, setFolded] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setPicked(null);
+    setFolded(new Set());
+  }, [date]);
   const [round, setRound] = useState(0); // how many times Close the gap was refreshed
   const [open, setOpen] = useState<string | null>(null); // which idea's recipe is showing
   const hidden = usePrefs((p) => p.hidden);
@@ -31,6 +36,7 @@ export default function Today() {
   const flipRing = usePrefs((p) => p.flipRing);
   const boostKcal = usePrefs((p) => p.boostKcal);
   const bottleMl = usePrefs((p) => p.bottleMl);
+  const weighEvery = usePrefs((p) => p.weighEvery);
   const show = (c: Card) => !hidden.includes(c);
 
   const day = s.days[date] ?? { entries: [], water: 0, checks: {} };
@@ -114,11 +120,11 @@ export default function Today() {
   const cards: Record<OrderCard, ReactNode> = {
     weigh: isToday && show('weigh') && (() => {
       const since = daysSinceWeighIn(s.weighIns, today);
-      if (since !== null && since < 7) return null;
+      if (since !== null && since < weighEvery) return null;
       return (
         <a href="#/progress?weigh=1" className="card tight" style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--ink)', textDecoration: 'none' }}>
           <span className="pro"><Icon name="trend" size={22} /></span>
-          <span className="grow small">{since === null ? 'Log your first weigh-in to start your trend line.' : `It’s been ${since} days since your last weigh-in. Time for a quick one?`}</span>
+          <span className="grow small">{since === null ? 'Log your first weigh-in to start your trend line.' : `It’s been ${since === 1 ? 'a day' : `${since} days`} since your last weigh-in. Time for a quick one?`}</span>
           <Icon name="right" size={18} />
         </a>
       );
@@ -282,16 +288,41 @@ export default function Today() {
             <div className="card tight">
               {sections.map((sec, si) => (
                 <div key={sec.entries[0].id} style={si ? { borderTop: '1px solid var(--line2)', marginTop: 4, paddingTop: 4 } : undefined}>
-                  <div className="between" style={{ padding: '8px 0 2px' }}>
-                    <span className="mono fuel">{SECTION_LABEL[sec.moment]}</span>
-                    <span className="mono dim">
-                      {energy(sec.kcal, unit)} {unit} ·{' '}
-                      <span style={sec.protein >= mealGoal ? { color: 'var(--pro)' } : undefined} title={sec.protein >= mealGoal ? `${mealGoal} g+ protein` : undefined}>
-                        {fmt(sec.protein)} g{sec.protein >= mealGoal ? ' ✓' : ''}
+                  <div className="row" style={{ gap: 4 }}>
+                    <button
+                      className="between grow"
+                      aria-expanded={!folded.has(sec.entries[0].id)}
+                      style={{ padding: '8px 0 2px', background: 'none', border: 0, color: 'inherit', font: 'inherit', cursor: 'pointer', textAlign: 'left' }}
+                      onClick={() => {
+                        const next = new Set(folded);
+                        if (!next.delete(sec.entries[0].id)) next.add(sec.entries[0].id);
+                        setFolded(next);
+                      }}
+                    >
+                      <span className="mono fuel" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ display: 'flex', transform: folded.has(sec.entries[0].id) ? undefined : 'rotate(90deg)', transition: 'transform .15s' }}><Icon name="right" size={12} stroke={2.6} /></span>
+                        {SECTION_LABEL[sec.moment]}
+                        {folded.has(sec.entries[0].id) && <span className="mut"> · {sec.entries.length}</span>}
                       </span>
-                    </span>
+                      <span className="mono dim">
+                        {energy(sec.kcal, unit)} {unit} ·{' '}
+                        <span style={sec.protein >= mealGoal ? { color: 'var(--pro)' } : undefined} title={sec.protein >= mealGoal ? `${mealGoal} g+ protein` : undefined}>
+                          {fmt(sec.protein)} g{sec.protein >= mealGoal ? ' ✓' : ''}
+                        </span>
+                      </span>
+                    </button>
+                    {!picked && (
+                      <a
+                        className="btn icon sm"
+                        style={{ width: 32, minHeight: 32, marginTop: 4 }}
+                        aria-label={`Add to ${SECTION_LABEL[sec.moment].toLowerCase()}`}
+                        href={`#/food?at=${hhmmOf(sec.entries[sec.entries.length - 1].at)}${isToday ? '' : `&d=${date}`}`}
+                      >
+                        <Icon name="plus" size={16} />
+                      </a>
+                    )}
                   </div>
-                  {sec.entries.map((e, i) => (
+                  {!folded.has(sec.entries[0].id) && sec.entries.map((e, i) => (
                     <button
                       key={e.id}
                       className="item-btn"
@@ -306,7 +337,10 @@ export default function Today() {
                     >
                       {picked && <span className={`check${picked.has(e.id) ? ' on' : ''}`}>{picked.has(e.id) && <Icon name="check" size={14} stroke={3.5} />}</span>}
                       <span className="mono dim" style={{ width: 64, flex: 'none' }}>{timeOf(e.at)}</span>
-                      <span className="grow">{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
+                      <span className="grow stack" style={{ gap: 0, minWidth: 0 }}>
+                        <span>{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
+                        {e.note && <span className="small mut" style={{ overflowWrap: 'anywhere' }}>{e.note}</span>}
+                      </span>
                       <span className="mono mut" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)} · {fmt(entryMacros(e).protein)} g</span>
                     </button>
                   ))}
@@ -316,6 +350,7 @@ export default function Today() {
           ) : (
             <p className="empty">Nothing logged {isToday ? 'yet today' : 'this day'}.</p>
           )}
+          {!picked && day.entries.length >= 3 && <DaySources date={date} />}
           {picked && (
             <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
               <button className="btn sm" onClick={() => setPicked(picked.size === day.entries.length ? new Set() : new Set(day.entries.map((e) => e.id)))}>
@@ -358,7 +393,7 @@ export default function Today() {
               className="btn sm"
               style={{ alignSelf: 'center' }}
               onClick={async () => {
-                const text = daySummary(fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long' }), day.entries, T, unit, timeOf);
+                const text = daySummary(fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long' }), day.entries, T, unit, timeOf, day.note);
                 try {
                   if (navigator.share) await navigator.share({ text });
                   else {
@@ -406,6 +441,14 @@ export default function Today() {
           ))}
         </div>
         {drinkMl(day.entries) >= 100 && <p className="small mut" style={{ margin: '8px 0 0' }}>Plus about {(drinkMl(day.entries) / 1000).toFixed(1)} L from drinks you logged (milk, lassi, juice).</p>}
+        {(() => {
+          const wk = waterWeek(s.days, date, waterGoal);
+          return wk && (
+            <p className="mono dim" style={{ margin: '8px 0 0' }}>
+              Last 7 days: {wk.avgL.toFixed(1)} L a day, goal hit on {wk.hit} of {wk.tracked}
+            </p>
+          );
+        })()}
       </section>
     ),
     quality: (
@@ -475,9 +518,14 @@ export default function Today() {
 
         <section className="card">
           <div className="row" style={{ gap: 16 }}>
-            <button className="ring-btn" onClick={flipRing} aria-label={ring === 'left' ? 'Show energy eaten' : 'Show energy to go'}>
+            <button className="ring-btn" onClick={flipRing} aria-label={ring === 'left' ? 'Show energy eaten' : ring === 'eaten' ? 'Show protein to go' : 'Show energy to go'}>
               <Rings kcal={t.kcal} kcalMax={T.kcal} protein={t.protein} proteinMax={T.protein}>
-                {ring === 'eaten' ? (
+                {ring === 'protein' ? (
+                  <>
+                    <span className="num pro" style={{ fontSize: 'clamp(26px, 9.5vw, 40px)', lineHeight: 0.95 }}>{pLeft > 0 ? fmt(pLeft) : '✓'}</span>
+                    <span className="mono mut" style={{ fontSize: 10 }}>{pLeft > 0 ? 'g protein to go' : 'protein hit'}</span>
+                  </>
+                ) : ring === 'eaten' ? (
                   <>
                     <span className="num" style={{ fontSize: 'clamp(26px, 9.5vw, 40px)', lineHeight: 0.95 }}>{energy(t.kcal, unit)}</span>
                     <span className="mono mut" style={{ fontSize: 10 }}>{unit} eaten</span>
@@ -557,7 +605,7 @@ export default function Today() {
 
         {order.map((id) => <Fragment key={id}>{cards[id]}</Fragment>)}
 
-        <a href="#/profile?open=display" className="btn sm" style={{ alignSelf: 'center' }}><Icon name="pencil" size={14} /> Customise this page</a>
+        <a href="#/profile?open=today" className="btn sm" style={{ alignSelf: 'center' }}><Icon name="pencil" size={14} /> Customise this page</a>
       </div>
 
       {editing && <EditSheet date={date} entry={editing} onClose={() => setEditing(null)} />}
@@ -566,9 +614,39 @@ export default function Today() {
   );
 }
 
+/** Which foods gave the day's protein or energy, biggest first; folded away until opened. */
+function DaySources({ date }: { date: string }) {
+  const days = useStore((s) => s.days);
+  const unit = useStore((s) => s.settings.unit);
+  const [what, setWhat] = useState<'protein' | 'kcal'>('protein');
+  const top = topFoods(days, date, what, 1, 6);
+  const color = what === 'kcal' ? 'var(--fuel)' : 'var(--pro)';
+  return (
+    <details className="card tight">
+      <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 600 }}>Where it came from</summary>
+      <div className="stack" style={{ gap: 10, paddingBottom: 8 }}>
+        <div className="row" style={{ gap: 6 }}>
+          <button className="chip" aria-pressed={what === 'protein'} onClick={() => setWhat('protein')}>Protein</button>
+          <button className="chip" aria-pressed={what === 'kcal'} onClick={() => setWhat('kcal')}>Energy</button>
+        </div>
+        {top.length ? top.map((f) => (
+          <div key={f.name} className="stack" style={{ gap: 4 }}>
+            <div className="between" style={{ gap: 8 }}>
+              <span className="grow" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{f.name}{f.times > 1 && <span className="mono dim"> ×{f.times}</span>}</span>
+              <span className="mono mut" style={{ flex: 'none' }}>{what === 'kcal' ? `${energy(f.value, unit)} ${unit}` : `${fmt(f.value)} g`} · {Math.round(f.share * 100)}%</span>
+            </div>
+            <Bar value={Math.round(f.share * 100)} max={100} color={color} />
+          </div>
+        )) : <p className="small mut" style={{ margin: 0 }}>No {what === 'kcal' ? 'energy' : 'protein'} logged.</p>}
+      </div>
+    </details>
+  );
+}
+
 /** A short note about the day, edited in place. */
 function DayNote({ date, note }: { date: string; note: string }) {
   const setNote = useStore((s) => s.setNote);
+  const tags = usePrefs((p) => p.tags);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(note);
   useEffect(() => setText(note), [note, date]);
@@ -598,10 +676,18 @@ function DayNote({ date, note }: { date: string; note: string }) {
       </section>
     );
   return (
-    <button className="card tight" style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', color: 'var(--ink)', border: 0 }} onClick={() => setEditing(true)}>
-      <span className="mut"><Icon name="pencil" size={18} /></span>
-      <span className="grow" style={note ? undefined : { color: 'var(--mut)' }}>{note || 'Add a note for the day'}</span>
-    </button>
+    <section className="card tight stack" style={{ gap: 6 }}>
+      <button className="item-btn" style={{ flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%', minHeight: 44 }} onClick={() => setEditing(true)}>
+        <span className="mut"><Icon name="pencil" size={18} /></span>
+        <span className="grow" style={note ? undefined : { color: 'var(--mut)' }}>{note || 'Add a note for the day'}</span>
+      </button>
+      {/* One tap adds or removes a tag, no typing. */}
+      {tags.length > 0 && <div className="quick" role="group" aria-label="Tag the day">
+        {tags.map((tag) => (
+          <button key={tag} className="chip" aria-pressed={hasTag(note, tag)} onClick={() => setNote(date, toggleTag(note, tag).slice(0, 200))}>{tag}</button>
+        ))}
+      </div>}
+    </section>
   );
 }
 
@@ -612,18 +698,24 @@ function QuickLog({ date }: { date: string }) {
   const recents = useStore((s) => s.recents);
   const unit = useStore((s) => s.settings.unit);
   const addEntries = useStore((s) => s.addEntries);
-  const seen = new Set<string>();
-  const foods = [...favourites, ...recents].filter((f) => !seen.has(f.name.toLowerCase()) && seen.add(f.name.toLowerCase())).slice(0, 10);
   const today = useToday();
   const now = useNow();
   const link = (open: string) => `#/food?open=${open}${date === today ? '' : `&d=${date}`}`;
   const hour = new Date(now).getHours() + new Date(now).getMinutes() / 60;
   const days = useStore((s) => s.days);
+  // What you usually have around now goes first (marked with a clock), then favourites and recents.
+  const usual: Food[] = date === today && !hidden.includes('qusual')
+    ? usualNow(days, today, hour).map((e) => ({ id: e.foodId ?? e.id, name: e.name, serving: e.serving, ...e.base }))
+    : [];
+  const seen = new Set<string>(usual.map((f) => f.name.toLowerCase()));
+  const quickCount = usePrefs((p) => p.quickCount);
+  const quickWrap = usePrefs((p) => p.quickWrap);
+  const foods = [...favourites, ...recents].filter((f) => !seen.has(f.name.toLowerCase()) && seen.add(f.name.toLowerCase())).slice(0, quickCount);
   const again = date === today ? lastSection(days, today, momentOf(hour)) : null;
   return (
     <section className="stack" style={{ gap: 6 }}>
-      <span className="mono mut">Quick log{foods.length ? ' · tap a food for your usual amount, hold to choose' : ''}</span>
-      <div className="quick">
+      <span className="mono mut">Quick log{foods.length || usual.length ? ' · tap a food for your usual amount, hold to choose' : ''}</span>
+      <div className={`quick${quickWrap ? ' wrap' : ''}`}>
         {!hidden.includes('qscan') && <a className="chip" href={link('scan')}><Icon name="barcode" size={16} /> Scan</a>}
         {!hidden.includes('qsnap') && <a className="chip" href={link('photo')}><Icon name="camera" size={16} /> Snap meal</a>}
         {!hidden.includes('qnum') && <a className="chip" href={link('manual')}><Icon name="pencil" size={16} /> Numbers</a>}
@@ -641,11 +733,12 @@ function QuickLog({ date }: { date: string }) {
             <span className="mono fuel" style={{ fontSize: 11 }}>{energy(again.kcal, unit)}</span>
           </button>
         )}
-        {foods.map((f) => (
+        {[...usual, ...foods].map((f, i) => (
           <QuickChip
             key={f.id + f.name}
             food={f}
             unit={unit}
+            usual={i < usual.length}
             onTap={() => {
               const qty = lastQty(useStore.getState().days, date, f.name, f.serving);
               const ids = addEntries(date, [{ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty, source: f.barcode ? 'off' : 'db', foodId: f.id }], [f]);
@@ -660,10 +753,11 @@ function QuickLog({ date }: { date: string }) {
 }
 
 /** A Quick log food: tap adds your usual amount, press and hold opens its sheet to choose. */
-function QuickChip({ food, unit, onTap, onHold }: { food: Food; unit: 'kcal' | 'kJ'; onTap: () => void; onHold: () => void }) {
+function QuickChip({ food, unit, usual, onTap, onHold }: { food: Food; unit: 'kcal' | 'kJ'; usual?: boolean; onTap: () => void; onHold: () => void }) {
   const press = useLongPress(onHold);
   return (
-    <button className="chip" {...press.handlers} onClick={() => !press.wasLong() && onTap()} style={{ WebkitTouchCallout: 'none', userSelect: 'none' }}>
+    <button className="chip" {...press.handlers} onClick={() => !press.wasLong() && onTap()} title={usual ? 'You usually have this around now' : undefined} style={{ WebkitTouchCallout: 'none', userSelect: 'none' }}>
+      {usual && <span className="fuel" style={{ display: 'flex' }}><Icon name="today" size={14} /></span>}
       {food.name.length > 22 ? `${food.name.slice(0, 21)}…` : food.name}
       <span className="mono fuel" style={{ fontSize: 11 }}>{energy(food.kcal, unit)}</span>
     </button>
@@ -674,8 +768,14 @@ function QuickChip({ food, unit, onTap, onHold }: { food: Food; unit: 'kcal' | '
 function WeekStrip({ date, today, onPick }: { date: string; today: string; onPick: (k: string) => void }) {
   const days = useStore((s) => s.days);
   const T = useStore((s) => s.settings.targets);
+  const unit = useStore((s) => s.settings.unit);
   const start = weekStart(date);
   const H = 56;
+  // Only for the current week: where the past days leave you, and what catches up.
+  const bal = start === weekStart(today) ? weekBalance(days, start, today, T.kcal) : null;
+  const near = bal && Math.abs(bal.kcal) < 100 * bal.days;
+  const weekGoal = usePrefs((p) => p.weekGoal);
+  const hitWeek = weekGoal ? weekStats(days, start, today, T).hit : 0;
   const bar = (frac: number, color: string) => <i style={{ height: Math.max(3, Math.min(1, frac) * H), background: color }} />;
   return (
     <section className="card tight">
@@ -703,6 +803,23 @@ function WeekStrip({ date, today, onPick }: { date: string; today: string; onPic
           );
         })}
       </div>
+      {weekGoal > 0 && (
+        <div className="stack" style={{ gap: 4, marginTop: 8 }}>
+          <div className="between">
+            <span className="small"><span className="mut">Goal:</span> {Math.min(hitWeek, weekGoal)} of {weekGoal} days on both targets</span>
+            {hitWeek >= weekGoal && <span className="mono fuel">Done ✓</span>}
+          </div>
+          <Bar value={hitWeek} max={weekGoal} color="var(--fuel)" />
+        </div>
+      )}
+      {bal && (
+        <p className="small" style={{ margin: '8px 0 0' }}>
+          <span className="mut">Week so far: </span>
+          {near ? 'on target.' : bal.kcal < 0
+            ? <>{energy(-bal.kcal, unit)} {unit} behind. <span className="mut">About</span> +{energy(bal.perDay, unit)} {unit} <span className="mut">a day catches up.</span></>
+            : <>{energy(bal.kcal, unit)} {unit} ahead.</>}
+        </p>
+      )}
     </section>
   );
 }
@@ -724,6 +841,8 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
   base.carbs = n(info.carbs);
   base.fat = n(info.fat);
   const name = info.name.trim().slice(0, 80) || entry.name;
+  const [note, setNote] = useState(entry.note ?? '');
+  const notePatch = note.trim() !== (entry.note ?? '') ? { note: note.trim().slice(0, 80) || undefined } : {};
   const infoPatch = name !== entry.name || info.serving !== entry.serving || (['kcal', 'protein', 'carbs', 'fat'] as const).some((k) => base[k] !== entry.base[k]) ? { name, serving: info.serving.trim().slice(0, 60), base } : {};
   const field = (k: keyof typeof info, label: string, numeric = true) => (
     <label className="field">
@@ -742,6 +861,10 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
       <Stepper value={qty} onChange={setQty} label="servings" presets={SERVING_PRESETS} />
       <MacroGrid {...m} unit={s.settings.unit} />
       <TimeField value={when.hhmm} onChange={when.setHhmm} />
+      <label className="field">
+        <span>Note (optional)</span>
+        <input className="input" value={note} maxLength={80} placeholder="Homemade, extra ghee…" onChange={(e) => setNote(e.target.value)} />
+      </label>
       <label className="field">
         <span>Day eaten</span>
         <input className="input" type="date" max={today} value={day} onChange={(e) => e.target.value && setDay(e.target.value <= today ? e.target.value : today)} aria-label="Day eaten" />
@@ -787,9 +910,9 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
           className="btn primary grow"
           onClick={() => {
             if (day !== date) {
-              s.moveEntry(date, day, { ...entry, qty, ...infoPatch, at: when.at });
+              s.moveEntry(date, day, { ...entry, qty, ...infoPatch, ...notePatch, at: when.at });
               toast(`Moved to ${fmtDate(day, { weekday: 'short', day: 'numeric', month: 'short' })}`);
-            } else s.updateEntry(date, entry.id, { qty, ...infoPatch, ...(when.hhmm === hhmmOf(entry.at) ? {} : { at: when.at }) });
+            } else s.updateEntry(date, entry.id, { qty, ...infoPatch, ...notePatch, ...(when.hhmm === hhmmOf(entry.at) ? {} : { at: when.at }) });
             onClose();
           }}
         >

@@ -2,7 +2,7 @@
 // A group is two or more entries on one day each within `gapMin` minutes of the one before.
 
 import type { DayLog, Entry, Food } from './types';
-import { addDays, atOn } from './dates';
+import { addDays, atOn, dateOf } from './dates';
 import { energy, roundMacros, sumEntries } from './nutrition';
 import { momentOf, type Moment } from './foods';
 
@@ -17,6 +17,171 @@ export function lastQty(days: Record<string, DayLog>, today: string, name: strin
     if (hits.length) return hits.reduce((a, b) => (b.at > a.at ? b : a)).qty;
   }
   return 1;
+}
+
+export interface FoodHistory {
+  /** Days in the last `lookback` with this food logged. */
+  days: number;
+  /** Most recent day it was logged, or null. */
+  last: string | null;
+}
+
+/** How often you've had a food (by name, any serving) in the last `lookback` days, for the food sheet. */
+export function foodHistory(days: Record<string, DayLog>, today: string, name: string, lookback = 30): FoodHistory {
+  const n = name.trim().toLowerCase();
+  let count = 0;
+  let last: string | null = null;
+  for (let i = 0; i < lookback; i++) {
+    const k = addDays(today, -i);
+    if (!(days[k]?.entries ?? []).some((e) => e.name.trim().toLowerCase() === n)) continue;
+    count++;
+    last ??= k;
+  }
+  return { days: count, last };
+}
+
+/** One-tap tags for the day note. */
+export const NOTE_TAGS = ['Gym', 'Rest day', 'Eating out', 'Busy day', 'Sick', 'Felt full', 'Low appetite'];
+
+const noteParts = (note: string) => note.split(',').map((x) => x.trim()).filter(Boolean);
+
+/** Whether a note already has a tag as one of its comma-separated parts. */
+export const hasTag = (note: string, tag: string) => noteParts(note).some((x) => x.toLowerCase() === tag.toLowerCase());
+
+/** Add a tag to the end of a note, or take it out if it's there. Other text is kept. */
+export function toggleTag(note: string, tag: string): string {
+  const parts = noteParts(note);
+  const out = hasTag(note, tag) ? parts.filter((x) => x.toLowerCase() !== tag.toLowerCase()) : [...parts, tag];
+  return out.join(', ');
+}
+
+export interface TagStat {
+  tag: string;
+  /** Logged days with the tag, and their average energy and protein. */
+  n: number;
+  kcal: number;
+  protein: number;
+  /** The same averages over logged days without it. */
+  otherKcal: number;
+  otherProtein: number;
+}
+
+/**
+ * For each note tag used on at least `min` logged days in the last `lookback` days (before today), average energy and
+ * protein on those days next to the other logged days. Most-used first.
+ */
+export function tagStats(days: Record<string, DayLog>, today: string, tags: string[], lookback = 56, min = 2): TagStat[] {
+  const logged = Array.from({ length: lookback }, (_, i) => addDays(today, -1 - i))
+    .filter((k) => days[k]?.entries.length)
+    .map((k) => ({ note: days[k].note ?? '', t: sumEntries(days[k].entries) }));
+  const avg = (xs: typeof logged, m: 'kcal' | 'protein') => (xs.length ? xs.reduce((a, x) => a + x.t[m], 0) / xs.length : 0);
+  return tags
+    .map((tag) => {
+      const on = logged.filter((x) => hasTag(x.note, tag));
+      const off = logged.filter((x) => !hasTag(x.note, tag));
+      return { tag, n: on.length, kcal: avg(on, 'kcal'), protein: avg(on, 'protein'), otherKcal: avg(off, 'kcal'), otherProtein: avg(off, 'protein'), others: off.length };
+    })
+    .filter((x) => x.n >= min && x.others > 0)
+    .sort((a, b) => b.n - a.n)
+    .map(({ others: _o, ...x }) => x);
+}
+
+export interface LogHit {
+  date: string;
+  entry: Entry;
+}
+
+/**
+ * Logged entries whose name and note together have every word of `q` (any order, ignoring case), newest first, at most `max`.
+ * `total` counts every match, so the list can say "and N more".
+ */
+export function searchLog(days: Record<string, DayLog>, q: string, max = 30): { hits: LogHit[]; total: number } {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length || words.join('').length < 2) return { hits: [], total: 0 };
+  const all: LogHit[] = [];
+  for (const [date, d] of Object.entries(days)) {
+    for (const entry of d.entries) {
+      const text = `${entry.name} ${entry.note ?? ''}`.toLowerCase();
+      if (words.every((w) => text.includes(w))) all.push({ date, entry });
+    }
+  }
+  all.sort((a, b) => (a.date === b.date ? b.entry.at - a.entry.at : a.date < b.date ? 1 : -1));
+  return { hits: all.slice(0, max), total: all.length };
+}
+
+export interface WeekBalance {
+  /** Energy eaten minus target over the week's logged days before today (negative = behind). */
+  kcal: number;
+  /** Logged days that went in. */
+  days: number;
+  /** Days left in the week, today included. */
+  left: number;
+  /** Extra kcal a day for the days left to make up a shortfall (capped at `cap`), 0 if not behind. */
+  perDay: number;
+}
+
+/**
+ * How the week is going against the energy target (training-day boosts included), from the week's logged days before today.
+ * null before there's a past logged day this week.
+ */
+export function weekBalance(days: Record<string, DayLog>, start: string, today: string, targetKcal: number, cap = 500): WeekBalance | null {
+  let kcal = 0;
+  let n = 0;
+  let left = 0;
+  for (let i = 0; i < 7; i++) {
+    const k = addDays(start, i);
+    if (k >= today) {
+      left++;
+      continue;
+    }
+    const d = days[k];
+    if (!d?.entries.length) continue;
+    kcal += sumEntries(d.entries).kcal - (targetKcal + (d.boost ?? 0));
+    n++;
+  }
+  if (!n || !left) return null;
+  return { kcal, days: n, left, perDay: kcal < 0 ? Math.min(cap, Math.round(-kcal / left / 10) * 10) : 0 };
+}
+
+/**
+ * Foods you often log around this time of day: logged within `window` hours of `hour` on at least `min` of the last
+ * `lookback` days (today not counted), and not already logged today within that window. Each comes back as its most
+ * recent entry (name, serving, numbers, amount). Most days first.
+ */
+export function usualNow(days: Record<string, DayLog>, today: string, hour: number, lookback = 14, window = 1.5, min = 2, max = 3): Entry[] {
+  const near = (e: Entry) => {
+    const d = new Date(e.at);
+    const h = d.getHours() + d.getMinutes() / 60;
+    return Math.abs(h - hour) <= window;
+  };
+  const seen = new Map<string, { n: number; last: Entry }>();
+  for (let i = 1; i <= lookback; i++) {
+    const names = new Set<string>();
+    for (const e of days[addDays(today, -i)]?.entries ?? []) {
+      const k = e.name.trim().toLowerCase();
+      if (!near(e) || names.has(k)) continue;
+      names.add(k);
+      const s = seen.get(k);
+      if (s) s.n++;
+      else seen.set(k, { n: 1, last: e }); // newest day comes first
+    }
+  }
+  const done = new Set((days[today]?.entries ?? []).filter(near).map((e) => e.name.trim().toLowerCase()));
+  return [...seen.entries()]
+    .filter(([k, s]) => s.n >= min && !done.has(k))
+    .sort((a, b) => b[1].n - a[1].n || b[1].last.at - a[1].last.at)
+    .slice(0, max)
+    .map(([, s]) => s.last);
+}
+
+/**
+ * Water over the `n` days before today: average litres on days with any water logged, and days the goal (in 250 ml
+ * glasses) was hit. null with fewer than 2 such days, since a gap in logging isn't a dry day.
+ */
+export function waterWeek(days: Record<string, DayLog>, today: string, goal: number, n = 7): { avgL: number; hit: number; tracked: number } | null {
+  const glasses = Array.from({ length: n }, (_, i) => days[addDays(today, -1 - i)]?.water ?? 0).filter((g) => g > 0);
+  if (glasses.length < 2) return null;
+  return { avgL: (glasses.reduce((a, b) => a + b, 0) * 0.25) / glasses.length, hit: glasses.filter((g) => g >= goal).length, tracked: glasses.length };
 }
 
 export interface MealGroup {
@@ -101,13 +266,14 @@ export function logSections(entries: Entry[]): LogSection[] {
 }
 
 /** Plain-text summary of a day for sharing, e.g. with a parent or coach. */
-export function daySummary(title: string, entries: Entry[], target: { kcal: number; protein: number }, unit: 'kcal' | 'kJ', fmtTime: (ms: number) => string): string {
+export function daySummary(title: string, entries: Entry[], target: { kcal: number; protein: number }, unit: 'kcal' | 'kJ', fmtTime: (ms: number) => string, note?: string): string {
   const t = sumEntries(entries);
   const e = (kcal: number) => `${energy(kcal, unit)} ${unit}`;
   const lines = [`${title}: ${e(t.kcal)} of ${e(target.kcal)}, ${Math.round(t.protein)} g of ${target.protein} g protein`];
+  if (note) lines.push(note);
   for (const s of logSections(entries)) {
     lines.push('', `${SECTION_LABEL[s.moment]} (${e(s.kcal)}, ${Math.round(s.protein)} g)`);
-    for (const x of s.entries) lines.push(`• ${fmtTime(x.at)} ${x.qty !== 1 ? `${x.qty}× ` : ''}${x.name}`);
+    for (const x of s.entries) lines.push(`• ${fmtTime(x.at)} ${x.qty !== 1 ? `${x.qty}× ` : ''}${x.name}${x.note ? ` (${x.note})` : ''}`);
   }
   return lines.join('\n');
 }
@@ -123,8 +289,11 @@ export interface WeekStats {
 }
 
 /** Monday-to-Sunday stats from `start`, counting only days up to `today`. */
-export function weekStats(days: Record<string, DayLog>, start: string, today: string, target: { kcal: number; protein: number }): WeekStats {
-  const keys = Array.from({ length: 7 }, (_, i) => addDays(start, i)).filter((k) => k <= today && days[k]?.entries.length);
+export const weekStats = (days: Record<string, DayLog>, start: string, today: string, target: { kcal: number; protein: number }): WeekStats => rangeStats(days, start, 7, today, target);
+
+/** The same stats over `n` days from `start` (e.g. a month), counting only days up to `today`. */
+export function rangeStats(days: Record<string, DayLog>, start: string, n: number, today: string, target: { kcal: number; protein: number }): WeekStats {
+  const keys = Array.from({ length: n }, (_, i) => addDays(start, i)).filter((k) => k <= today && days[k]?.entries.length);
   const totals = keys.map((k) => sumEntries(days[k].entries));
   const avg = (f: (t: (typeof totals)[number]) => number) => (totals.length ? totals.reduce((a, t) => a + f(t), 0) / totals.length : null);
   return {
@@ -196,6 +365,31 @@ export function insights(days: Record<string, DayLog>, today: string, target: { 
   const all = totals.reduce((a, x) => a + x.t.kcal, 0);
   if (all > 0 && late / all > 0.3) out.push({ tone: 'tip', text: `About ${Math.round((late / all) * 100)}% of your energy comes after 9 pm. Moving some earlier can help sleep.` });
   return out.slice(0, 4);
+}
+
+export interface WeekdayAvg {
+  /** 0 = Monday … 6 = Sunday. */
+  wd: number;
+  kcal: number;
+  protein: number;
+  /** Logged days that went into the average. */
+  n: number;
+}
+
+/** Average energy and protein for each weekday (Monday first) over the last `weeks` weeks, logged days before today only. */
+export function weekdayAverages(days: Record<string, DayLog>, today: string, weeks = 8): WeekdayAvg[] {
+  const out = Array.from({ length: 7 }, (_, wd) => ({ wd, kcal: 0, protein: 0, n: 0 }));
+  for (let i = 1; i <= weeks * 7; i++) {
+    const k = addDays(today, -i);
+    const d = days[k];
+    if (!d?.entries.length) continue;
+    const t = sumEntries(d.entries);
+    const o = out[(dateOf(k).getDay() + 6) % 7];
+    o.kcal += t.kcal;
+    o.protein += t.protein;
+    o.n++;
+  }
+  return out.map((o) => (o.n ? { ...o, kcal: o.kcal / o.n, protein: o.protein / o.n } : o));
 }
 
 /** Plain-text week summary for sharing: this week's stats, last week's for comparison, and weight change. */

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { coverage, dayTargets, dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCrossed } from '../src/lib/nutrition';
-import { foodDue, hourLabel, waterDue, wrapDue, wrapText } from '../src/lib/reminders';
+import { badgeCount, coverage, dayTargets, dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCrossed } from '../src/lib/nutrition';
+import { eatDue, foodDue, hourLabel, waterDue, wrapDue, wrapText } from '../src/lib/reminders';
 import { FOODS, browseFoods, planRest, proteinPer100kcal, sortFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
-import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
-import { addDays, atOn, daysSinceWeighIn, hhmmOf, weekStart } from '../src/lib/dates';
+import { RECIPES, recipeFor, recipeMacros, scaleAmount, scaleItem } from '../src/lib/recipes';
+import { addDays, atOn, daysSinceWeighIn, monthRange, shiftHhmm, hhmmOf, weekStart } from '../src/lib/dates';
 import { chartWindow, goalProgress, suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
 import { computeGame, levelFromXp, nextBadge, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
 import { DEFAULT_CHECKS, DEFAULT_DATA, cleanChecks, exportCsv, exportText, normalize, parseBackup } from '../src/lib/backup';
@@ -11,8 +11,8 @@ import { findByBarcode, parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
-import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
+import { ORDER, cleanOrderOf, lookDefaults, addShopping, autoBoostDue, cleanShopping, shoppingText, cleanTags, pushSearch, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
+import { daySummary, rangeStats, usualNow, waterWeek, foodHistory, hasTag, searchLog, weekBalance, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -249,6 +249,15 @@ describe('game', () => {
 });
 
 describe('backup', () => {
+  it('keeps an entry note, trimmed to 80 characters', () => {
+    const n = normalize({ days: { '2026-10-07': { entries: [{ id: 'a', name: 'Dal', note: 'x'.repeat(100), base: { kcal: 100 } }, { id: 'b', name: 'Roti', base: { kcal: 100 } }] } } });
+    expect(n.days['2026-10-07'].entries[0].note).toBe('x'.repeat(80));
+    expect(n.days['2026-10-07'].entries[1].note).toBeUndefined();
+  });
+  it('keeps a known theme, black included, and drops others', () => {
+    expect(normalize({ settings: { theme: 'black' } }).settings.theme).toBe('black');
+    expect(normalize({ settings: { theme: 'neon' } }).settings.theme).toBe('auto');
+  });
   it('round-trips v3', () => {
     const d = data({ days: { '2026-10-07': day([entry(500, 20)], 3) }, weighIns: [{ date: '2026-10-07', kg: 58.3 }] });
     const back = parseBackup(exportText(d));
@@ -441,6 +450,8 @@ describe('day summary', () => {
     const e = (name: string, hhmm: string, qty = 1): Entry => ({ id: name, name, serving: '', base: { kcal: 300, protein: 10, carbs: 0, fat: 0 }, qty, source: 'db', at: atOn(k, hhmm) });
     const text = daySummary('Thursday', [e('Toast', '07:00', 2), e('Dal', '19:00')], { kcal: 3000, protein: 115 }, 'kcal', hhmmOf);
     expect(text).toBe(['Thursday: 900 kcal of 3,000 kcal, 30 g of 115 g protein', '', 'Breakfast (600 kcal, 20 g)', '• 07:00 2× Toast', '', 'Dinner (300 kcal, 10 g)', '• 19:00 Dal'].join('\n'));
+    const noted = daySummary('Thursday', [{ ...e('Dal', '19:00'), note: 'extra ghee' }], { kcal: 3000, protein: 115 }, 'kcal', hhmmOf, 'Gym');
+    expect(noted.split('\n')).toEqual(['Thursday: 300 kcal of 3,000 kcal, 10 g of 115 g protein', 'Gym', '', 'Dinner (300 kcal, 10 g)', '• 19:00 Dal (extra ghee)']);
   });
 });
 
@@ -551,10 +562,259 @@ describe('usual amount and targets crossed', () => {
     expect(lastQty(days, k, 'Dal', '1 bowl')).toBe(1);
     expect(lastQty(days, addDays(k, 40), 'Rotli, plain', '1 rotli')).toBe(1);
   });
+  it('averages energy and protein by weekday, Monday first', () => {
+    const today = '2026-10-29'; // a Thursday
+    const days: Record<string, DayLog> = {
+      '2026-10-26': day([entry(2000, 100)]), // Monday
+      '2026-10-19': day([entry(3000, 120)]), // Monday
+      '2026-10-25': day([entry(2500, 90)]), // Sunday
+      [today]: day([entry(9000, 900)]), // today doesn't count
+      '2026-08-01': day([entry(9000, 900)]), // too old
+    };
+    const w = weekdayAverages(days, today);
+    expect(w[0]).toEqual({ wd: 0, kcal: 2500, protein: 110, n: 2 });
+    expect(w[6]).toEqual({ wd: 6, kcal: 2500, protein: 90, n: 1 });
+    expect(w[3]).toEqual({ wd: 3, kcal: 0, protein: 0, n: 0 });
+  });
+  it('counts the days you had a food, and the last one', () => {
+    const k = '2026-10-20';
+    const e = (name: string) => entry(100, 5, { name });
+    const days: Record<string, DayLog> = {
+      [k]: day([e('Dal'), e('dal ')]),
+      [addDays(k, -3)]: day([e('Dal')]),
+      [addDays(k, -40)]: day([e('Dal')]),
+    };
+    expect(foodHistory(days, k, 'DAL')).toEqual({ days: 2, last: k });
+    expect(foodHistory(days, addDays(k, 2), 'Dal')).toEqual({ days: 2, last: k });
+    expect(foodHistory(days, k, 'Paneer')).toEqual({ days: 0, last: null });
+  });
   it('spots a target just passed', () => {
     const T = { kcal: 3000, protein: 115, carbs: 0, fat: 0 };
     expect(targetsCrossed({ kcal: 2900, protein: 100, carbs: 0, fat: 0 }, { kcal: 3100, protein: 110, carbs: 0, fat: 0 }, T)).toEqual({ kcal: true, protein: false });
     expect(targetsCrossed({ kcal: 3100, protein: 120, carbs: 0, fat: 0 }, { kcal: 3300, protein: 130, carbs: 0, fat: 0 }, T)).toEqual({ kcal: false, protein: false });
+  });
+});
+
+describe('note tags', () => {
+  it('adds and removes a tag, keeping the rest of the note', () => {
+    expect(toggleTag('', 'Gym')).toBe('Gym');
+    expect(toggleTag('felt great', 'Gym')).toBe('felt great, Gym');
+    expect(toggleTag('felt great, gym ', 'Gym')).toBe('felt great');
+    expect(hasTag('Rest day, tired', 'rest day')).toBe(true);
+    expect(hasTag('Gymnastics', 'Gym')).toBe(false);
+  });
+});
+
+describe('eat reminder', () => {
+  const at = (hhmm: string) => atOn('2026-10-29', hhmm);
+  const H = 3_600_000;
+  it('nudges after the gap, in awake hours, until the target is hit', () => {
+    expect(eatDue(at('14:00'), at('10:30'), 0, 1500, 3000, 3 * H)).toBe(true);
+    expect(eatDue(at('13:00'), at('10:30'), 0, 1500, 3000, 3 * H)).toBe(false);
+    expect(eatDue(at('14:00'), at('10:30'), at('13:30'), 1500, 3000, 3 * H)).toBe(false); // nudged recently
+    expect(eatDue(at('14:00'), at('10:30'), 0, 3000, 3000, 3 * H)).toBe(false); // target hit
+    expect(eatDue(at('14:00'), at('10:30'), 0, 1500, 3000, 0)).toBe(false); // off
+    expect(eatDue(at('22:00'), at('10:30'), 0, 1500, 3000, 3 * H)).toBe(false); // after 9 pm
+    expect(eatDue(at('11:00'), 0, 0, 0, 3000, 3 * H)).toBe(true); // nothing since 8 am
+  });
+});
+
+describe('earlier time', () => {
+  it('moves a time back within the day', () => {
+    expect(shiftHhmm('13:20', -30)).toBe('12:50');
+    expect(shiftHhmm('09:05', -60)).toBe('08:05');
+    expect(shiftHhmm('00:10', -15)).toBe('00:00');
+  });
+});
+
+describe('recipe scaling', () => {
+  it('scales the leading number of an amount, fractions included', () => {
+    expect(scaleAmount('250 ml', 2)).toBe('500 ml');
+    expect(scaleAmount('1', 4)).toBe('4');
+    expect(scaleAmount('½ cup', 2)).toBe('1 cup');
+    expect(scaleAmount('1½ tsp', 2)).toBe('3 tsp');
+    expect(scaleAmount('¾ cup', 2)).toBe('1½ cup');
+    expect(scaleAmount('⅓ cup', 2)).toBe('⅔ cup');
+    expect(scaleAmount('pinch', 2)).toBe('2 × pinch');
+    expect(scaleAmount('1 tbsp', 1)).toBe('1 tbsp');
+    expect(scaleItem('rolled oats (½ cup)', 2)).toBe('rolled oats (1 cup)');
+    expect(scaleItem('banana (about 120 g)', 2)).toBe('banana (about 240 g)');
+    expect(scaleItem('tofu (firm)', 2)).toBe('tofu (firm)');
+  });
+});
+
+describe('reset look', () => {
+  it('gives fresh defaults each time and leaves the shopping list out', () => {
+    const a = lookDefaults();
+    a.tags.push('x');
+    expect(lookDefaults().tags).not.toContain('x');
+    expect(lookDefaults()).toMatchObject({ accent: 'ember', quickCount: 10, weighEvery: 7, start: 'today' });
+    expect('shopping' in lookDefaults()).toBe(false);
+  });
+});
+
+describe('card order for any page', () => {
+  it('keeps known ids once each and puts missing ones in their default place', () => {
+    expect(cleanOrderOf(['c', 'a', 'a', 'zzz'], ['a', 'b', 'c'] as const)).toEqual(['c', 'a', 'b']);
+    expect(cleanOrderOf(null, ['a', 'b'] as const)).toEqual(['a', 'b']);
+  });
+});
+
+describe('auto training day', () => {
+  it('boosts a chosen weekday once, and leaves it off if you turn it off', () => {
+    expect(autoBoostDue('2026-10-28', 3, [1, 3, 5], '', false)).toBe(true);
+    expect(autoBoostDue('2026-10-28', 3, [1, 3, 5], '2026-10-28', false)).toBe(false); // done today, then turned off
+    expect(autoBoostDue('2026-10-28', 3, [1, 3, 5], '', true)).toBe(false); // already boosted
+    expect(autoBoostDue('2026-10-29', 4, [1, 3, 5], '', false)).toBe(false); // not a training day
+    expect(autoBoostDue('2026-10-28', 3, [1, 3, 5], '', false, true)).toBe(false); // changed today on another device
+  });
+});
+
+describe('shopping list', () => {
+  it('adds ingredients, merging repeats and unticking them', () => {
+    let l = addShopping([], [['200 g', 'Paneer'], ['1 cup', 'Milk']]);
+    l = l.map((x) => (x.item === 'Milk' ? { ...x, done: true } : x));
+    l = addShopping(l, [['250 ml', 'milk'], ['', '  '], ['40 g', 'rolled oats (½ cup)'], ['50 g', 'Rolled oats (⅔ cup)']]);
+    expect(l).toEqual([
+      { item: 'Paneer', amounts: ['200 g'], done: false },
+      { item: 'Milk', amounts: ['1 cup', '250 ml'], done: false },
+      { item: 'rolled oats', amounts: ['40 g (½ cup)', '50 g (⅔ cup)'], done: false },
+    ]);
+  });
+  it('shares the unticked items', () => {
+    const l = addShopping([], [['200 g', 'Paneer'], ['', 'Bread'], ['1 L', 'Milk']]).map((x) => (x.item === 'Milk' ? { ...x, done: true } : x));
+    expect(shoppingText(l)).toBe('Shopping list\n- Paneer: 200 g\n- Bread');
+  });
+  it('cleans a saved list', () => {
+    expect(cleanShopping([{ item: 'Oats', amounts: ['50 g', 3], done: 1 }, { item: '' }, null, 'x'])).toEqual([{ item: 'Oats', amounts: ['50 g'], done: false }]);
+    expect(cleanShopping('nope')).toEqual([]);
+  });
+});
+
+describe('recent searches', () => {
+  it('keeps the newest few, once each', () => {
+    let l: string[] = [];
+    for (const q of ['paneer', 'milk', ' Paneer  ', 'a', 'dal', 'roti', 'oats', 'eggs', 'tofu']) l = pushSearch(l, q);
+    expect(l).toEqual(['tofu', 'eggs', 'oats', 'roti', 'dal', 'Paneer']);
+  });
+});
+
+describe('custom tags', () => {
+  it('cleans saved tags', () => {
+    expect(cleanTags(undefined)).toContain('Gym');
+    expect(cleanTags([' Gym ', 'gym', 'a,b', '', 3, 'x'.repeat(40)])).toEqual(['Gym', 'a b', 'x'.repeat(24)]);
+    expect(cleanTags(Array.from({ length: 20 }, (_, i) => `t${i}`))).toHaveLength(12);
+    expect(cleanTags([])).toEqual([]);
+  });
+});
+
+describe('water week', () => {
+  it('averages the tracked days before today', () => {
+    const today = '2026-10-29';
+    const w = (g: number): DayLog => ({ ...day([]), water: g });
+    const days = { '2026-10-28': w(8), '2026-10-27': w(4), '2026-10-25': w(12), [today]: w(20), '2026-10-20': w(10) };
+    expect(waterWeek(days, today, 8)).toEqual({ avgL: 2, hit: 2, tracked: 3 });
+    expect(waterWeek({ '2026-10-28': w(8) }, today, 8)).toBeNull();
+  });
+});
+
+describe('usual now', () => {
+  it('suggests foods you often log around this hour', () => {
+    const today = '2026-10-29';
+    const e = (k: string, name: string, hhmm: string) => entry(100, 5, { name, at: atOn(k, hhmm) });
+    const days: Record<string, DayLog> = {
+      '2026-10-28': day([e('2026-10-28', 'Milk', '07:10'), e('2026-10-28', 'Oats', '07:30'), e('2026-10-28', 'Dal', '19:00')]),
+      '2026-10-27': day([e('2026-10-27', 'milk', '07:40'), e('2026-10-27', 'Milk', '07:50'), e('2026-10-27', 'Dal', '19:30')]),
+      '2026-10-26': day([e('2026-10-26', 'Oats', '08:15'), e('2026-10-26', 'Toast', '07:00')]),
+      [today]: day([e(today, 'Oats', '06:50')]),
+    };
+    // 7:30 am: milk on 2 days (twice on one day counts once), oats too but already had today, toast only once.
+    expect(usualNow(days, today, 7.5).map((x) => x.name)).toEqual(['Milk']);
+    expect(usualNow(days, today, 19).map((x) => x.name)).toEqual(['Dal']);
+    expect(usualNow(days, today, 13)).toEqual([]);
+  });
+});
+
+describe('month stats', () => {
+  it('finds a month and its length', () => {
+    expect(monthRange('2026-10-29')).toEqual({ start: '2026-10-01', n: 31 });
+    expect(monthRange('2026-03-31', -1)).toEqual({ start: '2026-02-01', n: 28 });
+    expect(monthRange('2026-01-15', -1)).toEqual({ start: '2025-12-01', n: 31 });
+    expect(monthRange('2028-03-01', -1).n).toBe(29);
+  });
+  it('averages a month of logged days up to today', () => {
+    const T = { kcal: 3000, protein: 100 };
+    const days: Record<string, DayLog> = {
+      '2026-10-02': day([entry(3200, 110)]),
+      '2026-10-20': day([entry(2000, 60)]),
+      '2026-10-30': day([entry(9000, 900)]), // after today
+    };
+    const m = monthRange('2026-10-29');
+    expect(rangeStats(days, m.start, m.n, '2026-10-29', T)).toEqual({ logged: 2, hit: 1, kcal: 2600, protein: 85 });
+  });
+});
+
+describe('week balance', () => {
+  it('sums the gap on past logged days and spreads a shortfall over the days left', () => {
+    const start = '2026-10-26'; // Monday
+    const today = '2026-10-29'; // Thursday: 4 days left
+    const days: Record<string, DayLog> = {
+      '2026-10-26': day([entry(2500, 100)]),
+      '2026-10-27': { ...day([entry(2900, 100)]), boost: 300 },
+      // Wednesday not logged: left out rather than counted as zero.
+      [today]: day([entry(5000, 100)]),
+    };
+    expect(weekBalance(days, start, today, 3000)).toEqual({ kcal: -900, days: 2, left: 4, perDay: 230 });
+    expect(weekBalance({ '2026-10-26': day([entry(3500, 1)]) }, start, today, 3000)).toEqual({ kcal: 500, days: 1, left: 4, perDay: 0 });
+    expect(weekBalance({ '2026-10-26': day([entry(0.1, 1)]) }, start, '2026-11-01', 3000)?.perDay).toBe(500);
+    expect(weekBalance({}, start, today, 3000)).toBeNull();
+    expect(weekBalance(days, start, start, 3000)).toBeNull();
+  });
+});
+
+describe('search the log', () => {
+  it('finds entries by every word, newest first', () => {
+    const e = (name: string, at: number) => entry(100, 5, { name, at });
+    const days: Record<string, DayLog> = {
+      '2026-10-01': day([e('Paneer bhurji', 1), e('Milk', 2)]),
+      '2026-10-03': day([e('paneer tikka wrap', 5), e('Bhurji, paneer', 9)]),
+    };
+    const r = searchLog(days, 'PANEER');
+    expect(r.total).toBe(3);
+    expect(r.hits.map((h) => h.entry.name)).toEqual(['Bhurji, paneer', 'paneer tikka wrap', 'Paneer bhurji']);
+    expect(searchLog(days, 'bhurji paneer').total).toBe(2);
+    expect(searchLog(days, 'paneer', 1).hits).toHaveLength(1);
+    expect(searchLog(days, ' p ').total).toBe(0);
+    const noted = { '2026-10-05': day([entry(100, 5, { name: 'Dal', note: 'Nani made it' })]) };
+    expect(searchLog(noted, 'nani dal').total).toBe(1);
+  });
+});
+
+describe('tag stats', () => {
+  it('compares tagged days with the rest', () => {
+    const today = '2026-10-29';
+    const d = (kcal: number, protein: number, note?: string): DayLog => ({ ...day([entry(kcal, protein)]), note });
+    const days: Record<string, DayLog> = {
+      '2026-10-28': d(3200, 140, 'Gym'),
+      '2026-10-27': d(3000, 120, 'felt ok, gym'),
+      '2026-10-26': d(2400, 90),
+      '2026-10-25': d(2600, 100, 'Eating out'),
+      [today]: d(9000, 900, 'Gym'),
+    };
+    expect(tagStats(days, today, ['Gym', 'Eating out', 'Sick'])).toEqual([{ tag: 'Gym', n: 2, kcal: 3100, protein: 130, otherKcal: 2500, otherProtein: 95 }]);
+    expect(tagStats(days, today, ['Eating out'], 56, 1)[0].n).toBe(1);
+  });
+});
+
+describe('app badge', () => {
+  it('counts what is left today, never below zero', () => {
+    const T = { kcal: 3000, protein: 115, carbs: 0, fat: 0 };
+    const eaten = { kcal: 2000, protein: 80.4, carbs: 0, fat: 0 };
+    expect(badgeCount('protein', T, eaten, 'kcal')).toBe(35);
+    expect(badgeCount('kcal', T, eaten, 'kcal')).toBe(1000);
+    expect(badgeCount('kcal', T, eaten, 'kJ')).toBe(4184);
+    expect(badgeCount('protein', T, { ...eaten, protein: 130 }, 'kcal')).toBe(0);
+    expect(badgeCount('off', T, eaten, 'kcal')).toBe(0);
   });
 });
 

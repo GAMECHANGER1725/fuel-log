@@ -4,14 +4,15 @@ import { RANKS, BOSS_XP, computeGame } from '../lib/game';
 import { suggestTargets } from '../lib/targets';
 import { DEFAULT_CHECKS, MAX_CHECKS, exportCsv, exportText, parseBackup } from '../lib/backup';
 import { AI_MODELS, GEMINI_MODELS, PROVIDER_NAME, friendlyError, hasAi, testKey, type Provider } from '../lib/ai';
-import { fmt, KJ } from '../lib/nutrition';
+import { fmt, KJ, type BadgeMode } from '../lib/nutrition';
 import { todayKey, fmtDate } from '../lib/dates';
 import type { AppData, Macros } from '../lib/types';
 import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
-import { FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
+import { EAT_GAPS, FOOD_HOURS, WATER_GAPS, hourLabel, pauseToday, pausedToday, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
-import { ACCENTS, BOOSTS, BOTTLES, CARDS, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
+import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, PROGRESS_CARDS, QUICK_COUNTS, STARTS, WEEK_GOALS, lookDefaults, WEIGH_EVERY, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
+import { NOTE_TAGS } from '../lib/meals';
 import WhatsNew from '../components/WhatsNew';
 
 const TONE = { fuel: 'var(--fuel)', protein: 'var(--pro)', sand: 'var(--carb)', ink: 'var(--ink)' };
@@ -20,6 +21,10 @@ export default function ProfilePage() {
   const s = useStore();
   const g = useGame();
   const { params } = useRoute();
+  const progressHidden = usePrefs((p) => p.progressHidden);
+  const toggleProgress = usePrefs((p) => p.toggleProgress);
+  const progressOrder = usePrefs((p) => p.progressOrder);
+  const moveProgress = usePrefs((p) => p.moveProgress);
   const open = params.get('open');
   const earned = g.badges.filter((b) => b.earned).length;
   const sync = useSync();
@@ -107,8 +112,33 @@ export default function ProfilePage() {
         <Section title="Food-quality checks" hint={`${s.settings.checks.length} checks`} open={open === 'checks'}>
           <ChecksForm />
         </Section>
-        <Section title="Display and food" hint={`${s.settings.unit} · ${s.settings.theme === 'auto' ? 'match device' : s.settings.theme}`} open={open === 'display'}>
-          <DisplayForm />
+        <Section title="Look" hint={`${s.settings.unit} · ${s.settings.theme === 'auto' ? 'match device' : s.settings.theme}`} open={open === 'look' || open === 'display'}>
+          <LookForm />
+        </Section>
+        <Section title="Today page" hint="Cards, buttons, tags" open={open === 'today'}>
+          <TodayForm />
+        </Section>
+        <Section title="Progress page" hint={`${PROGRESS_CARDS.length - progressHidden.length} of ${PROGRESS_CARDS.length} cards`} open={open === 'progress'}>
+          <span className="small mut">Cards on Progress, top to bottom (this device). Tick to show, arrows to move.</span>
+          {progressOrder.map((id, i) => (
+            <div key={id} className="row" style={{ gap: 8, minHeight: 44 }}>
+              <label className="row small grow">
+                <input type="checkbox" checked={!progressHidden.includes(id)} onChange={() => toggleProgress(id)} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
+                {PROGRESS_CARDS.find(([c]) => c === id)?.[1]}
+              </label>
+              <button className="btn icon sm" style={{ width: 36 }} aria-label={`Move ${PROGRESS_CARDS.find(([c]) => c === id)?.[1]} up`} disabled={i === 0} onClick={() => moveProgress(id, -1)}><span style={{ transform: 'rotate(90deg)', display: 'flex' }}><Icon name="left" size={16} /></span></button>
+              <button className="btn icon sm" style={{ width: 36 }} aria-label={`Move ${PROGRESS_CARDS.find(([c]) => c === id)?.[1]} down`} disabled={i === progressOrder.length - 1} onClick={() => moveProgress(id, 1)}><span style={{ transform: 'rotate(90deg)', display: 'flex' }}><Icon name="right" size={16} /></span></button>
+            </div>
+          ))}
+        </Section>
+        <Section title="Reminders" hint={!remindersOn() ? 'Off' : pausedToday() ? 'Paused today' : 'On'} hintColor={remindersOn() && !pausedToday() ? 'var(--pro)' : undefined} open={open === 'reminders'}>
+          <ReminderToggle />
+          {'setAppBadge' in navigator && (
+            <>
+              <span className="mono mut">App icon badge (this device)</span>
+              <BadgePicker />
+            </>
+          )}
         </Section>
         <Section title="Backup and import" hint={s.lastExport ? `Last export ${fmtDate(s.lastExport)}` : 'Never exported'} open={open === 'backup'}>
           <BackupForm />
@@ -117,6 +147,17 @@ export default function ProfilePage() {
           Talk to a parent and your GP before big target changes, before starting any supplement, or if your weight is dropping despite eating more. These numbers are starting points, not rules.
         </p>
         <button className="btn block" onClick={() => setNews(true)}>What’s new</button>
+        <button
+          className="btn block"
+          onClick={() => {
+            const p = usePrefs.getState();
+            const before = Object.fromEntries(Object.keys(lookDefaults()).map((k) => [k, p[k as keyof typeof p]]));
+            p.resetLook();
+            toast('This device’s settings are back to the defaults', 0, { label: 'Undo', run: () => usePrefs.setState(before) });
+          }}
+        >
+          Reset this device’s settings
+        </button>
         <button className="btn block" onClick={() => useAuth.getState().lock()}>Log out</button>
         <p className="mono dim" style={{ paddingBottom: 12 }}>Fuel Log · your data stays on this phone</p>
       </div>
@@ -321,7 +362,8 @@ function KeyForm(p: {
   );
 }
 
-function DisplayForm() {
+/** Units, theme and per-device look. */
+function LookForm() {
   const s = useStore();
   const opt = <T extends string>(cur: T, set: (v: T) => void, items: [T, string][]) => (
     <div className="row" style={{ flexWrap: 'wrap' }}>
@@ -333,25 +375,44 @@ function DisplayForm() {
       <span className="mono mut">Energy units</span>
       {opt(s.settings.unit, (unit) => s.setSettings({ unit }), [['kcal', 'Calories (kcal)'], ['kJ', 'Kilojoules (kJ)']])}
       <span className="mono mut">Theme</span>
-      {opt(s.settings.theme, (theme) => s.setSettings({ theme }), [['auto', 'Match device'], ['dark', 'Dark'], ['light', 'Light']])}
+      {opt(s.settings.theme, (theme) => s.setSettings({ theme }), [['auto', 'Match device'], ['dark', 'Dark'], ['black', 'Black (OLED)'], ['light', 'Light']])}
+      <span className="mono mut">Open the app on (this device)</span>
+      <StartPicker />
       <span className="mono mut">Accent colour (this device)</span>
       <AccentPicker />
       <span className="mono mut">Text size (this device)</span>
       <TextSizePicker />
+      <span className="mono mut">Level-ups (this device)</span>
+      <LevelUpPicker />
+    </>
+  );
+}
+
+/** What Today shows and how its buttons behave. */
+function TodayForm() {
+  const s = useStore();
+  return (
+    <>
       <span className="mono mut">Water bottle button (this device)</span>
       <BottlePicker />
       <span className="mono mut">Training day adds (this device)</span>
       <BoostPicker />
+      <span className="mono mut">Weekly goal (this device)</span>
+      <WeekGoalPicker />
+      <span className="mono mut">Training days (this device)</span>
+      <TrainDaysPicker />
+      <span className="mono mut">Weigh-in reminder (this device)</span>
+      <WeighPicker />
       <span className="mono mut">Show on Today (this device)</span>
       <TodayCards />
+      <span className="mono mut">Day note tags (this device)</span>
+      <TagsEditor />
       <span className="mono mut">Suggestions</span>
       <label className="row small">
         <input type="checkbox" checked={s.settings.wheyOk} onChange={(e) => s.setSettings({ wheyOk: e.target.checked })} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
         Include whey protein in “Close the gap” (off by default; whey can make acne worse for some people)
       </label>
       <HiddenSuggestions />
-      <span className="mono mut">Reminders</span>
-      <ReminderToggle />
     </>
   );
 }
@@ -367,6 +428,34 @@ function AccentPicker() {
         </button>
       ))}
     </div>
+  );
+}
+
+/** Add, remove or reset the one-tap tags under Today's day note. */
+function TagsEditor() {
+  const { tags, setTags } = usePrefs();
+  const [text, setText] = useState('');
+  const add = () => {
+    if (!text.trim()) return;
+    setTags([...tags, text]);
+    setText('');
+  };
+  const isDefault = tags.join('|') === NOTE_TAGS.join('|');
+  return (
+    <>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+        {tags.map((t) => (
+          <button key={t} className="chip" aria-label={`Remove tag ${t}`} onClick={() => setTags(tags.filter((x) => x !== t))}>{t} ✕</button>
+        ))}
+      </div>
+      {tags.length < MAX_TAGS && (
+        <div className="row">
+          <input className="input grow" value={text} maxLength={24} placeholder="New tag, e.g. School camp" aria-label="New tag" onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+          <button className="btn sm" disabled={!text.trim()} onClick={add}>Add</button>
+        </div>
+      )}
+      {!isDefault && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setTags([...NOTE_TAGS])}>Reset tags</button>}
+    </>
   );
 }
 
@@ -414,6 +503,42 @@ function ChecksForm() {
   );
 }
 
+function BadgePicker() {
+  const { badge, setBadge } = usePrefs();
+  const unit = useStore((s) => s.settings.unit);
+  const items: [BadgeMode, string][] = [['off', 'Off'], ['protein', 'Protein left (g)'], ['kcal', `Energy left (${unit})`]];
+  return (
+    <>
+      <div className="row" style={{ flexWrap: 'wrap' }} role="group" aria-label="App icon badge">
+        {items.map(([id, label]) => <button key={id} className="chip" aria-pressed={badge === id} onClick={() => setBadge(id)}>{label}</button>)}
+      </div>
+      <span className="small mut">Shows on the home-screen icon while the app is installed. It updates when you open the app.</span>
+    </>
+  );
+}
+
+function StartPicker() {
+  const { start, setStart } = usePrefs();
+  return (
+    <div className="row" style={{ flexWrap: 'wrap' }} role="group" aria-label="Open the app on">
+      {STARTS.map(([id, label]) => <button key={id} className="chip" aria-pressed={start === id} onClick={() => setStart(id)}>{label}</button>)}
+    </div>
+  );
+}
+
+function WeighPicker() {
+  const { weighEvery, setWeighEvery } = usePrefs();
+  const label: Record<number, string> = { 1: 'Daily', 3: 'Every 3 days', 7: 'Weekly', 14: 'Fortnightly' };
+  return (
+    <>
+      <div className="row" style={{ flexWrap: 'wrap' }} role="group" aria-label="Weigh-in reminder">
+        {WEIGH_EVERY.map((d) => <button key={d} className="chip" aria-pressed={weighEvery === d} onClick={() => setWeighEvery(d)}>{label[d]}</button>)}
+      </div>
+      <span className="small mut">Daily weigh-ins bounce around; the trend line on Progress smooths them out. Weigh at the same time each day, before eating.</span>
+    </>
+  );
+}
+
 function BottlePicker() {
   const { bottleMl, setBottleMl } = usePrefs();
   return (
@@ -433,6 +558,44 @@ function BoostPicker() {
   );
 }
 
+/** Weekdays whose target gets the training-day boost by itself. */
+function WeekGoalPicker() {
+  const { weekGoal, setWeekGoal } = usePrefs();
+  return (
+    <>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 6 }} role="group" aria-label="Weekly goal">
+        {WEEK_GOALS.map((n) => <button key={n} className="chip" aria-pressed={weekGoal === n} onClick={() => setWeekGoal(n)}>{n ? `${n} days` : 'Off'}</button>)}
+      </div>
+      <span className="small mut">Days a week to hit both energy and protein. This week on Today tracks it.</span>
+    </>
+  );
+}
+
+function TrainDaysPicker() {
+  const { trainDays, setTrainDays } = usePrefs();
+  const days: [number, string][] = [[1, 'Mon'], [2, 'Tue'], [3, 'Wed'], [4, 'Thu'], [5, 'Fri'], [6, 'Sat'], [0, 'Sun']];
+  return (
+    <>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 6 }} role="group" aria-label="Training days">
+        {days.map(([d, l]) => (
+          <button key={d} className="chip" aria-pressed={trainDays.includes(d)} onClick={() => setTrainDays(trainDays.includes(d) ? trainDays.filter((x) => x !== d) : [...trainDays, d])}>{l}</button>
+        ))}
+      </div>
+      <span className="small mut">On these days the boost switches on by itself when you open the app. Turn it off on Today if you skip a session.</span>
+    </>
+  );
+}
+
+function LevelUpPicker() {
+  const { quietLevelUp, setQuietLevelUp } = usePrefs();
+  return (
+    <div className="row" style={{ flexWrap: 'wrap' }} role="group" aria-label="Level-ups">
+      <button className="chip" aria-pressed={!quietLevelUp} onClick={() => setQuietLevelUp(false)}>Full screen</button>
+      <button className="chip" aria-pressed={quietLevelUp} onClick={() => setQuietLevelUp(true)}>Just a message</button>
+    </div>
+  );
+}
+
 function TextSizePicker() {
   const { size, setSize } = usePrefs();
   return (
@@ -443,7 +606,7 @@ function TextSizePicker() {
 }
 
 function TodayCards() {
-  const { hidden, toggle, order, move, resetOrder } = usePrefs();
+  const { hidden, toggle, order, move, resetOrder, quickCount, quickWrap, setQuick } = usePrefs();
   const hideable = (id: string): id is Card => CARDS.some(([c]) => c === id);
   return (
     <div className="stack" style={{ gap: 6 }}>
@@ -462,6 +625,12 @@ function TodayCards() {
             {CARDS.find(([c]) => c === id)?.[1]}
           </button>
         ))}
+      </div>
+      <span className="small mut">Quick log foods</span>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 6 }} role="group" aria-label="Quick log foods">
+        {QUICK_COUNTS.map((n) => <button key={n} className="chip" aria-pressed={quickCount === n} onClick={() => setQuick({ quickCount: n })}>{n}</button>)}
+        <button className="chip" aria-pressed={!quickWrap} onClick={() => setQuick({ quickWrap: false })}>One row</button>
+        <button className="chip" aria-pressed={quickWrap} onClick={() => setQuick({ quickWrap: true })}>Show all</button>
       </div>
       <span className="small mut">Cards, top to bottom. Tick to show, arrows to move.</span>
       {order.map((id, i) => (
@@ -485,6 +654,7 @@ function ReminderToggle() {
   const [on, setOn] = useState(remindersOn);
   const [times, setTimes] = useState(reminderTimes);
   const [wrap, setWrapState] = useState(wrapOn);
+  const [paused, setPaused] = useState(pausedToday);
   const pick = (p: Partial<typeof times>) => {
     setReminderTimes(p);
     setTimes({ ...times, ...p });
@@ -507,6 +677,18 @@ function ReminderToggle() {
       </label>
       {on && (
         <>
+          <button
+            className="btn sm"
+            style={{ alignSelf: 'flex-start' }}
+            aria-pressed={paused}
+            onClick={() => {
+              pauseToday(!paused);
+              setPaused(!paused);
+              toast(paused ? 'Reminders back on' : 'Reminders paused until tomorrow');
+            }}
+          >
+            {paused ? 'Paused today · tap to resume' : 'Pause for today'}
+          </button>
           <span className="small mut">Water reminder after</span>
           <div className="row" style={{ flexWrap: 'wrap' }}>
             {WATER_GAPS.map((h) => <button key={h} className="chip" aria-pressed={times.waterGapH === h} onClick={() => pick({ waterGapH: h })}>{h} h</button>)}
@@ -514,6 +696,10 @@ function ReminderToggle() {
           <span className="small mut">Food reminder at</span>
           <div className="row" style={{ flexWrap: 'wrap' }}>
             {FOOD_HOURS.map((h) => <button key={h} className="chip" aria-pressed={times.foodHour === h} onClick={() => pick({ foodHour: h })}>{hourLabel(h)}</button>)}
+          </div>
+          <span className="small mut">Nudge me if I haven’t eaten for (until the energy target is hit)</span>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            {EAT_GAPS.map((h) => <button key={h} className="chip" aria-pressed={times.eatGapH === h} onClick={() => pick({ eatGapH: h })}>{h ? `${h} h` : 'Off'}</button>)}
           </div>
           <label className="row small">
             <input type="checkbox" checked={wrap} onChange={(e) => { setWrap(e.target.checked); setWrapState(e.target.checked); }} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
