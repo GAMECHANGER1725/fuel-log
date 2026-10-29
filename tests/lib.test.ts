@@ -4,7 +4,7 @@ import { foodDue, hourLabel, waterDue, wrapDue, wrapText } from '../src/lib/remi
 import { FOODS, browseFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
 import { addDays, atOn, daysSinceWeighIn, hhmmOf, weekStart } from '../src/lib/dates';
-import { goalProgress, suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
+import { chartWindow, goalProgress, suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
 import { computeGame, levelFromXp, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
 import { DEFAULT_CHECKS, DEFAULT_DATA, cleanChecks, exportCsv, exportText, normalize, parseBackup } from '../src/lib/backup';
 import { findByBarcode, parseProduct } from '../src/lib/off';
@@ -645,6 +645,18 @@ describe('combineAsFood', () => {
     const e = (name: string, kcal: number, protein: number, qty = 1): Entry => ({ id: name, name, serving: '', base: { kcal, protein, carbs: 10, fat: 2.25 }, qty, source: 'db', at: 0 });
     const f = combineAsFood([e('Oats', 300, 10), e('Banana ', 105, 1.3, 2)], ' My breakfast ');
     expect(f).toMatchObject({ name: 'My breakfast', serving: '1 meal: Oats, 2× Banana', kcal: 510, protein: 12.6, carbs: 30, fat: 6.8 });
+  });
+});
+
+describe('chartWindow', () => {
+  const line = ['2026-01-01', '2026-06-01', '2026-10-01', '2026-10-20'].map((date) => ({ date }));
+  it('keeps the chosen span, or everything', () => {
+    expect(chartWindow(line, '2026-10-29', 56).map((p) => p.date)).toEqual(['2026-10-01', '2026-10-20']);
+    expect(chartWindow(line, '2026-10-29', 182)).toHaveLength(3);
+    expect(chartWindow(line, '2026-10-29', null)).toHaveLength(4);
+  });
+  it('falls back to the last two when the span has fewer', () => {
+    expect(chartWindow(line.slice(0, 2), '2026-10-29', 56).map((p) => p.date)).toEqual(['2026-01-01', '2026-06-01']);
   });
 });
 

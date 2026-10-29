@@ -107,3 +107,12 @@ export function projectedDate(currentKg: number, goalKg: number | null, rate: nu
   const weeks = (goalKg - currentKg) / rate;
   return weeks > 260 ? null : addDays(today, Math.round(weeks * 7));
 }
+
+/**
+ * The weigh-ins to chart: those in the last `days` days (all of them when null). Always at least the
+ * last two, so a gap in weighing doesn't leave an empty chart.
+ */
+export function chartWindow<P extends { date: string }>(line: P[], today: string, days: number | null): P[] {
+  const pts = days === null ? line : line.filter((p) => daysBetween(p.date, today) <= days);
+  return pts.length >= 2 ? pts : line.slice(-2);
+}
