@@ -7,6 +7,12 @@ import { dayTotals, entryMacros, r1 } from './nutrition';
 import { DEFAULT_GEMINI_MODEL, DEFAULT_MODEL } from './ai';
 import type { Recipe, RecipeEdits } from './recipes';
 
+export const DEFAULT_CHECKS: [string, string][] = [
+  ['veg', 'Fruit or veg'],
+  ['protein', 'Protein each meal'],
+  ['grains', 'Whole grains'],
+  ['nosugar', 'No sugary drinks'],
+];
 // Personal app: starts set up for its one user. Targets = suggestTargets(profile).
 export const DEFAULT_DATA: AppData = {
   v: 3,
@@ -24,6 +30,7 @@ export const DEFAULT_DATA: AppData = {
     geminiModel: DEFAULT_GEMINI_MODEL,
     aiFirst: 'deepseek',
     wheyOk: false,
+    checks: DEFAULT_CHECKS,
   },
   days: {},
   weighIns: [],
@@ -48,6 +55,20 @@ function num(v: unknown, def: number, min: number, max: number): number {
   return typeof n === 'number' && Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
 }
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+export const MAX_CHECKS = 6;
+
+/** Up to 6 checks with a-z keys (unique) and short labels; the defaults if none are valid. */
+export function cleanChecks(v: unknown): [string, string][] {
+  const seen = new Set<string>();
+  const out = arr(v)
+    .map((c) => arr(c))
+    .map(([k, l]) => [str(k, 20), str(l, 30).trim()] as [string, string])
+    .filter(([k, l]) => /^[a-z]{1,20}$/.test(k) && l && !seen.has(k) && !!seen.add(k))
+    .slice(0, MAX_CHECKS);
+  return out.length ? out : DEFAULT_CHECKS;
+}
+
 
 function macros(v: unknown): Macros {
   const m = obj(v);
@@ -164,6 +185,7 @@ export function normalize(raw: unknown): AppData {
       })(),
       aiFirst: s.aiFirst === 'gemini' ? 'gemini' : 'deepseek',
       wheyOk: !!s.wheyOk,
+      checks: cleanChecks(s.checks),
     },
     days,
     weighIns: weighIns.filter((w, i) => weighIns.findIndex((x) => x.date === w.date) === i),
