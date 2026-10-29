@@ -12,7 +12,7 @@ vi.hoisted(() => {
 
 import { dataOf, useStore } from '../src/lib/store';
 import { connect, disconnect, syncNow, useSync } from '../src/lib/sync';
-import { DEFAULT_DATA } from '../src/lib/backup';
+import { DEFAULT_DATA, normalize } from '../src/lib/backup';
 import { applyDoc, mergeDocs, parseDoc, toDoc } from '../src/lib/syncdoc';
 import type { AppData, Entry } from '../src/lib/types';
 
@@ -271,5 +271,18 @@ describe('merge', () => {
     expect(() => parseDoc('{}')).toThrow();
     expect(() => parseDoc('{"v":1,"days":5}')).toThrow();
     expect(parseDoc(JSON.stringify(doc([entry('a', 1)]))).days['2026-10-07'].entries).toHaveLength(1);
+  });
+});
+
+describe('day notes', () => {
+  const day = (note: string | undefined, m: number) => ({ entries: [], water: 0, checks: {}, ...(note ? { note } : {}), m });
+  const docOf = (d: ReturnType<typeof day>) => toDoc({ ...structuredClone(DEFAULT_DATA), days: { '2026-10-29': d } });
+  it('takes the note from the newer change', () => {
+    const merged = mergeDocs(docOf(day('gym day', 200)), docOf(day('rest day', 100)));
+    expect(merged.days['2026-10-29'].note).toBe('gym day');
+  });
+  it('keeps a day that only has a note, and drops an empty note', () => {
+    expect(mergeDocs(docOf(day('camp', 5)), docOf(day('camp', 5))).days['2026-10-29'].note).toBe('camp');
+    expect('note' in normalize({ days: { '2026-10-29': { note: '   ' } } }).days['2026-10-29']).toBe(false);
   });
 });

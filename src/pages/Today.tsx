@@ -314,6 +314,8 @@ export default function Today() {
           )}
         </section>
 
+        {show('note') && <DayNote date={date} note={day.note ?? ''} />}
+
         {show('water') && <section className="card">
           <div className="between" style={{ alignItems: 'center' }}>
             <div className="stack" style={{ gap: 2 }}>
@@ -358,6 +360,45 @@ export default function Today() {
 
       {editing && <EditSheet date={date} entry={editing} onClose={() => setEditing(null)} />}
     </>
+  );
+}
+
+/** A short note about the day, edited in place. */
+function DayNote({ date, note }: { date: string; note: string }) {
+  const setNote = useStore((s) => s.setNote);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(note);
+  useEffect(() => setText(note), [note, date]);
+  const save = () => {
+    if (text.trim() !== note) setNote(date, text);
+    setEditing(false);
+  };
+  if (editing)
+    return (
+      <section className="card tight stack" style={{ gap: 8 }}>
+        <span className="mono mut">Note for the day</span>
+        <textarea
+          className="input"
+          rows={2}
+          maxLength={200}
+          autoFocus
+          value={text}
+          placeholder="Gym day, felt full, school camp…"
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), save())}
+          style={{ resize: 'none', minHeight: 64, paddingTop: 10 }}
+        />
+        <div className="row">
+          <button className="btn sm" onClick={() => { setText(note); setEditing(false); }}>Cancel</button>
+          <button className="btn sm primary grow" onClick={save}>Save note</button>
+        </div>
+      </section>
+    );
+  return (
+    <button className="card tight" style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', color: 'var(--ink)', border: 0 }} onClick={() => setEditing(true)}>
+      <span className="mut"><Icon name="pencil" size={18} /></span>
+      <span className="grow" style={note ? undefined : { color: 'var(--mut)' }}>{note || 'Add a note for the day'}</span>
+    </button>
   );
 }
 
