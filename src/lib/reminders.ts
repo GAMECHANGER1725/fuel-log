@@ -5,7 +5,7 @@
 
 import { useStore } from './store';
 import { keyOf, todayKey } from './dates';
-import { dayTotals } from './nutrition';
+import { dayTargets, dayTotals } from './nutrition';
 import { FOCUS_LABEL, FOODS, gapFocus, gapSuggestions, remaining } from './foods';
 
 const LS_KEY = 'fuel-log-reminders';
@@ -23,8 +23,12 @@ interface Saved {
   waterGapH: number;
   /** Hour of the day (24 h) for the food reminder. */
   foodHour: number;
+  /** The 9 PM wrap-up is opt-in. */
+  wrapOn: boolean;
+  wrapDate: string;
 }
-const DEFAULTS: Saved = { on: false, lastWaterAt: 0, lastWaterRemind: 0, foodDate: '', waterGapH: 2, foodHour: 17 };
+const DEFAULTS: Saved = { on: false, lastWaterAt: 0, lastWaterRemind: 0, foodDate: '', waterGapH: 2, foodHour: 17, wrapOn: false, wrapDate: '' };
+const WRAP_HOUR = 21;
 export const WATER_GAPS = [1, 1.5, 2, 3];
 export const FOOD_HOURS = [15, 16, 17, 18, 19];
 const read = (): Saved => {
@@ -52,6 +56,8 @@ export const reminderTimes = () => {
   return { waterGapH: r.waterGapH, foodHour: r.foodHour };
 };
 export const setReminderTimes = (p: Partial<Pick<Saved, 'waterGapH' | 'foodHour'>>) => patch(p);
+export const wrapOn = () => read().wrapOn;
+export const setWrap = (on: boolean) => patch({ wrapOn: on });
 
 /** "5 PM" for an hour of the day. */
 export const hourLabel = (h: number) => `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}`;
@@ -80,6 +86,22 @@ export const foodDue = (now: number, lastDate: string, fromHour = 17): boolean =
   const d = new Date(now);
   return d.getHours() >= fromHour && d.getHours() < fromHour + FOOD_SPAN && keyOf(d) !== lastDate;
 };
+
+/** Evening wrap-up: once a day, from 9 PM until midnight. */
+export const wrapDue = (now: number, lastDate: string): boolean => {
+  const d = new Date(now);
+  return d.getHours() >= WRAP_HOUR && keyOf(d) !== lastDate;
+};
+
+/** The wrap-up text from the day's totals and targets (energy in kcal). */
+export function wrapText(eaten: { kcal: number; protein: number }, target: { kcal: number; protein: number }): { title: string; body: string } {
+  const k = Math.round(target.kcal - eaten.kcal);
+  const p = Math.round(target.protein - eaten.protein);
+  const line = `${Math.round(eaten.kcal)} / ${Math.round(target.kcal)} kcal, ${Math.round(eaten.protein)} / ${Math.round(target.protein)} g protein.`;
+  if (k <= 0 && p <= 0) return { title: 'Both targets hit today', body: `${line} Nice work.` };
+  const left = [k > 0 && `${k} kcal`, p > 0 && `${p} g protein`].filter(Boolean).join(' and ');
+  return { title: `${left} to go today`, body: `${line} ${k > 0 && k <= 600 ? 'A glass of milk and a banana would about cover it.' : 'A snack before bed still counts.'}` };
+}
 
 // ----- Showing them -------------------------------------------------------------------------
 
@@ -120,6 +142,14 @@ function tick() {
     patch({ foodDate: todayKey() });
     const f = foodReminder();
     if (f) notify(f.title, f.body, 'food');
+  }
+  if (r.wrapOn && wrapDue(now, r.wrapDate)) {
+    patch({ wrapDate: todayKey() });
+    const day = s.days[todayKey()];
+    if (day?.entries.length) {
+      const w = wrapText(dayTotals(day), dayTargets(s.settings.targets, day));
+      notify(w.title, w.body, 'wrap');
+    }
   }
 }
 

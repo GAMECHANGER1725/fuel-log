@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { coverage, dayTargets, dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCrossed } from '../src/lib/nutrition';
-import { foodDue, hourLabel, waterDue } from '../src/lib/reminders';
+import { foodDue, hourLabel, waterDue, wrapDue, wrapText } from '../src/lib/reminders';
 import { FOODS, browseFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
 import { addDays, atOn, daysSinceWeighIn, hhmmOf, weekStart } from '../src/lib/dates';
@@ -672,5 +672,20 @@ describe('insights', () => {
     expect(text).toMatch(/averaging 400 kcal under/);
     expect(text).toMatch(/Breakfast averages 200 kcal/);
     expect(text).toMatch(/4 of the last 7 days have nothing logged/);
+  });
+});
+
+describe('evening wrap-up', () => {
+  it('is due once a day after 9 pm', () => {
+    const at = (h: number) => new Date(2026, 9, 29, h, 5).getTime();
+    expect(wrapDue(at(20), '')).toBe(false);
+    expect(wrapDue(at(21), '')).toBe(true);
+    expect(wrapDue(at(22), '2026-10-29')).toBe(false);
+  });
+  it('says what is left, or well done', () => {
+    const T = { kcal: 3000, protein: 115 };
+    expect(wrapText({ kcal: 2600, protein: 100 }, T).title).toBe('400 kcal and 15 g protein to go today');
+    expect(wrapText({ kcal: 2600, protein: 100 }, T).body).toMatch(/milk and a banana/);
+    expect(wrapText({ kcal: 3100, protein: 120 }, T).title).toBe('Both targets hit today');
   });
 });
