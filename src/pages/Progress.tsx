@@ -6,7 +6,7 @@ import { goalProgress, projectedDate, trendLine, weeklyNudge, weeklyRate, withKc
 
 import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
-import { records, weekStats, weekSummary } from '../lib/meals';
+import { records, topFoods, weekStats, weekSummary } from '../lib/meals';
 import { hasAi } from '../lib/ai';
 import { Bar, Icon, Sheet, toast, useGame, useRoute, useToday } from '../components/ui';
 
@@ -159,6 +159,8 @@ export default function Progress() {
           );
         })()}
 
+        <TopFoods today={today} />
+
         <section className="card">
           <h2 className="h2" style={{ marginBottom: 8 }}>Weekly averages</h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr .8fr', fontSize: 14 }}>
@@ -271,6 +273,40 @@ function WeekCompare({ today }: { today: string }) {
 }
 
 /** Last 14 days as bars against the target line; energy or protein. Each bar opens that day. */
+/** The foods that gave the most protein or energy over the last 14 days. */
+function TopFoods({ today }: { today: string }) {
+  const days = useStore((s) => s.days);
+  const unit = useStore((s) => s.settings.unit);
+  const [what, setWhat] = useState<'kcal' | 'protein'>('protein');
+  const list = topFoods(days, today, what);
+  if (!topFoods(days, today, 'kcal').length) return null;
+  const color = what === 'kcal' ? 'var(--fuel)' : 'var(--pro)';
+  return (
+    <section className="card">
+      <div className="between" style={{ marginBottom: 6, alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+        <h2 className="h2">Top foods</h2>
+        <div className="row" style={{ gap: 6 }}>
+          <button className="chip" aria-pressed={what === 'protein'} onClick={() => setWhat('protein')}>Protein</button>
+          <button className="chip" aria-pressed={what === 'kcal'} onClick={() => setWhat('kcal')}>Energy</button>
+        </div>
+      </div>
+      <p className="small mut" style={{ margin: '0 0 8px' }}>Where your {what === 'kcal' ? 'energy' : 'protein'} came from in the last 14 days.</p>
+      {list.length === 0 && <p className="small mut" style={{ margin: 0 }}>Nothing with protein logged yet.</p>}
+      {list.map((f) => (
+        <div key={f.name} className="stack" style={{ gap: 4, padding: '6px 0' }}>
+          <div className="between" style={{ gap: 8 }}>
+            <span className="grow" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{f.name} <span className="mono dim">×{f.times}</span></span>
+            <span className="mono mut" style={{ flex: 'none' }}>{what === 'kcal' ? `${energy(f.value, unit)} ${unit}` : `${fmt(f.value)} g`} · {Math.round(f.share * 100)}%</span>
+          </div>
+          <div style={{ height: 6, borderRadius: 3, background: 'var(--s2)', overflow: 'hidden' }}>
+            <div style={{ width: `${Math.max(2, f.share * 100)}%`, height: '100%', background: color, borderRadius: 3 }} />
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function DailyChart({ today }: { today: string }) {
   const days = useStore((s) => s.days);
   const T = useStore((s) => s.settings.targets);
