@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29zc';
+export const NEWS_ID = '2026-10-29zd';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Choose your Progress cards', 'Hide the Progress cards you don’t use: tap Customise this page at the bottom of Progress.', '#/profile?open=progress'],
   ['Quick log your way', 'Show 6, 10 or 16 of your foods in Quick log, in one scrolling row or all at once.', '#/profile?open=today'],
   ['Automatic training days', 'Pick your gym days in Profile and the training-day boost switches on by itself on those days.', '#/profile?open=today'],
   ['Notes on a food', 'Tap a logged food to add a short note, like “homemade, extra ghee”. It shows under the food in the log, and Search your log finds it.'],

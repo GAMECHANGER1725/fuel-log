@@ -11,7 +11,7 @@ import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { EAT_GAPS, FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
-import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, QUICK_COUNTS, STARTS, WEIGH_EVERY, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
+import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, PROGRESS_CARDS, QUICK_COUNTS, STARTS, WEIGH_EVERY, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
 import { NOTE_TAGS } from '../lib/meals';
 import WhatsNew from '../components/WhatsNew';
 
@@ -21,6 +21,8 @@ export default function ProfilePage() {
   const s = useStore();
   const g = useGame();
   const { params } = useRoute();
+  const progressHidden = usePrefs((p) => p.progressHidden);
+  const toggleProgress = usePrefs((p) => p.toggleProgress);
   const open = params.get('open');
   const earned = g.badges.filter((b) => b.earned).length;
   const sync = useSync();
@@ -113,6 +115,15 @@ export default function ProfilePage() {
         </Section>
         <Section title="Today page" hint="Cards, buttons, tags" open={open === 'today'}>
           <TodayForm />
+        </Section>
+        <Section title="Progress page" hint={`${PROGRESS_CARDS.length - progressHidden.length} of ${PROGRESS_CARDS.length} cards`} open={open === 'progress'}>
+          <span className="small mut">Cards to show on Progress (this device)</span>
+          {PROGRESS_CARDS.map(([id, label]) => (
+            <label key={id} className="row small">
+              <input type="checkbox" checked={!progressHidden.includes(id)} onChange={() => toggleProgress(id)} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
+              {label}
+            </label>
+          ))}
         </Section>
         <Section title="Reminders" hint={remindersOn() ? 'On' : 'Off'} hintColor={remindersOn() ? 'var(--pro)' : undefined} open={open === 'reminders'}>
           <ReminderToggle />

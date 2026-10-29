@@ -8,7 +8,7 @@ import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
 import { rangeStats, records, searchLog, tagStats, topFoods, weekdayAverages, weekStats, weekSummary } from '../lib/meals';
 import { hasAi } from '../lib/ai';
-import { usePrefs } from '../lib/prefs';
+import { usePrefs, type ProgressCard } from '../lib/prefs';
 import { Bar, Icon, Sheet, toast, toastAdded, useGame, useRoute, useToday } from '../components/ui';
 
 export default function Progress() {
@@ -20,6 +20,8 @@ export default function Progress() {
   const [weighing, setWeighing] = useState(params.get('weigh') === '1');
   const unit = s.settings.unit;
   const tags = usePrefs((p) => p.tags);
+  const progressHidden = usePrefs((p) => p.progressHidden);
+  const on = (c: ProgressCard) => !progressHidden.includes(c);
 
   const line = trendLine(s.weighIns);
   const latest = line[line.length - 1];
@@ -112,42 +114,50 @@ export default function Progress() {
           </section>
         )}
 
-        <section className="card">
-          <div className="between" style={{ marginBottom: 12 }}>
-            <h2 className="h2">Days hit</h2>
-            <div className="row" style={{ gap: 6 }}>
-              <button className="btn icon sm" style={{ width: 34 }} aria-label="Older weeks" disabled={!olderExists} onClick={() => setPage(page + 1)}><Icon name="left" size={16} /></button>
-              <button className="btn icon sm" style={{ width: 34 }} aria-label="Newer weeks" disabled={page === 0} onClick={() => setPage(page - 1)}><Icon name="right" size={16} /></button>
+        {on('heat') && (
+          <section className="card">
+            <div className="between" style={{ marginBottom: 12 }}>
+              <h2 className="h2">Days hit</h2>
+              <div className="row" style={{ gap: 6 }}>
+                <button className="btn icon sm" style={{ width: 34 }} aria-label="Older weeks" disabled={!olderExists} onClick={() => setPage(page + 1)}><Icon name="left" size={16} /></button>
+                <button className="btn icon sm" style={{ width: 34 }} aria-label="Newer weeks" disabled={page === 0} onClick={() => setPage(page - 1)}><Icon name="right" size={16} /></button>
+              </div>
             </div>
-          </div>
-          <div className="between" style={{ margin: '-4px 0 10px' }}>
-            <span className="mono dim">{fmtDate(cells[0])} – {fmtDate(cells[34])}</span>
-            <span className="mono mut">{hitBoth} of {elapsed.length} · tap a day</span>
-          </div>
-          <div className="heat" role="img" aria-label={`Hit both targets on ${hitBoth} of the last ${elapsed.length} days`}>
-            {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-              <span key={i} className="mono dim" style={{ textAlign: 'center', fontSize: 10 }}>{d}</span>
-            ))}
-            {cells.map((k) => {
-              const st = g.byDate.get(k);
-              const cls = k > today ? 'future' : k === today ? 'today' : k < firstDay ? 'pre' : st?.hitKcal && st.hitProtein ? 'both' : st?.hitKcal || st?.hitProtein ? 'one' : '';
-              // Past and today's cells open that day's log.
-              return k > today || k < firstDay ? <i key={k} className={cls} /> : <a key={k} className={cls} href={k === today ? '#/today' : `#/today?d=${k}`} aria-label={`Open ${fmtDate(k, { weekday: 'long', day: 'numeric', month: 'long' })}`} />;
-            })}
-          </div>
-          <div className="row" style={{ gap: 14, marginTop: 12, flexWrap: 'wrap' }}>
-            <Legend color="var(--fuel)" label="Kcal + protein" />
-            <Legend color="var(--fuel-dim)" label="One of them" />
-            <Legend color="var(--track)" label="Missed" />
-          </div>
-        </section>
+            <div className="between" style={{ margin: '-4px 0 10px' }}>
+              <span className="mono dim">{fmtDate(cells[0])} – {fmtDate(cells[34])}</span>
+              <span className="mono mut">{hitBoth} of {elapsed.length} · tap a day</span>
+            </div>
+            <div className="heat" role="img" aria-label={`Hit both targets on ${hitBoth} of the last ${elapsed.length} days`}>
+              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+                <span key={i} className="mono dim" style={{ textAlign: 'center', fontSize: 10 }}>{d}</span>
+              ))}
+              {cells.map((k) => {
+                const st = g.byDate.get(k);
+                const cls = k > today ? 'future' : k === today ? 'today' : k < firstDay ? 'pre' : st?.hitKcal && st.hitProtein ? 'both' : st?.hitKcal || st?.hitProtein ? 'one' : '';
+                // Past and today's cells open that day's log.
+                return k > today || k < firstDay ? <i key={k} className={cls} /> : <a key={k} className={cls} href={k === today ? '#/today' : `#/today?d=${k}`} aria-label={`Open ${fmtDate(k, { weekday: 'long', day: 'numeric', month: 'long' })}`} />;
+              })}
+            </div>
+            <div className="row" style={{ gap: 14, marginTop: 12, flexWrap: 'wrap' }}>
+              <Legend color="var(--fuel)" label="Kcal + protein" />
+              <Legend color="var(--fuel-dim)" label="One of them" />
+              <Legend color="var(--track)" label="Missed" />
+            </div>
+          </section>
+        )}
 
-        <WeekCompare today={today} />
+        {on('compare') && (
+          <WeekCompare today={today} />
+        )}
 
-        <DailyChart today={today} />
-        <WeekdayChart today={today} />
+        {on('daily') && (
+          <DailyChart today={today} />
+        )}
+        {on('weekday') && (
+          <WeekdayChart today={today} />
+        )}
 
-        {(() => {
+        {on('records') && (() => {
           const r = records(s.days);
           if (!r.kcal && !r.water) return null;
           const tile = (label: string, value: string, date: string | undefined) => (
@@ -170,22 +180,28 @@ export default function Progress() {
           );
         })()}
 
-        <TopFoods today={today} />
-        <LogSearch today={today} />
+        {on('top') && (
+          <TopFoods today={today} />
+        )}
+        {on('search') && (
+          <LogSearch today={today} />
+        )}
 
-        <section className="card">
-          <h2 className="h2" style={{ marginBottom: 8 }}>Weekly averages</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr .8fr', fontSize: 14 }}>
-            {['Week of', unit, 'Protein', 'Days'].map((h, i) => (
-              <span key={h} className="mono dim" style={{ padding: '8px 0', fontSize: 10, textAlign: i ? 'right' : 'left' }}>{h}</span>
-            ))}
-            {weeks.map((w) => (
-              <WeekRow key={w.w} label={w.w === weekStart(today) ? 'This week' : fmtDate(w.w)} cells={[w.kcal === null ? '–' : energy(w.kcal, unit), w.protein === null ? '–' : `${fmt(w.protein)} g`, `${w.n}/7`]} />
-            ))}
-          </div>
-        </section>
+        {on('averages') && (
+          <section className="card">
+            <h2 className="h2" style={{ marginBottom: 8 }}>Weekly averages</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr .8fr', fontSize: 14 }}>
+              {['Week of', unit, 'Protein', 'Days'].map((h, i) => (
+                <span key={h} className="mono dim" style={{ padding: '8px 0', fontSize: 10, textAlign: i ? 'right' : 'left' }}>{h}</span>
+              ))}
+              {weeks.map((w) => (
+                <WeekRow key={w.w} label={w.w === weekStart(today) ? 'This week' : fmtDate(w.w)} cells={[w.kcal === null ? '–' : energy(w.kcal, unit), w.protein === null ? '–' : `${fmt(w.protein)} g`, `${w.n}/7`]} />
+              ))}
+            </div>
+          </section>
+        )}
 
-        {(() => {
+        {on('notes') && (() => {
           const notes = Object.entries(s.days).filter(([, d]) => d.note).sort(([a], [b]) => (a < b ? 1 : -1)).slice(0, 10);
           return notes.length > 0 && (
             <section className="card">
@@ -201,7 +217,7 @@ export default function Progress() {
           );
         })()}
 
-        {(() => {
+        {on('tags') && (() => {
           const stats = tagStats(s.days, today, tags);
           if (!stats.length) return null;
           const diff = (v: number, show: string) => (Math.abs(v) < 0.5 ? '' : ` (${v > 0 ? '+' : '−'}${show})`);
@@ -223,18 +239,19 @@ export default function Progress() {
           );
         })()}
 
-        {s.weighIns.length > 0 && (
-          <section className="card">
-            <h2 className="h2" style={{ marginBottom: 4 }}>Weigh-ins</h2>
-            {[...s.weighIns].reverse().slice(0, 10).map((w) => (
-              <div key={w.date} className="item" style={{ padding: '8px 0' }}>
-                <span className="grow">{fmtDate(w.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-                <span className="num" style={{ fontSize: 20 }}>{w.kg.toFixed(1)} kg</span>
-                <button className="btn icon sm" style={{ width: 36 }} aria-label={`Delete weigh-in ${w.date}`} onClick={() => s.removeWeighIn(w.date)}><Icon name="trash" size={16} /></button>
-              </div>
-            ))}
-          </section>
+        {on('weighins') && s.weighIns.length > 0 && (
+            <section className="card">
+              <h2 className="h2" style={{ marginBottom: 4 }}>Weigh-ins</h2>
+              {[...s.weighIns].reverse().slice(0, 10).map((w) => (
+                <div key={w.date} className="item" style={{ padding: '8px 0' }}>
+                  <span className="grow">{fmtDate(w.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                  <span className="num" style={{ fontSize: 20 }}>{w.kg.toFixed(1)} kg</span>
+                  <button className="btn icon sm" style={{ width: 36 }} aria-label={`Delete weigh-in ${w.date}`} onClick={() => s.removeWeighIn(w.date)}><Icon name="trash" size={16} /></button>
+                </div>
+              ))}
+            </section>
         )}
+        <a href="#/profile?open=progress" className="btn sm" style={{ alignSelf: 'center' }}><Icon name="pencil" size={14} /> Customise this page</a>
       </div>
 
       {weighing && (
