@@ -30,6 +30,8 @@ export default function Today() {
   const [open, setOpen] = useState<string | null>(null); // which idea's recipe is showing
   const hidden = usePrefs((p) => p.hidden);
   const order = usePrefs((p) => p.order);
+  const ring = usePrefs((p) => p.ring);
+  const flipRing = usePrefs((p) => p.flipRing);
   const show = (c: Card) => !hidden.includes(c);
 
   const day = s.days[date] ?? { entries: [], water: 0, checks: {} };
@@ -253,7 +255,17 @@ export default function Today() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(waterGoal, day.water)}, minmax(0,1fr))`, gap: 4, marginTop: 12 }}>
           {Array.from({ length: Math.max(waterGoal, day.water) }, (_, i) => (
-            <div key={i} style={{ height: 10, background: i < day.water ? 'var(--pro)' : 'var(--track)' }} />
+            // Tap a bar to set that many glasses; tapping the last full one takes it off.
+            <button
+              key={i}
+              className="water-bar"
+              aria-label={`${i + 1} glass${i ? 'es' : ''} (${((i + 1) * 0.25).toFixed(2).replace(/0$/, '')} L)`}
+              onClick={() => {
+                addWater((i + 1 === day.water ? i : i + 1) - day.water);
+              }}
+            >
+              <i style={{ background: i < day.water ? 'var(--pro)' : 'var(--track)' }} />
+            </button>
           ))}
         </div>
       </section>
@@ -324,10 +336,21 @@ export default function Today() {
 
         <section className="card">
           <div className="row" style={{ gap: 16 }}>
-            <Rings kcal={t.kcal} kcalMax={T.kcal} protein={t.protein} proteinMax={T.protein}>
-              <span className="num" style={{ fontSize: 40, lineHeight: 0.95 }}>{kLeft > 0 ? energy(kLeft, unit) : '✓'}</span>
-              <span className="mono mut" style={{ fontSize: 10 }}>{kLeft > 0 ? `${unit} to go` : 'target hit'}</span>
-            </Rings>
+            <button className="ring-btn" onClick={flipRing} aria-label={ring === 'left' ? 'Show energy eaten' : 'Show energy to go'}>
+              <Rings kcal={t.kcal} kcalMax={T.kcal} protein={t.protein} proteinMax={T.protein}>
+                {ring === 'eaten' ? (
+                  <>
+                    <span className="num" style={{ fontSize: 40, lineHeight: 0.95 }}>{energy(t.kcal, unit)}</span>
+                    <span className="mono mut" style={{ fontSize: 10 }}>{unit} eaten</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="num" style={{ fontSize: 40, lineHeight: 0.95 }}>{kLeft > 0 ? energy(kLeft, unit) : '✓'}</span>
+                    <span className="mono mut" style={{ fontSize: 10 }}>{kLeft > 0 ? `${unit} to go` : 'target hit'}</span>
+                  </>
+                )}
+              </Rings>
+            </button>
             <div className="stack grow" style={{ gap: 12 }}>
               <div className="stack" style={{ gap: 2 }}>
                 <span className="mono fuel">Energy</span>

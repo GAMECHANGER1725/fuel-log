@@ -279,3 +279,8 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 /* Energy split bar on Today */
 .split { display: flex; height: 8px; border-radius: 999px; overflow: hidden; gap: 2px; background: var(--track); }
 .split > i { display: block; height: 100%; }
+
+/* Tappable ring (switches its centre number) and water bars */
+.ring-btn { border: 0; padding: 0; background: none; color: inherit; border-radius: 999px; flex: none; }
+.water-bar { border: 0; padding: 8px 0; margin: -8px 0; background: none; min-width: 0; }
+.water-bar > i { display: block; height: 10px; }
