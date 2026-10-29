@@ -59,8 +59,9 @@ export function Rings({ kcal, kcalMax, protein, proteinMax, children }: { kcal: 
     );
   };
   return (
-    <div style={{ position: 'relative', width: 168, height: 168, flex: 'none' }}>
-      <svg width="168" height="168" viewBox="0 0 168 168" aria-hidden="true">
+    // Up to 168 px, smaller on narrow screens so the text beside it keeps room.
+    <div style={{ position: 'relative', width: 'min(168px, 40vw)', aspectRatio: '1', flex: 'none' }}>
+      <svg width="100%" height="100%" viewBox="0 0 168 168" aria-hidden="true">
         {ring(76, 12, kcalMax ? kcal / kcalMax : 0, 'var(--fuel)')}
         {ring(58, 10, proteinMax ? protein / proteinMax : 0, 'var(--pro)')}
       </svg>

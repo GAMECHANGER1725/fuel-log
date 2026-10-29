@@ -429,12 +429,12 @@ export default function Today() {
               <Rings kcal={t.kcal} kcalMax={T.kcal} protein={t.protein} proteinMax={T.protein}>
                 {ring === 'eaten' ? (
                   <>
-                    <span className="num" style={{ fontSize: 40, lineHeight: 0.95 }}>{energy(t.kcal, unit)}</span>
+                    <span className="num" style={{ fontSize: 'clamp(26px, 9.5vw, 40px)', lineHeight: 0.95 }}>{energy(t.kcal, unit)}</span>
                     <span className="mono mut" style={{ fontSize: 10 }}>{unit} eaten</span>
                   </>
                 ) : (
                   <>
-                    <span className="num" style={{ fontSize: 40, lineHeight: 0.95 }}>{kLeft > 0 ? energy(kLeft, unit) : '✓'}</span>
+                    <span className="num" style={{ fontSize: 'clamp(26px, 9.5vw, 40px)', lineHeight: 0.95 }}>{kLeft > 0 ? energy(kLeft, unit) : '✓'}</span>
                     <span className="mono mut" style={{ fontSize: 10 }}>{kLeft > 0 ? `${unit} to go` : 'target hit'}</span>
                   </>
                 )}
