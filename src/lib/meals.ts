@@ -4,6 +4,7 @@
 import type { DayLog, Entry } from './types';
 import { addDays } from './dates';
 import { sumEntries } from './nutrition';
+import { momentOf, type Moment } from './foods';
 
 export interface MealGroup {
   /** Same foods and amounts give the same key. */
@@ -50,4 +51,38 @@ export function mealGroups(days: Record<string, DayLog>, today: string, lookback
     flush();
   }
   return [...found.values()].sort((a, b) => b.count - a.count || b.last - a.last).slice(0, max);
+}
+
+export const SECTION_LABEL: Record<Moment, string> = {
+  breakfast: 'Breakfast',
+  morning: 'Morning snack',
+  lunch: 'Lunch',
+  afternoon: 'Afternoon snack',
+  dinner: 'Dinner',
+  late: 'Late snack',
+};
+
+export interface LogSection {
+  moment: Moment;
+  entries: Entry[];
+  kcal: number;
+  protein: number;
+}
+
+/** A day's log in time order, split where the part of the day changes, each with its subtotal. */
+export function logSections(entries: Entry[]): LogSection[] {
+  const out: LogSection[] = [];
+  for (const e of [...entries].sort((a, b) => a.at - b.at)) {
+    const d = new Date(e.at);
+    const moment = momentOf(d.getHours() + d.getMinutes() / 60);
+    const last = out[out.length - 1];
+    if (last?.moment === moment) last.entries.push(e);
+    else out.push({ moment, entries: [e], kcal: 0, protein: 0 });
+  }
+  for (const s of out) {
+    const t = sumEntries(s.entries);
+    s.kcal = t.kcal;
+    s.protein = t.protein;
+  }
+  return out;
 }

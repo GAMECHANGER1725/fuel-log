@@ -234,3 +234,21 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .date-pick { position: relative; cursor: pointer; }
 .date-pick input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; border: 0; padding: 0; cursor: pointer; }
 .date-pick input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+
+/* Accent colours (Profile > Display, per device). Ember is the default above. Light shades need the
+   extra attribute selector to outrank the plain dark rule. Dim and soft tints are mixed from the ground. */
+:root[data-accent] { --fuel-dim: color-mix(in srgb, var(--fuel) 38%, var(--bg)); --fuel-soft: color-mix(in srgb, var(--fuel) 12%, var(--bg)); }
+:root[data-accent='rose'] { --fuel: #ff7aa8; }
+:root[data-accent='grape'] { --fuel: #c29bff; }
+:root[data-accent='leaf'] { --fuel: #8fdc6e; }
+:root[data-accent='gold'] { --fuel: #f5c542; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark'])[data-accent='rose'] { --fuel: #c2185b; }
+  :root:not([data-theme='dark'])[data-accent='grape'] { --fuel: #7a3fd1; }
+  :root:not([data-theme='dark'])[data-accent='leaf'] { --fuel: #3d7f1f; }
+  :root:not([data-theme='dark'])[data-accent='gold'] { --fuel: #8a6400; }
+}
+:root[data-theme='light'][data-accent='rose'] { --fuel: #c2185b; }
+:root[data-theme='light'][data-accent='grape'] { --fuel: #7a3fd1; }
+:root[data-theme='light'][data-accent='leaf'] { --fuel: #3d7f1f; }
+:root[data-theme='light'][data-accent='gold'] { --fuel: #8a6400; }

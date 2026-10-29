@@ -11,8 +11,8 @@ import { parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
-import { cleanHidden, toggleIn } from '../src/lib/prefs';
-import { mealGroups } from '../src/lib/meals';
+import { cleanAccent, cleanHidden, toggleIn } from '../src/lib/prefs';
+import { logSections, mealGroups } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -398,5 +398,24 @@ describe('usual meals', () => {
   it('skips single foods and days outside the lookback', () => {
     expect(mealGroups({ [t]: day([e('Apple', h(t, 13))]) }, t)).toEqual([]);
     expect(mealGroups(days, addDays(t, 20))).toEqual([]);
+  });
+});
+
+describe('log sections', () => {
+  const k = '2026-10-29';
+  const e = (name: string, hhmm: string): Entry => ({ id: name, name, serving: '', base: { kcal: 200, protein: 10, carbs: 0, fat: 0 }, qty: 1, source: 'db', at: atOn(k, hhmm) });
+  it('splits the day by part of day with subtotals, in time order', () => {
+    const s = logSections([e('Dal', '19:30'), e('Toast', '07:10'), e('Milk', '07:15'), e('Roti', '13:00')]);
+    expect(s.map((x) => x.moment)).toEqual(['breakfast', 'lunch', 'dinner']);
+    expect(s[0].entries.map((x) => x.name)).toEqual(['Toast', 'Milk']);
+    expect([s[0].kcal, s[0].protein]).toEqual([400, 20]);
+  });
+});
+
+describe('accent', () => {
+  it('falls back to ember for anything unknown', () => {
+    expect(cleanAccent('grape')).toBe('grape');
+    expect(cleanAccent('neon')).toBe('ember');
+    expect(cleanAccent(undefined)).toBe('ember');
   });
 });

@@ -9,6 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card } from '../lib/prefs';
+import { SECTION_LABEL, logSections } from '../lib/meals';
 
 const CHECKS: [string, string][] = [
   ['veg', 'Fruit or veg'],
@@ -56,7 +57,7 @@ export default function Today() {
     setOpen(null);
   };
 
-  const log = [...day.entries].sort((a, b) => a.at - b.at);
+  const sections = logSections(day.entries);
   const ago = isToday ? sinceLast(day.entries, now.getTime()) : null;
   const addWater = (n: number) => {
     s.setWater(date, day.water + n);
@@ -223,14 +224,22 @@ export default function Today() {
               </button>
             )}
           </div>
-          {log.length > 0 ? (
+          {sections.length > 0 ? (
             <div className="card tight">
-              {log.map((e, i) => (
-                <button key={e.id} className="item-btn" style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, borderTop: i ? '1px solid var(--line)' : 0 }} onClick={() => setEditing(e)}>
-                  <span className="mono dim" style={{ width: 64, flex: 'none' }}>{timeOf(e.at)}</span>
-                  <span className="grow">{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
-                  <span className="mono mut" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)} · {fmt(entryMacros(e).protein)} g</span>
-                </button>
+              {sections.map((sec, si) => (
+                <div key={sec.entries[0].id} style={si ? { borderTop: '1px solid var(--line2)', marginTop: 4, paddingTop: 4 } : undefined}>
+                  <div className="between" style={{ padding: '8px 0 2px' }}>
+                    <span className="mono fuel">{SECTION_LABEL[sec.moment]}</span>
+                    <span className="mono dim">{energy(sec.kcal, unit)} {unit} · {fmt(sec.protein)} g</span>
+                  </div>
+                  {sec.entries.map((e, i) => (
+                    <button key={e.id} className="item-btn" style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, borderTop: i ? '1px solid var(--line)' : 0 }} onClick={() => setEditing(e)}>
+                      <span className="mono dim" style={{ width: 64, flex: 'none' }}>{timeOf(e.at)}</span>
+                      <span className="grow">{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
+                      <span className="mono mut" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)} · {fmt(entryMacros(e).protein)} g</span>
+                    </button>
+                  ))}
+                </div>
               ))}
             </div>
           ) : (

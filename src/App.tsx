@@ -13,9 +13,11 @@ import { useAuth } from './lib/auth';
 import { startSync, useSync } from './lib/sync';
 import { autoDue, checkIn, useCoach } from './lib/coach';
 import { startReminders } from './lib/reminders';
+import { usePrefs } from './lib/prefs';
 
 export default function App() {
   const theme = useStore((s) => s.settings.theme);
+  const accent = usePrefs((p) => p.accent);
   const unlocked = useAuth((s) => s.unlocked);
   const { path } = useRoute();
 
@@ -26,6 +28,11 @@ export default function App() {
     const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg || '#14110E');
   }, [theme]);
+
+  useEffect(() => {
+    if (accent === 'ember') document.documentElement.removeAttribute('data-accent');
+    else document.documentElement.setAttribute('data-accent', accent);
+  }, [accent]);
 
   useEffect(() => {
     // Ask the browser not to evict our data under storage pressure.
