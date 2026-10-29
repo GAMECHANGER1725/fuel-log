@@ -11,7 +11,7 @@ import { parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
-import { cleanAccent, cleanHidden, cleanSize, toggleIn } from '../src/lib/prefs';
+import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, moveIn, toggleIn } from '../src/lib/prefs';
 import { daySummary, logSections, mealGroups } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
@@ -504,5 +504,19 @@ describe('energy split', () => {
     const s = energySplit({ kcal: 0, protein: 33, carbs: 33, fat: 33 })!;
     expect(s.protein + s.carbs + s.fat).toBe(100);
     expect(energySplit({ kcal: 0, protein: 0, carbs: 0, fat: 0 })).toBeNull();
+  });
+});
+
+describe('card order', () => {
+  it('keeps a saved order and slots in cards it does not know yet', () => {
+    expect(cleanOrder(['log', 'water', 'quick'])).toEqual(['log', 'note', 'water', 'quality', 'tips', 'quick', 'week', 'quests', 'gap']);
+    expect(cleanOrder(undefined)).toEqual([...ORDER]);
+    expect(cleanOrder(['nope', 'log', 'log'])).toHaveLength(ORDER.length);
+  });
+  it('moves a card one place and stops at the ends', () => {
+    const o = [...ORDER];
+    expect(moveIn(o, 'log', -1).indexOf('log')).toBe(o.indexOf('log') - 1);
+    expect(moveIn(o, 'quick', -1)).toEqual(o);
+    expect(moveIn(o, 'tips', 1)).toEqual(o);
   });
 });
