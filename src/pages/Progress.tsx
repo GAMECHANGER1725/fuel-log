@@ -267,7 +267,7 @@ function DailyChart({ today }: { today: string }) {
         <span className="chart14-target" style={{ bottom: (target / top) * H }} />
         {keys.map((k, i) => (
           <a key={k} href={k === today ? '#/today' : `#/today?d=${k}`} aria-label={`${fmtDate(k, { weekday: 'long', day: 'numeric', month: 'short' })}: ${show(vals[i])}`}>
-            <i style={{ height: Math.max(vals[i] ? 3 : 0, (vals[i] / top) * H), background: vals[i] >= target ? color : `color-mix(in srgb, ${color} 55%, var(--track))` }} />
+            <i style={{ height: Math.max(vals[i] ? 3 : 0, (vals[i] / top) * H), background: vals[i] >= (what === 'kcal' ? target + (days[k]?.boost ?? 0) : target) ? color : `color-mix(in srgb, ${color} 55%, var(--track))` }} />
           </a>
         ))}
       </div>

@@ -594,6 +594,10 @@ function WeekStrip({ date, today, onPick }: { date: string; today: string; onPic
                 {bar(t.protein / T.protein, 'var(--pro)')}
               </span>
               <span className="mono" style={{ fontSize: 11 }}>{fmtDate(k, { weekday: 'narrow' })}</span>
+              <span className="week-marks" aria-hidden="true">
+                {days[k]?.boost ? <Icon name="bolt" size={10} stroke={2.6} /> : null}
+                {days[k]?.note ? <i /> : null}
+              </span>
             </button>
           );
         })}

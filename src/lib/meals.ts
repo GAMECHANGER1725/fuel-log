@@ -124,13 +124,13 @@ export interface WeekStats {
 
 /** Monday-to-Sunday stats from `start`, counting only days up to `today`. */
 export function weekStats(days: Record<string, DayLog>, start: string, today: string, target: { kcal: number; protein: number }): WeekStats {
-  const totals = Array.from({ length: 7 }, (_, i) => addDays(start, i))
-    .filter((k) => k <= today && days[k]?.entries.length)
-    .map((k) => sumEntries(days[k].entries));
+  const keys = Array.from({ length: 7 }, (_, i) => addDays(start, i)).filter((k) => k <= today && days[k]?.entries.length);
+  const totals = keys.map((k) => sumEntries(days[k].entries));
   const avg = (f: (t: (typeof totals)[number]) => number) => (totals.length ? totals.reduce((a, t) => a + f(t), 0) / totals.length : null);
   return {
     logged: totals.length,
-    hit: totals.filter((t) => t.kcal >= target.kcal && t.protein >= target.protein).length,
+    // Each day against its own energy target (a training day's is higher).
+    hit: totals.filter((t, i) => t.kcal >= target.kcal + (days[keys[i]].boost ?? 0) && t.protein >= target.protein).length,
     kcal: avg((t) => t.kcal),
     protein: avg((t) => t.protein),
   };
