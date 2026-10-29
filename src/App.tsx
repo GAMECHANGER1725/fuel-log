@@ -15,7 +15,7 @@ import { startSync, useSync } from './lib/sync';
 import { autoDue, checkIn, useCoach } from './lib/coach';
 import { startReminders } from './lib/reminders';
 import { usePrefs } from './lib/prefs';
-import { dayTotals, targetsCrossed } from './lib/nutrition';
+import { dayTargets, dayTotals, targetsCrossed } from './lib/nutrition';
 
 export default function App() {
   const theme = useStore((s) => s.settings.theme);
@@ -142,7 +142,7 @@ function useOnline() {
 function TargetCheer() {
   const today = useToday();
   const day = useStore((s) => s.days[today]);
-  const T = useStore((s) => s.settings.targets);
+  const T = dayTargets(useStore((s) => s.settings.targets), day);
   const t = dayTotals(day);
   const prev = useRef<{ date: string; kcal: number; protein: number } | null>(null);
   useEffect(() => {

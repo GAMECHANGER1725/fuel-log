@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coverage, dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCrossed } from '../src/lib/nutrition';
+import { coverage, dayTargets, dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCrossed } from '../src/lib/nutrition';
 import { foodDue, hourLabel, waterDue } from '../src/lib/reminders';
 import { FOODS, browseFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
@@ -610,5 +610,18 @@ describe('known barcodes', () => {
     const foods = [{ id: 'a', name: 'Yoghurt', serving: '170 g', kcal: 150, protein: 15, carbs: 6, fat: 7, barcode: '9300601000000' }, { id: 'b', name: 'Toast', serving: '2', kcal: 190, protein: 8, carbs: 32, fat: 2 }];
     expect(findByBarcode(foods, ' 9300601000000 ')?.name).toBe('Yoghurt');
     expect(findByBarcode(foods, '123')).toBeUndefined();
+  });
+});
+
+describe('training day targets', () => {
+  it('adds the boost to the day energy target and to game hits', () => {
+    const T = DEFAULT_DATA.settings.targets;
+    expect(dayTargets(T, { entries: [], water: 0, checks: {}, boost: 300 }).kcal).toBe(T.kcal + 300);
+    expect(dayTargets(T, undefined)).toBe(T);
+    const k = '2026-10-29';
+    const e: Entry = { id: 'a', name: 'x', serving: '', base: { kcal: T.kcal, protein: T.protein, carbs: 0, fat: 0 }, qty: 1, source: 'db', at: atOn(k, '12:00') };
+    const data = (boost?: number) => ({ ...structuredClone(DEFAULT_DATA), days: { [k]: { entries: [e], water: 0, checks: {}, ...(boost ? { boost } : {}) } } });
+    expect(computeGame(data(), k).byDate.get(k)?.hitKcal).toBe(true);
+    expect(computeGame(data(500), k).byDate.get(k)?.hitKcal).toBe(false);
   });
 });

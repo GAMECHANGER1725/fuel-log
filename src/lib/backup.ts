@@ -115,7 +115,8 @@ function day(v: unknown): DayLog {
   const checks: Record<string, boolean> = {};
   for (const [k, val] of Object.entries(obj(d.checks))) if (/^[a-z]{1,20}$/.test(k)) checks[k] = !!val;
   const note = str(d.note, 200).trim();
-  return { entries: arr(d.entries).slice(0, 200).map(entry), water: num(d.water, 0, 0, 60), checks, ...(note ? { note } : {}), m: d.m == null ? undefined : num(d.m, 0, 0, 4e12) };
+  const boost = Math.round(num(d.boost, 0, 0, 1500));
+  return { entries: arr(d.entries).slice(0, 200).map(entry), water: num(d.water, 0, 0, 60), checks, ...(note ? { note } : {}), ...(boost ? { boost } : {}), m: d.m == null ? undefined : num(d.m, 0, 0, 4e12) };
 }
 
 /** Validate a v3 data object, filling anything missing from the defaults. */

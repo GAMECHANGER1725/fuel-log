@@ -5,6 +5,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export const CARDS = [
+  ['train', 'Training day button'],
   ['quick', 'Quick log'],
   ['macros', 'Carbs and fat'],
   ['week', 'This week'],
@@ -67,6 +68,8 @@ export const ACCENTS = [
   ['gold', 'Gold', '#f5c542'],
 ] as const;
 export type Accent = (typeof ACCENTS)[number][0];
+export const BOOSTS = [200, 300, 500];
+
 export const SIZES = [
   ['normal', 'Normal'],
   ['large', 'Large'],
@@ -91,6 +94,9 @@ interface Prefs {
   order: OrderCard[];
   /** What the ring's centre shows: energy still to eat, or eaten so far. */
   ring: 'left' | 'eaten';
+  /** Extra kcal the Training day button adds. */
+  boostKcal: number;
+  setBoostKcal: (k: number) => void;
   toggle: (c: Card) => void;
   flipRing: () => void;
   move: (id: OrderCard, dir: -1 | 1) => void;
@@ -109,6 +115,8 @@ export const usePrefs = create<Prefs>()(
       newsSeen: '',
       order: [...ORDER],
       ring: 'left',
+      boostKcal: 300,
+      setBoostKcal: (boostKcal) => set({ boostKcal }),
       flipRing: () => set((s) => ({ ring: s.ring === 'left' ? 'eaten' : 'left' })),
       move: (id, dir) => set((s) => ({ order: moveIn(s.order, id, dir) })),
       resetOrder: () => set({ order: [...ORDER] }),
@@ -119,9 +127,9 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown };
         return {
           ...cur,
           hidden: cleanHidden(saved.hidden),
@@ -130,6 +138,7 @@ export const usePrefs = create<Prefs>()(
           newsSeen: typeof saved.newsSeen === 'string' ? saved.newsSeen.slice(0, 20) : '',
           order: cleanOrder(saved.order),
           ring: saved.ring === 'eaten' ? 'eaten' : 'left',
+          boostKcal: BOOSTS.includes(saved.boostKcal as number) ? (saved.boostKcal as number) : 300,
         };
       },
     },

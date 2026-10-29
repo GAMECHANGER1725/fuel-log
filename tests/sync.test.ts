@@ -286,3 +286,12 @@ describe('day notes', () => {
     expect('note' in normalize({ days: { '2026-10-29': { note: '   ' } } }).days['2026-10-29']).toBe(false);
   });
 });
+
+describe('training day boost', () => {
+  const day = (boost: number | undefined, m: number) => ({ entries: [], water: 0, checks: {}, ...(boost ? { boost } : {}), m });
+  const docOf = (d: ReturnType<typeof day>) => toDoc({ ...structuredClone(DEFAULT_DATA), days: { '2026-10-29': d } });
+  it('syncs with the newer change and keeps a boost-only day', () => {
+    expect(mergeDocs(docOf(day(300, 200)), docOf(day(undefined, 100))).days['2026-10-29'].boost).toBe(300);
+    expect(mergeDocs(docOf(day(undefined, 300)), docOf(day(500, 100))).days['2026-10-29']?.boost).toBeUndefined();
+  });
+});

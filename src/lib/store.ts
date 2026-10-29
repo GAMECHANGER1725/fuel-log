@@ -30,6 +30,8 @@ interface Actions {
   copyDay: (from: string, to: string) => number;
   setWater: (date: string, glasses: number) => void;
   toggleCheck: (date: string, key: string) => void;
+  /** Set the day's training-day boost in kcal; 0 removes it. */
+  setBoost: (date: string, kcal: number) => void;
   /** Set the day's note; empty removes it. */
   setNote: (date: string, note: string) => void;
   addWeighIn: (date: string, kg: number) => void;
@@ -92,6 +94,12 @@ export const useStore = create<AppData & Actions>()(
           return src.length;
         },
         setWater: (date, glasses) => editDay(date, (d) => ({ ...d, water: Math.max(0, Math.min(40, glasses)), m: Date.now() })),
+        setBoost: (date, kcal) =>
+          editDay(date, (d) => {
+            const { boost: _old, ...rest } = d;
+            const b = Math.round(Math.max(0, Math.min(1500, kcal)));
+            return { ...rest, ...(b ? { boost: b } : {}), m: Date.now() };
+          }),
         setNote: (date, note) =>
           editDay(date, (d) => {
             const { note: _old, ...rest } = d;

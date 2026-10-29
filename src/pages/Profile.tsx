@@ -11,7 +11,7 @@ import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
-import { ACCENTS, CARDS, ORDER_LABEL, SIZES, usePrefs, type Card } from '../lib/prefs';
+import { ACCENTS, BOOSTS, CARDS, ORDER_LABEL, SIZES, usePrefs, type Card } from '../lib/prefs';
 import WhatsNew from '../components/WhatsNew';
 
 const TONE = { fuel: 'var(--fuel)', protein: 'var(--pro)', sand: 'var(--carb)', ink: 'var(--ink)' };
@@ -335,6 +335,8 @@ function DisplayForm() {
       <AccentPicker />
       <span className="mono mut">Text size (this device)</span>
       <TextSizePicker />
+      <span className="mono mut">Training day adds (this device)</span>
+      <BoostPicker />
       <span className="mono mut">Show on Today (this device)</span>
       <TodayCards />
       <span className="mono mut">Suggestions</span>
@@ -362,6 +364,16 @@ function AccentPicker() {
   );
 }
 
+function BoostPicker() {
+  const { boostKcal, setBoostKcal } = usePrefs();
+  const unit = useStore((s) => s.settings.unit);
+  return (
+    <div className="row" style={{ flexWrap: 'wrap' }} role="group" aria-label="Training day boost">
+      {BOOSTS.map((k) => <button key={k} className="chip" aria-pressed={boostKcal === k} onClick={() => setBoostKcal(k)}>+{unit === 'kJ' ? Math.round(k * KJ) : k} {unit}</button>)}
+    </div>
+  );
+}
+
 function TextSizePicker() {
   const { size, setSize } = usePrefs();
   return (
@@ -379,6 +391,10 @@ function TodayCards() {
       <label className="row small">
         <input type="checkbox" checked={!hidden.includes('macros')} onChange={() => toggle('macros')} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
         Carbs, fat and energy split in the top card
+      </label>
+      <label className="row small">
+        <input type="checkbox" checked={!hidden.includes('train')} onChange={() => toggle('train')} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
+        Training day button in the top card
       </label>
       <span className="small mut">Cards, top to bottom. Tick to show, arrows to move.</span>
       {order.map((id, i) => (

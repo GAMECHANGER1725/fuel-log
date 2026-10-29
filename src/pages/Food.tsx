@@ -3,7 +3,7 @@ import { useStore } from '../lib/store';
 import { todayKey } from '../lib/dates';
 import { BROWSE, FOODS, browseFoods, foodMacros, searchFoods, type Browse } from '../lib/foods';
 import { searchProducts } from '../lib/off';
-import { coverage, dayTotals, energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
+import { coverage, dayTargets, dayTotals, energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
 import type { Food, Macros, Source } from '../lib/types';
 import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, toastAdded, useEatenAt, useRoute, useToday } from '../components/ui';
@@ -405,8 +405,9 @@ function FavEditSheet({ food, onClose }: { food: Food; onClose: () => void }) {
 
 /** One line under the numbers: how much of what's left today this portion covers. */
 function Coverage({ m, date }: { m: Macros; date: string }) {
-  const eaten = dayTotals(useStore((s) => s.days[date]));
-  const T = useStore((s) => s.settings.targets);
+  const d = useStore((s) => s.days[date]);
+  const eaten = dayTotals(d);
+  const T = dayTargets(useStore((s) => s.settings.targets), d);
   const c = coverage(m, eaten, T);
   if (c.kcal === null && c.protein === null) return <p className="small mut" style={{ margin: 0 }}>Both targets are already hit for this day.</p>;
   const parts = [c.kcal !== null && `${c.kcal}% of the energy`, c.protein !== null && `${c.protein}% of the protein`].filter(Boolean).join(' and ');
