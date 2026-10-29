@@ -518,9 +518,14 @@ export default function Today() {
 
         <section className="card">
           <div className="row" style={{ gap: 16 }}>
-            <button className="ring-btn" onClick={flipRing} aria-label={ring === 'left' ? 'Show energy eaten' : 'Show energy to go'}>
+            <button className="ring-btn" onClick={flipRing} aria-label={ring === 'left' ? 'Show energy eaten' : ring === 'eaten' ? 'Show protein to go' : 'Show energy to go'}>
               <Rings kcal={t.kcal} kcalMax={T.kcal} protein={t.protein} proteinMax={T.protein}>
-                {ring === 'eaten' ? (
+                {ring === 'protein' ? (
+                  <>
+                    <span className="num pro" style={{ fontSize: 'clamp(26px, 9.5vw, 40px)', lineHeight: 0.95 }}>{pLeft > 0 ? fmt(pLeft) : '✓'}</span>
+                    <span className="mono mut" style={{ fontSize: 10 }}>{pLeft > 0 ? 'g protein to go' : 'protein hit'}</span>
+                  </>
+                ) : ring === 'eaten' ? (
                   <>
                     <span className="num" style={{ fontSize: 'clamp(26px, 9.5vw, 40px)', lineHeight: 0.95 }}>{energy(t.kcal, unit)}</span>
                     <span className="mono mut" style={{ fontSize: 10 }}>{unit} eaten</span>

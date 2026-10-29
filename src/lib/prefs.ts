@@ -70,6 +70,10 @@ export function moveIn<T>(order: T[], id: T, dir: -1 | 1): T[] {
   return out;
 }
 
+/** What the ring's centre shows, in the order a tap cycles through: energy to go, energy eaten, protein to go. */
+export const RINGS = ['left', 'eaten', 'protein'] as const;
+export type RingShow = (typeof RINGS)[number];
+
 /** Accent colours; the swatch is the dark-theme shade (styles.css has both). */
 export const ACCENTS = [
   ['ember', 'Ember', '#ff8a4c'],
@@ -208,7 +212,7 @@ interface Prefs {
   newsSeen: string;
   order: OrderCard[];
   /** What the ring's centre shows: energy still to eat, or eaten so far. */
-  ring: 'left' | 'eaten';
+  ring: RingShow;
   /** Extra kcal the Training day button adds. */
   boostKcal: number;
   setBoostKcal: (k: number) => void;
@@ -279,7 +283,7 @@ export const lookDefaults = () => ({
   accent: 'ember' as Accent,
   size: 'normal' as TextSize,
   order: [...ORDER] as OrderCard[],
-  ring: 'left' as 'left' | 'eaten',
+  ring: 'left' as RingShow,
   boostKcal: 300,
   bottleMl: 500,
   badge: 'off' as BadgeMode,
@@ -328,7 +332,7 @@ export const usePrefs = create<Prefs>()(
           return { noSuggest: s.noSuggest.includes(n) ? s.noSuggest.filter((x) => x !== n) : [...s.noSuggest, n].slice(-200) };
         }),
       setBoostKcal: (boostKcal) => set({ boostKcal }),
-      flipRing: () => set((s) => ({ ring: s.ring === 'left' ? 'eaten' : 'left' })),
+      flipRing: () => set((s) => ({ ring: RINGS[(RINGS.indexOf(s.ring) + 1) % RINGS.length] })),
       move: (id, dir) => set((s) => ({ order: moveIn(s.order, id, dir) })),
       resetOrder: () => set({ order: [...ORDER] }),
       markNews: (newsSeen) => set({ newsSeen }),
@@ -348,7 +352,7 @@ export const usePrefs = create<Prefs>()(
           size: cleanSize(saved.size),
           newsSeen: typeof saved.newsSeen === 'string' ? saved.newsSeen.slice(0, 20) : '',
           order: cleanOrder(saved.order),
-          ring: saved.ring === 'eaten' ? 'eaten' : 'left',
+          ring: RINGS.includes(saved.ring as RingShow) ? (saved.ring as RingShow) : 'left',
           boostKcal: BOOSTS.includes(saved.boostKcal as number) ? (saved.boostKcal as number) : 300,
           foodSort: cleanSort(saved.foodSort),
           tags: cleanTags(saved.tags),

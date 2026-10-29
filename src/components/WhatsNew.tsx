@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29zq';
+export const NEWS_ID = '2026-10-29zr';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Protein in the ring', 'Tap the ring on Today to cycle energy to go, energy eaten and now protein to go. It remembers your pick.'],
   ['Keyboard shortcuts', 'On a laptop: A opens Add food, T Today, P Progress, W adds a glass of water. / searches and ← → change the day, as before.'],
   ['Start fresh', 'Changed lots of settings? Reset this device’s settings at the bottom of Profile puts the look and layout back, with Undo.', '#/profile'],
   ['Add to a meal', 'Forgot something at lunch? Tap + next to Lunch in the log and it’s added at that time.'],
