@@ -2,7 +2,7 @@
 // A group is two or more entries on one day each within `gapMin` minutes of the one before.
 
 import type { DayLog, Entry, Food } from './types';
-import { addDays } from './dates';
+import { addDays, atOn } from './dates';
 import { energy, roundMacros, sumEntries } from './nutrition';
 import { momentOf, type Moment } from './foods';
 
@@ -296,4 +296,16 @@ export function drinkMl(entries: Entry[]): number {
     ml += Number(m[1]) * (m[2].toLowerCase() === 'l' ? 1000 : 1) * e.qty;
   }
   return Math.round(ml);
+}
+
+/**
+ * Energy eaten on day `k` up to the same clock time as `now` (e.g. yesterday by 3 pm), so today can be
+ * compared like for like. null when that day has nothing logged.
+ */
+export function eatenByTime(days: Record<string, DayLog>, k: string, now: number): number | null {
+  const d = days[k];
+  if (!d?.entries.length) return null;
+  const n = new Date(now);
+  const cutoff = atOn(k, `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`);
+  return Math.round(sumEntries(d.entries.filter((e) => e.at <= cutoff)).kcal);
 }

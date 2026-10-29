@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
-import { SECTION_LABEL, combineAsFood, daySummary, drinkMl, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals } from '../lib/meals';
+import { SECTION_LABEL, combineAsFood, daySummary, drinkMl, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals } from '../lib/meals';
 
 export default function Today() {
   const today = useToday();
@@ -93,6 +93,7 @@ export default function Today() {
   const sections = logSections(day.entries);
   const mealGoal = mealProteinGoal(s.profile.weightKg);
   const pace = isToday && kLeft > 0 ? paceGap(t.kcal, T.kcal, hour) : null;
+  const yesterdayByNow = isToday ? eatenByTime(s.days, addDays(today, -1), now.getTime()) : null;
   // Shortcut from the app icon: #/today?add=water adds a glass. The hash check stops StrictMode's re-run adding two.
   const addParam = params.get('add');
   useEffect(() => {
@@ -496,6 +497,11 @@ export default function Today() {
                 {pace !== null && (
                   <span className="small" style={{ color: pace < -150 ? 'var(--warn)' : 'var(--mut)' }}>
                     {pace < -150 ? `${energy(-pace, unit)} ${unit} behind pace` : pace > 150 ? `${energy(pace, unit)} ${unit} ahead of pace` : 'On pace'}
+                  </span>
+                )}
+                {yesterdayByNow !== null && (
+                  <span className="mono dim" title="Energy eaten yesterday up to this time">
+                    {Math.abs(t.kcal - yesterdayByNow) < 50 ? 'Same as yesterday by now' : `${energy(Math.abs(t.kcal - yesterdayByNow), unit)} ${unit} ${t.kcal > yesterdayByNow ? 'more' : 'less'} than yesterday by now`}
                   </span>
                 )}
               </div>
