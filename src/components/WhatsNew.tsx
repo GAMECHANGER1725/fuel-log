@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29zp';
+export const NEWS_ID = '2026-10-29zq';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Keyboard shortcuts', 'On a laptop: A opens Add food, T Today, P Progress, W adds a glass of water. / searches and ← → change the day, as before.'],
   ['Start fresh', 'Changed lots of settings? Reset this device’s settings at the bottom of Profile puts the look and layout back, with Undo.', '#/profile'],
   ['Add to a meal', 'Forgot something at lunch? Tap + next to Lunch in the log and it’s added at that time.'],
   ['Ate it a bit ago?', 'Under the time when logging, tap −15 min, −30 min or −1 h instead of changing the clock.'],

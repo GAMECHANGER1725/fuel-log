@@ -16,7 +16,7 @@ import { startSync, useSync } from './lib/sync';
 import { autoDue, checkIn, useCoach } from './lib/coach';
 import { startReminders } from './lib/reminders';
 import { autoBoostDue, usePrefs } from './lib/prefs';
-import { atOn, dateOf } from './lib/dates';
+import { atOn, dateOf, todayKey } from './lib/dates';
 import { badgeCount, dayTargets, dayTotals, energy, targetsCrossed } from './lib/nutrition';
 
 export default function App() {
@@ -99,6 +99,28 @@ export default function App() {
     if (!nav.setAppBadge) return;
     (unlocked && badgeNum ? nav.setAppBadge(badgeNum) : nav.clearAppBadge?.())?.catch(() => {});
   }, [unlocked, badgeNum]);
+
+  // Keyboard shortcuts on a laptop: A add food, T today, P progress, W a glass of water (not while typing or in a sheet).
+  useEffect(() => {
+    if (!unlocked) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || document.querySelector('[role=dialog]') || (e.target as HTMLElement).closest('input, textarea, select, [contenteditable]')) return;
+      const k = e.key.toLowerCase();
+      if (k === 'a') window.location.hash = '/food';
+      else if (k === 't') window.location.hash = '/today';
+      else if (k === 'p') window.location.hash = '/progress';
+      else if (k === 'w') {
+        const s = useStore.getState();
+        const d = todayKey();
+        const g = (s.days[d]?.water ?? 0) + 1;
+        s.setWater(d, g);
+        toast(`Glass of water added (${(g * 0.25).toFixed(2).replace(/0$/, '')} L)`);
+      } else return;
+      e.preventDefault();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [unlocked]);
 
   // The tab shows what's left today (handy with the app open on a laptop).
   const leftKcal = useStore((s) => Math.round(dayTargets(s.settings.targets, s.days[today]).kcal - dayTotals(s.days[today]).kcal));
