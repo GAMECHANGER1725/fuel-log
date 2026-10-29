@@ -11,7 +11,8 @@ import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
-import { ACCENTS, BOOSTS, BOTTLES, CARDS, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
+import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
+import { NOTE_TAGS } from '../lib/meals';
 import WhatsNew from '../components/WhatsNew';
 
 const TONE = { fuel: 'var(--fuel)', protein: 'var(--pro)', sand: 'var(--carb)', ink: 'var(--ink)' };
@@ -344,6 +345,8 @@ function DisplayForm() {
       <BoostPicker />
       <span className="mono mut">Show on Today (this device)</span>
       <TodayCards />
+      <span className="mono mut">Day note tags (this device)</span>
+      <TagsEditor />
       <span className="mono mut">Suggestions</span>
       <label className="row small">
         <input type="checkbox" checked={s.settings.wheyOk} onChange={(e) => s.setSettings({ wheyOk: e.target.checked })} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
@@ -373,6 +376,34 @@ function AccentPicker() {
         </button>
       ))}
     </div>
+  );
+}
+
+/** Add, remove or reset the one-tap tags under Today's day note. */
+function TagsEditor() {
+  const { tags, setTags } = usePrefs();
+  const [text, setText] = useState('');
+  const add = () => {
+    if (!text.trim()) return;
+    setTags([...tags, text]);
+    setText('');
+  };
+  const isDefault = tags.join('|') === NOTE_TAGS.join('|');
+  return (
+    <>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
+        {tags.map((t) => (
+          <button key={t} className="chip" aria-label={`Remove tag ${t}`} onClick={() => setTags(tags.filter((x) => x !== t))}>{t} ✕</button>
+        ))}
+      </div>
+      {tags.length < MAX_TAGS && (
+        <div className="row">
+          <input className="input grow" value={text} maxLength={24} placeholder="New tag, e.g. School camp" aria-label="New tag" onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+          <button className="btn sm" disabled={!text.trim()} onClick={add}>Add</button>
+        </div>
+      )}
+      {!isDefault && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setTags([...NOTE_TAGS])}>Reset tags</button>}
+    </>
   );
 }
 

@@ -11,7 +11,7 @@ import { findByBarcode, parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
-import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
+import { ORDER, cleanTags, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
 import { daySummary, foodHistory, hasTag, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
@@ -591,6 +591,15 @@ describe('note tags', () => {
     expect(toggleTag('felt great, gym ', 'Gym')).toBe('felt great');
     expect(hasTag('Rest day, tired', 'rest day')).toBe(true);
     expect(hasTag('Gymnastics', 'Gym')).toBe(false);
+  });
+});
+
+describe('custom tags', () => {
+  it('cleans saved tags', () => {
+    expect(cleanTags(undefined)).toContain('Gym');
+    expect(cleanTags([' Gym ', 'gym', 'a,b', '', 3, 'x'.repeat(40)])).toEqual(['Gym', 'a b', 'x'.repeat(24)]);
+    expect(cleanTags(Array.from({ length: 20 }, (_, i) => `t${i}`))).toHaveLength(12);
+    expect(cleanTags([])).toEqual([]);
   });
 });
 

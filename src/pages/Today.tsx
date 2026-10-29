@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
-import { NOTE_TAGS, SECTION_LABEL, combineAsFood, hasTag, toggleTag, daySummary, drinkMl, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals } from '../lib/meals';
+import { SECTION_LABEL, combineAsFood, hasTag, toggleTag, daySummary, drinkMl, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals } from '../lib/meals';
 
 export default function Today() {
   const today = useToday();
@@ -569,6 +569,7 @@ export default function Today() {
 /** A short note about the day, edited in place. */
 function DayNote({ date, note }: { date: string; note: string }) {
   const setNote = useStore((s) => s.setNote);
+  const tags = usePrefs((p) => p.tags);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(note);
   useEffect(() => setText(note), [note, date]);
@@ -604,11 +605,11 @@ function DayNote({ date, note }: { date: string; note: string }) {
         <span className="grow" style={note ? undefined : { color: 'var(--mut)' }}>{note || 'Add a note for the day'}</span>
       </button>
       {/* One tap adds or removes a tag, no typing. */}
-      <div className="quick" role="group" aria-label="Tag the day">
-        {NOTE_TAGS.map((tag) => (
+      {tags.length > 0 && <div className="quick" role="group" aria-label="Tag the day">
+        {tags.map((tag) => (
           <button key={tag} className="chip" aria-pressed={hasTag(note, tag)} onClick={() => setNote(date, toggleTag(note, tag).slice(0, 200))}>{tag}</button>
         ))}
-      </div>
+      </div>}
     </section>
   );
 }

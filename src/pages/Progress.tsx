@@ -6,8 +6,9 @@ import { chartWindow, goalProgress, projectedDate, trendLine, weeklyNudge, weekl
 
 import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
-import { NOTE_TAGS, records, tagStats, topFoods, weekdayAverages, weekStats, weekSummary } from '../lib/meals';
+import { records, tagStats, topFoods, weekdayAverages, weekStats, weekSummary } from '../lib/meals';
 import { hasAi } from '../lib/ai';
+import { usePrefs } from '../lib/prefs';
 import { Bar, Icon, Sheet, toast, useGame, useRoute, useToday } from '../components/ui';
 
 export default function Progress() {
@@ -18,6 +19,7 @@ export default function Progress() {
   const { params } = useRoute();
   const [weighing, setWeighing] = useState(params.get('weigh') === '1');
   const unit = s.settings.unit;
+  const tags = usePrefs((p) => p.tags);
 
   const line = trendLine(s.weighIns);
   const latest = line[line.length - 1];
@@ -199,7 +201,7 @@ export default function Progress() {
         })()}
 
         {(() => {
-          const stats = tagStats(s.days, today, NOTE_TAGS);
+          const stats = tagStats(s.days, today, tags);
           if (!stats.length) return null;
           const diff = (v: number, show: string) => (Math.abs(v) < 0.5 ? '' : ` (${v > 0 ? '+' : '−'}${show})`);
           return (

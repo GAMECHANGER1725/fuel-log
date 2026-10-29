@@ -5,6 +5,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { FOOD_SORTS, type FoodSort } from './foods';
 import type { BadgeMode } from './nutrition';
+import { NOTE_TAGS } from './meals';
 
 export const CARDS = [
   ['train', 'Training day button'],
@@ -87,6 +88,19 @@ export const SIZES = [
 export type TextSize = (typeof SIZES)[number][0];
 export const cleanSize = (v: unknown): TextSize => SIZES.find(([id]) => id === v)?.[0] ?? 'normal';
 
+export const MAX_TAGS = 12;
+
+/** Note tags: trimmed, no commas (they separate tags in the note), 1 to 24 characters, once each ignoring case, at most MAX_TAGS. */
+export function cleanTags(v: unknown): string[] {
+  if (!Array.isArray(v)) return [...NOTE_TAGS];
+  const out: string[] = [];
+  for (const x of v) {
+    const t = typeof x === 'string' ? x.replace(/,/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 24) : '';
+    if (t && !out.some((o) => o.toLowerCase() === t.toLowerCase())) out.push(t);
+  }
+  return out.slice(0, MAX_TAGS);
+}
+
 export const cleanSort = (v: unknown): FoodSort => FOOD_SORTS.find(([id]) => id === v)?.[0] ?? 'match';
 
 export const cleanAccent = (v: unknown): Accent => ACCENTS.find(([id]) => id === v)?.[0] ?? 'ember';
@@ -114,6 +128,9 @@ interface Prefs {
   /** What the home-screen icon's badge shows. */
   badge: BadgeMode;
   setBadge: (b: BadgeMode) => void;
+  /** One-tap tags under the day note. ponytail: per device, so a phone and laptop can differ. */
+  tags: string[];
+  setTags: (t: string[]) => void;
   /** Lower-case names Close the gap shouldn't suggest. ponytail: per device, not synced. */
   noSuggest: string[];
   toggleSuggest: (name: string) => void;
@@ -142,6 +159,8 @@ export const usePrefs = create<Prefs>()(
       noSuggest: [],
       bottleMl: 500,
       badge: 'off',
+      tags: [...NOTE_TAGS],
+      setTags: (tags) => set({ tags: cleanTags(tags) }),
       setBadge: (badge) => set({ badge }),
       foodSort: 'match',
       setFoodSort: (foodSort) => set({ foodSort }),
@@ -162,9 +181,9 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown };
         return {
           ...cur,
           hidden: cleanHidden(saved.hidden),
@@ -175,6 +194,7 @@ export const usePrefs = create<Prefs>()(
           ring: saved.ring === 'eaten' ? 'eaten' : 'left',
           boostKcal: BOOSTS.includes(saved.boostKcal as number) ? (saved.boostKcal as number) : 300,
           foodSort: cleanSort(saved.foodSort),
+          tags: cleanTags(saved.tags),
           badge: saved.badge === 'protein' || saved.badge === 'kcal' ? saved.badge : 'off',
           bottleMl: BOTTLES.includes(saved.bottleMl as number) ? (saved.bottleMl as number) : 500,
           noSuggest: Array.isArray(saved.noSuggest) ? saved.noSuggest.filter((x): x is string => typeof x === 'string').map((x) => x.slice(0, 80)).slice(-200) : [],
