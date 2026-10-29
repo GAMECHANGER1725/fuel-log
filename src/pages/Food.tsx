@@ -376,6 +376,18 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
         >
           <Icon name="star" size={18} />
         </button>
+        <button
+          className="btn"
+          aria-label="Add to shopping list"
+          style={{ width: 52, padding: 0 }}
+          onClick={() => {
+            const p = usePrefs.getState();
+            p.setShopping(addShopping(p.shopping, [['', food.name]]));
+            toast(`${food.name} is on your shopping list`, 0, { label: 'View', run: () => { onClose(); go('food?list=1'); } });
+          }}
+        >
+          <Icon name="cart" size={18} />
+        </button>
         <button className="btn primary grow" style={{ minHeight: 52 }} onClick={add}>Add · +{xp} XP</button>
       </div>
     </Sheet>
