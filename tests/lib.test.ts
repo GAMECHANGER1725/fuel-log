@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayTotals, energy, forGrams } from '../src/lib/nutrition';
+import { dayTotals, energy, forGrams, sinceLast } from '../src/lib/nutrition';
 import { foodDue, waterDue } from '../src/lib/reminders';
 import { FOODS, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
@@ -359,5 +359,21 @@ describe('prefs', () => {
   it('toggles a card in and out', () => {
     expect(toggleIn([], 'gap')).toEqual(['gap']);
     expect(toggleIn(['gap', 'water'], 'gap')).toEqual(['water']);
+  });
+});
+
+describe('since last meal', () => {
+  const at = (ms: number) => ({ at: ms }) as Entry;
+  const now = 10 * 3_600_000;
+  it('counts from the latest entry before now', () => {
+    expect(sinceLast([at(now - 200 * 60_000), at(now - 80 * 60_000)], now)).toBe('1 h 20 min');
+    expect(sinceLast([at(now - 120 * 60_000)], now)).toBe('2 h');
+    expect(sinceLast([at(now - 25 * 60_000)], now)).toBe('25 min');
+    expect(sinceLast([at(now - 10_000)], now)).toBe('just now');
+  });
+  it('ignores entries timed later than now, and an empty log', () => {
+    expect(sinceLast([at(now - 60 * 60_000), at(now + 60 * 60_000)], now)).toBe('1 h');
+    expect(sinceLast([at(now + 60_000)], now)).toBeNull();
+    expect(sinceLast([], now)).toBeNull();
   });
 });

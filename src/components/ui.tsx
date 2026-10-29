@@ -230,6 +230,16 @@ export function useToday(): string {
   return k;
 }
 
+/** The current time, refreshed each minute, for "x min ago" text. */
+export function useNow(): number {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
+}
+
 export function useGame() {
   const today = useToday();
   const days = useStore((s) => s.days);

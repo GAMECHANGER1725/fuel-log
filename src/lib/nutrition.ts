@@ -43,5 +43,15 @@ export function energy(kcal: number, unit: 'kcal' | 'kJ'): string {
 
 export const fmt = (n: number) => Math.round(n).toLocaleString('en-AU');
 
+/** "3 h 20 min" since the latest entry eaten before `now`, or null if none. */
+export function sinceLast(entries: Entry[], now: number): string | null {
+  const last = Math.max(-Infinity, ...entries.map((e) => e.at).filter((at) => at <= now));
+  if (!Number.isFinite(last)) return null;
+  const m = Math.floor((now - last) / 60_000);
+  if (m < 1) return 'just now';
+  const h = Math.floor(m / 60);
+  return h ? `${h} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`;
+}
+
 /** Time an entry was logged, e.g. "7:20 am". */
 export const timeOf = (ms: number) => new Date(ms).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });

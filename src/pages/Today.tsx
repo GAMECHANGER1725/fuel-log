@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store';
 import { addDays, fmtDate, hhmmOf } from '../lib/dates';
-import { dayTotals, energy, entryMacros, fmt, timeOf } from '../lib/nutrition';
+import { dayTotals, energy, entryMacros, fmt, sinceLast, timeOf } from '../lib/nutrition';
 import { FOCUS_LABEL, FOODS, MOMENT_LABEL, gapFocus, gapSuggestions, momentOf, remaining } from '../lib/foods';
 import { XP } from '../lib/game';
 import type { Entry, Food } from '../lib/types';
-import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, useEatenAt, useGame, useRoute, useToday } from '../components/ui';
+import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, useEatenAt, useGame, useNow, useRoute, useToday } from '../components/ui';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card } from '../lib/prefs';
@@ -40,7 +40,7 @@ export default function Today() {
   const dayXp = g.byDate.get(date)?.xp ?? 0;
 
   const setDate = (k: string) => (window.location.hash = k === today ? '/today' : `/today?d=${k}`);
-  const now = new Date();
+  const now = new Date(useNow());
   const weekday = now.getDay() >= 1 && now.getDay() <= 5;
   const atSchool = isToday && weekday && now.getHours() >= 8 && now.getHours() < 15;
   const need = remaining(T, t);
@@ -57,6 +57,11 @@ export default function Today() {
   };
 
   const log = [...day.entries].sort((a, b) => a.at - b.at);
+  const ago = isToday ? sinceLast(day.entries, now.getTime()) : null;
+  const addWater = (n: number) => {
+    s.setWater(date, day.water + n);
+    if (day.water < waterGoal && day.water + n >= waterGoal) toast('Water goal hit', XP.water);
+  };
   const addHref = `#/food${isToday ? '' : `?d=${date}`}`;
 
   return (
@@ -202,7 +207,10 @@ export default function Today() {
 
         <section className="stack" style={{ marginTop: 8 }}>
           <div className="between" style={{ alignItems: 'center' }}>
-            <h2 className="h2">Log</h2>
+            <div className="stack" style={{ gap: 0 }}>
+              <h2 className="h2">Log</h2>
+              {ago && <span className="mono mut">Last ate {ago}{ago === 'just now' ? '' : ' ago'}</span>}
+            </div>
             {(s.days[addDays(date, -1)]?.entries.length ?? 0) > 0 && (
               <button
                 className="btn sm"
@@ -239,7 +247,8 @@ export default function Today() {
             </div>
             <div className="row">
               <button className="btn icon" aria-label="Remove a glass" onClick={() => s.setWater(date, day.water - 1)}>−</button>
-              <button className="btn icon ink" aria-label="Add a 250 ml glass" onClick={() => { s.setWater(date, day.water + 1); if (day.water + 1 === waterGoal) toast('Water goal hit', XP.water); }}>+</button>
+              <button className="btn sm" aria-label="Add a 500 ml bottle" onClick={() => addWater(2)}>+500 ml</button>
+              <button className="btn icon ink" aria-label="Add a 250 ml glass" onClick={() => addWater(1)}>+</button>
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(waterGoal, day.water)}, minmax(0,1fr))`, gap: 4, marginTop: 12 }}>

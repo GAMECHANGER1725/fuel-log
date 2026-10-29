@@ -211,11 +211,11 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 
 /* Heatmap */
 .heat { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
-.heat > i { aspect-ratio: 1; border-radius: 10px; background: var(--track); }
-.heat > i.both { background: var(--fuel); }
-.heat > i.one { background: var(--fuel-dim); }
-.heat > i.today { background: transparent; box-shadow: inset 0 0 0 2px var(--fuel); }
-.heat > i.pre { background: transparent; }
+.heat > i, .heat > a { aspect-ratio: 1; border-radius: 10px; background: var(--track); }
+.heat > .both { background: var(--fuel); }
+.heat > .one { background: var(--fuel-dim); }
+.heat > .today { background: transparent; box-shadow: inset 0 0 0 2px var(--fuel); }
+.heat > .pre { background: transparent; }
 .heat > i.future { background: transparent; box-shadow: inset 0 0 0 1.5px var(--line2); }
 
 .photo { width: 100%; max-height: 240px; object-fit: cover; border-radius: 18px; display: block; }
