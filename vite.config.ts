@@ -28,6 +28,12 @@ export default defineConfig(({ command, isPreview }) => ({
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
           { src: 'maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
+        // Long-press the app icon (Android, desktop Chrome). Hash routes, handled by Food and Today.
+        shortcuts: [
+          { name: 'Add food', short_name: 'Add food', url: './#/food', icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }] },
+          { name: 'Scan barcode', short_name: 'Scan', url: './#/food?open=scan', icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }] },
+          { name: 'Add a glass of water', short_name: 'Water', url: './#/today?add=water', icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }] },
+        ],
       },
       workbox: { importScripts: ['sw-extra.js'], globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,wasm}'], maximumFileSizeToCacheInBytes: 4_000_000 },
     }),

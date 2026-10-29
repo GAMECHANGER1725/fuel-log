@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../lib/store';
 import { addDays, fmtDate, hhmmOf, weekStart } from '../lib/dates';
-import { KJ, dayTotals, energy, entryMacros, fmt, sinceLast, timeOf } from '../lib/nutrition';
+import { KJ, dayTotals, energy, entryMacros, fmt, paceGap, sinceLast, timeOf } from '../lib/nutrition';
 import { FOCUS_LABEL, FOODS, MOMENT_LABEL, gapFocus, gapSuggestions, momentOf, remaining } from '../lib/foods';
 import { XP } from '../lib/game';
 import type { Entry, Food } from '../lib/types';
@@ -58,6 +58,16 @@ export default function Today() {
   };
 
   const sections = logSections(day.entries);
+  const pace = isToday && kLeft > 0 ? paceGap(t.kcal, T.kcal, hour) : null;
+  // Shortcut from the app icon: #/today?add=water adds a glass. The hash check stops StrictMode's re-run adding two.
+  const addParam = params.get('add');
+  useEffect(() => {
+    if (addParam !== 'water' || !window.location.hash.includes('add=water')) return;
+    window.location.replace('#/today');
+    const d = useStore.getState().days[today]?.water ?? 0;
+    useStore.getState().setWater(today, d + 1);
+    toast(`Glass of water added (${((d + 1) * 0.25).toFixed(2).replace(/0$/, '')} L)`, d + 1 === waterGoal ? XP.water : 0);
+  }, [addParam]);
   const ago = isToday ? sinceLast(day.entries, now.getTime()) : null;
   const addWater = (n: number) => {
     s.setWater(date, day.water + n);
@@ -115,6 +125,11 @@ export default function Today() {
               <div className="stack" style={{ gap: 2 }}>
                 <span className="mono fuel">Energy</span>
                 <span><span className="num" style={{ fontSize: 24 }}>{energy(t.kcal, unit)}</span><span className="mut small"> / {energy(T.kcal, unit)} {unit}</span></span>
+                {pace !== null && (
+                  <span className="small" style={{ color: pace < -150 ? 'var(--warn)' : 'var(--mut)' }}>
+                    {pace < -150 ? `${energy(-pace, unit)} ${unit} behind pace` : pace > 150 ? `${energy(pace, unit)} ${unit} ahead of pace` : 'On pace'}
+                  </span>
+                )}
               </div>
               <div className="stack" style={{ gap: 2 }}>
                 <span className="mono pro">Protein</span>

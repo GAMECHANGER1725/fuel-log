@@ -21,7 +21,8 @@ export default function FoodPage() {
   const date = params.get('d') ?? today;
   const [q, setQ] = useState('');
   const [picked, setPicked] = useState<Picked | null>(null);
-  const [sheet, setSheet] = useState<'scan' | 'manual' | AiMode | null>(null);
+  // #/food?open=scan comes from the app-icon shortcut.
+  const [sheet, setSheet] = useState<'scan' | 'manual' | AiMode | null>(params.get('open') === 'scan' ? 'scan' : null);
   const [off, setOff] = useState<{ q: string; foods: Food[]; loading: boolean; failed: boolean }>({ q: '', foods: [], loading: false, failed: false });
   const s = useStore();
   const unit = s.settings.unit;

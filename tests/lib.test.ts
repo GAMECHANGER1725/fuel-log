@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayTotals, energy, forGrams, sinceLast } from '../src/lib/nutrition';
+import { dayTotals, energy, forGrams, paceGap, sinceLast } from '../src/lib/nutrition';
 import { foodDue, waterDue } from '../src/lib/reminders';
 import { FOODS, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
@@ -417,5 +417,17 @@ describe('accent', () => {
     expect(cleanAccent('grape')).toBe('grape');
     expect(cleanAccent('neon')).toBe('ember');
     expect(cleanAccent(undefined)).toBe('ember');
+  });
+});
+
+describe('pace', () => {
+  it('compares what you ate with an even spread from 7 am to 9 pm', () => {
+    expect(paceGap(1400, 2800, 14)).toBe(0); // halfway through the window
+    expect(paceGap(1000, 2800, 14)).toBe(-400);
+    expect(paceGap(2000, 2800, 14)).toBe(600);
+  });
+  it('says nothing early in the morning or late at night', () => {
+    expect(paceGap(0, 2800, 8)).toBeNull();
+    expect(paceGap(0, 2800, 21.5)).toBeNull();
   });
 });
