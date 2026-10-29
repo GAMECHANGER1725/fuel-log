@@ -47,7 +47,10 @@ interface Prefs {
   hidden: Card[];
   accent: Accent;
   size: TextSize;
+  /** Id of the last What's new sheet seen on this device. */
+  newsSeen: string;
   toggle: (c: Card) => void;
+  markNews: (id: string) => void;
   setAccent: (a: Accent) => void;
   setSize: (s: TextSize) => void;
 }
@@ -58,16 +61,18 @@ export const usePrefs = create<Prefs>()(
       hidden: [],
       accent: 'ember',
       size: 'normal',
+      newsSeen: '',
+      markNews: (newsSeen) => set({ newsSeen }),
       toggle: (c) => set((s) => ({ hidden: toggleIn(s.hidden, c) })),
       setAccent: (accent) => set({ accent }),
       setSize: (size) => set({ size }),
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown };
-        return { ...cur, hidden: cleanHidden(saved.hidden), accent: cleanAccent(saved.accent), size: cleanSize(saved.size) };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown };
+        return { ...cur, hidden: cleanHidden(saved.hidden), accent: cleanAccent(saved.accent), size: cleanSize(saved.size), newsSeen: typeof saved.newsSeen === 'string' ? saved.newsSeen.slice(0, 20) : '' };
       },
     },
   ),

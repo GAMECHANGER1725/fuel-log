@@ -12,6 +12,7 @@ import { useAuth } from '../lib/auth';
 import { FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
 import { ACCENTS, CARDS, SIZES, usePrefs } from '../lib/prefs';
+import WhatsNew from '../components/WhatsNew';
 
 const TONE = { fuel: 'var(--fuel)', protein: 'var(--pro)', sand: 'var(--carb)', ink: 'var(--ink)' };
 
@@ -22,6 +23,7 @@ export default function ProfilePage() {
   const open = params.get('open');
   const earned = g.badges.filter((b) => b.earned).length;
   const sync = useSync();
+  const [news, setNews] = useState(false);
   const syncHint = !sync.conn ? 'Not connected' : sync.status === 'syncing' ? 'Syncing…' : sync.status === 'error' ? 'Problem' : sync.last ? `Synced ${ago(sync.last)}` : 'Connected';
 
   return (
@@ -111,9 +113,11 @@ export default function ProfilePage() {
         <p className="small mut rule" style={{ paddingTop: 12 }}>
           Talk to a parent and your GP before big target changes, before starting any supplement, or if your weight is dropping despite eating more. These numbers are starting points, not rules.
         </p>
+        <button className="btn block" onClick={() => setNews(true)}>What’s new</button>
         <button className="btn block" onClick={() => useAuth.getState().lock()}>Log out</button>
         <p className="mono dim" style={{ paddingBottom: 12 }}>Fuel Log · your data stays on this phone</p>
       </div>
+      {news && <WhatsNew onClose={() => setNews(false)} />}
     </>
   );
 }
