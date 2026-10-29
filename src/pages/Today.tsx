@@ -673,12 +673,14 @@ function QuickLog({ date }: { date: string }) {
     ? usualNow(days, today, hour).map((e) => ({ id: e.foodId ?? e.id, name: e.name, serving: e.serving, ...e.base }))
     : [];
   const seen = new Set<string>(usual.map((f) => f.name.toLowerCase()));
-  const foods = [...favourites, ...recents].filter((f) => !seen.has(f.name.toLowerCase()) && seen.add(f.name.toLowerCase())).slice(0, 10);
+  const quickCount = usePrefs((p) => p.quickCount);
+  const quickWrap = usePrefs((p) => p.quickWrap);
+  const foods = [...favourites, ...recents].filter((f) => !seen.has(f.name.toLowerCase()) && seen.add(f.name.toLowerCase())).slice(0, quickCount);
   const again = date === today ? lastSection(days, today, momentOf(hour)) : null;
   return (
     <section className="stack" style={{ gap: 6 }}>
       <span className="mono mut">Quick log{foods.length || usual.length ? ' · tap a food for your usual amount, hold to choose' : ''}</span>
-      <div className="quick">
+      <div className={`quick${quickWrap ? ' wrap' : ''}`}>
         {!hidden.includes('qscan') && <a className="chip" href={link('scan')}><Icon name="barcode" size={16} /> Scan</a>}
         {!hidden.includes('qsnap') && <a className="chip" href={link('photo')}><Icon name="camera" size={16} /> Snap meal</a>}
         {!hidden.includes('qnum') && <a className="chip" href={link('manual')}><Icon name="pencil" size={16} /> Numbers</a>}

@@ -274,6 +274,8 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .quick { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 2px; }
 .quick::-webkit-scrollbar { display: none; }
 .quick .chip { flex: none; display: inline-flex; gap: 6px; align-items: center; }
+/* Quick log set to wrap (Profile > Today page): every chip in view, no sideways scrolling. */
+.quick.wrap { flex-wrap: wrap; overflow-x: visible; margin: 0; padding: 0; }
 
 /* 14-day chart on Progress */
 .chart14 { position: relative; display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 4px; align-items: end; }

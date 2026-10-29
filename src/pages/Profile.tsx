@@ -11,7 +11,7 @@ import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { EAT_GAPS, FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
-import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, STARTS, WEIGH_EVERY, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
+import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, QUICK_COUNTS, STARTS, WEIGH_EVERY, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
 import { NOTE_TAGS } from '../lib/meals';
 import WhatsNew from '../components/WhatsNew';
 
@@ -552,7 +552,7 @@ function TextSizePicker() {
 }
 
 function TodayCards() {
-  const { hidden, toggle, order, move, resetOrder } = usePrefs();
+  const { hidden, toggle, order, move, resetOrder, quickCount, quickWrap, setQuick } = usePrefs();
   const hideable = (id: string): id is Card => CARDS.some(([c]) => c === id);
   return (
     <div className="stack" style={{ gap: 6 }}>
@@ -571,6 +571,12 @@ function TodayCards() {
             {CARDS.find(([c]) => c === id)?.[1]}
           </button>
         ))}
+      </div>
+      <span className="small mut">Quick log foods</span>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 6 }} role="group" aria-label="Quick log foods">
+        {QUICK_COUNTS.map((n) => <button key={n} className="chip" aria-pressed={quickCount === n} onClick={() => setQuick({ quickCount: n })}>{n}</button>)}
+        <button className="chip" aria-pressed={!quickWrap} onClick={() => setQuick({ quickWrap: false })}>One row</button>
+        <button className="chip" aria-pressed={quickWrap} onClick={() => setQuick({ quickWrap: true })}>Show all</button>
       </div>
       <span className="small mut">Cards, top to bottom. Tick to show, arrows to move.</span>
       {order.map((id, i) => (

@@ -88,6 +88,9 @@ export const STARTS = [
 ] as const;
 export type Start = (typeof STARTS)[number][0];
 
+/** How many of your foods Quick log shows. */
+export const QUICK_COUNTS = [6, 10, 16];
+
 /** Days between weigh-in reminders on Today. */
 export const WEIGH_EVERY = [1, 3, 7, 14];
 
@@ -191,6 +194,10 @@ interface Prefs {
   badge: BadgeMode;
   setBadge: (b: BadgeMode) => void;
   /** Weekdays (0 = Sunday) that get the training-day boost by themselves, and the last day it was switched on that way. */
+  /** Quick log: how many foods, and whether the chips wrap onto lines instead of scrolling sideways. */
+  quickCount: number;
+  quickWrap: boolean;
+  setQuick: (p: { quickCount?: number; quickWrap?: boolean }) => void;
   trainDays: number[];
   setTrainDays: (d: number[]) => void;
   lastAutoBoost: string;
@@ -240,6 +247,9 @@ export const usePrefs = create<Prefs>()(
       bottleMl: 500,
       badge: 'off',
       weighEvery: 7,
+      quickCount: 10,
+      quickWrap: false,
+      setQuick: (p) => set(p),
       trainDays: [],
       setTrainDays: (trainDays) => set({ trainDays }),
       lastAutoBoost: '',
@@ -274,9 +284,9 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches, weighEvery: s.weighEvery, start: s.start, shopping: s.shopping, trainDays: s.trainDays, lastAutoBoost: s.lastAutoBoost }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches, weighEvery: s.weighEvery, start: s.start, shopping: s.shopping, trainDays: s.trainDays, lastAutoBoost: s.lastAutoBoost, quickCount: s.quickCount, quickWrap: s.quickWrap }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown; weighEvery?: unknown; start?: unknown; shopping?: unknown; trainDays?: unknown; lastAutoBoost?: unknown };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown; weighEvery?: unknown; start?: unknown; shopping?: unknown; trainDays?: unknown; lastAutoBoost?: unknown; quickCount?: unknown; quickWrap?: unknown };
         return {
           ...cur,
           hidden: cleanHidden(saved.hidden),
@@ -290,6 +300,8 @@ export const usePrefs = create<Prefs>()(
           tags: cleanTags(saved.tags),
           shopping: cleanShopping(saved.shopping),
           trainDays: Array.isArray(saved.trainDays) ? [...new Set(saved.trainDays.filter((x): x is number => Number.isInteger(x) && x >= 0 && x <= 6))] : [],
+          quickCount: QUICK_COUNTS.includes(saved.quickCount as number) ? (saved.quickCount as number) : 10,
+          quickWrap: saved.quickWrap === true,
           lastAutoBoost: typeof saved.lastAutoBoost === 'string' ? saved.lastAutoBoost.slice(0, 10) : '',
           start: STARTS.find(([id]) => id === saved.start)?.[0] ?? 'today',
           weighEvery: WEIGH_EVERY.includes(saved.weighEvery as number) ? (saved.weighEvery as number) : 7,
