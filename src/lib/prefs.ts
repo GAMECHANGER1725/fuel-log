@@ -101,6 +101,13 @@ export function cleanTags(v: unknown): string[] {
   return out.slice(0, MAX_TAGS);
 }
 
+/** Put a search at the front of the recent list (once, ignoring case), keeping the newest `max`. */
+export function pushSearch(list: string[], q: string, max = 6): string[] {
+  const t = q.replace(/\s+/g, ' ').trim().slice(0, 40);
+  if (t.length < 2) return list;
+  return [t, ...list.filter((x) => x.toLowerCase() !== t.toLowerCase())].slice(0, max);
+}
+
 export const cleanSort = (v: unknown): FoodSort => FOOD_SORTS.find(([id]) => id === v)?.[0] ?? 'match';
 
 export const cleanAccent = (v: unknown): Accent => ACCENTS.find(([id]) => id === v)?.[0] ?? 'ember';
@@ -131,6 +138,10 @@ interface Prefs {
   /** One-tap tags under the day note. ponytail: per device, so a phone and laptop can differ. */
   tags: string[];
   setTags: (t: string[]) => void;
+  /** Searches on Add food that led to a food, newest first. */
+  searches: string[];
+  addSearch: (q: string) => void;
+  clearSearches: () => void;
   /** Lower-case names Close the gap shouldn't suggest. ponytail: per device, not synced. */
   noSuggest: string[];
   toggleSuggest: (name: string) => void;
@@ -160,6 +171,9 @@ export const usePrefs = create<Prefs>()(
       bottleMl: 500,
       badge: 'off',
       tags: [...NOTE_TAGS],
+      searches: [],
+      addSearch: (q) => set((s) => ({ searches: pushSearch(s.searches, q) })),
+      clearSearches: () => set({ searches: [] }),
       setTags: (tags) => set({ tags: cleanTags(tags) }),
       setBadge: (badge) => set({ badge }),
       foodSort: 'match',
@@ -181,9 +195,9 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown };
         return {
           ...cur,
           hidden: cleanHidden(saved.hidden),
@@ -195,6 +209,7 @@ export const usePrefs = create<Prefs>()(
           boostKcal: BOOSTS.includes(saved.boostKcal as number) ? (saved.boostKcal as number) : 300,
           foodSort: cleanSort(saved.foodSort),
           tags: cleanTags(saved.tags),
+          searches: Array.isArray(saved.searches) ? saved.searches.filter((x): x is string => typeof x === 'string').reduceRight((a: string[], x) => pushSearch(a, x), []) : [],
           badge: saved.badge === 'protein' || saved.badge === 'kcal' ? saved.badge : 'off',
           bottleMl: BOTTLES.includes(saved.bottleMl as number) ? (saved.bottleMl as number) : 500,
           noSuggest: Array.isArray(saved.noSuggest) ? saved.noSuggest.filter((x): x is string => typeof x === 'string').map((x) => x.slice(0, 80)).slice(-200) : [],

@@ -11,7 +11,7 @@ import { findByBarcode, parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
-import { ORDER, cleanTags, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
+import { ORDER, cleanTags, pushSearch, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
 import { daySummary, foodHistory, hasTag, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
@@ -591,6 +591,14 @@ describe('note tags', () => {
     expect(toggleTag('felt great, gym ', 'Gym')).toBe('felt great');
     expect(hasTag('Rest day, tired', 'rest day')).toBe(true);
     expect(hasTag('Gymnastics', 'Gym')).toBe(false);
+  });
+});
+
+describe('recent searches', () => {
+  it('keeps the newest few, once each', () => {
+    let l: string[] = [];
+    for (const q of ['paneer', 'milk', ' Paneer  ', 'a', 'dal', 'roti', 'oats', 'eggs', 'tofu']) l = pushSearch(l, q);
+    expect(l).toEqual(['tofu', 'eggs', 'oats', 'roti', 'dal', 'Paneer']);
   });
 });
 

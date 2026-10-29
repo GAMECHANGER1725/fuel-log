@@ -59,6 +59,9 @@ export default function FoodPage() {
   const s = useStore();
   const unit = s.settings.unit;
   const speak = useDictation(setQ);
+  const searches = usePrefs((p) => p.searches);
+  // A search that led to a food is worth offering again.
+  const keepSearch = () => q.trim() && usePrefs.getState().addSearch(q);
 
   const local = useMemo(() => {
     const mine = new Set([...s.favourites, ...s.recents].map((f) => f.name.toLowerCase()));
@@ -99,6 +102,7 @@ export default function FoodPage() {
   const back = () => go(date === today ? 'today' : `today?d=${date}`);
   // + logs one serving straight away; tapping the name opens the sheet for amount and time.
   const quickAdd = (food: Food, source: Source) => {
+    keepSearch();
     const f = withEdit(food, s.recipeEdits);
     const qty = lastQty(s.days, today, f.name, f.serving);
     const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: foodMacros(f), qty, source, foodId: f.id }], [f]);
@@ -106,7 +110,7 @@ export default function FoodPage() {
   };
   const row = (f: Food, source: Source, remove?: () => void, onOpen?: () => void, move?: { up: boolean; down: boolean }) => (
     <div key={`${source}-${f.id}`} className="item">
-      <button className="item-btn" onClick={onOpen ?? (() => setPicked({ food: f, source }))}>
+      <button className="item-btn" onClick={onOpen ?? (() => { keepSearch(); setPicked({ food: f, source }); })}>
         <span>{f.name}</span>
         <span className="mono mut">
           {f.serving} · {energy(f.kcal, unit)} {unit} · {f.protein} g P{sort === 'lean' && (q || browse) ? ` · ${Math.round(proteinPer100kcal(f))} g per 100 kcal` : ''}{recipeFor(f, s.recipeEdits) ? ' · recipe' : ''}
@@ -162,13 +166,24 @@ export default function FoodPage() {
         <label className="search">
           <span className="mut"><Icon name="search" size={20} /></span>
           <input ref={searchRef} aria-label="Search foods" placeholder="Search foods or products" value={q} onChange={(e) => setQ(e.target.value)} enterKeyHint="search" />
-          {q && <button className="btn icon sm" style={{ border: 0, width: 32 }} aria-label="Clear search" onClick={() => setQ('')}><Icon name="close" size={18} /></button>}
+          {q && <button className="btn icon sm" style={{ border: 0, width: 32, padding: 0 }} aria-label="Clear search" onClick={() => setQ('')}><Icon name="close" size={18} /></button>}
           {speak.ok && (!q || speak.on) && (
-            <button className="btn icon sm" style={{ border: 0, width: 32, ...(speak.on ? { color: 'var(--fuel)' } : {}) }} aria-label={speak.on ? 'Stop listening' : 'Speak a search'} aria-pressed={speak.on} onClick={speak.toggle}>
+            <button className="btn icon sm" style={{ border: 0, width: 32, padding: 0, ...(speak.on ? { color: 'var(--fuel)' } : {}) }} aria-label={speak.on ? 'Stop listening' : 'Speak a search'} aria-pressed={speak.on} onClick={speak.toggle}>
               <Icon name="mic" size={18} />
             </button>
           )}
         </label>
+
+        {!q && searches.length > 0 && (
+          <div className="quick" role="group" aria-label="Recent searches" style={{ marginTop: -4 }}>
+            {searches.map((x) => (
+              <button key={x} className="chip" onClick={() => setQ(x)}>
+                <Icon name="search" size={14} /> {x}
+              </button>
+            ))}
+            <button className="chip" aria-label="Clear recent searches" onClick={() => usePrefs.getState().clearSearches()}><Icon name="close" size={14} /></button>
+          </div>
+        )}
 
         {!q && (
           <>
