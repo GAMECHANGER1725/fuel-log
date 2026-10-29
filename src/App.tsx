@@ -14,7 +14,8 @@ import { useAuth } from './lib/auth';
 import { startSync, useSync } from './lib/sync';
 import { autoDue, checkIn, useCoach } from './lib/coach';
 import { startReminders } from './lib/reminders';
-import { usePrefs } from './lib/prefs';
+import { autoBoostDue, usePrefs } from './lib/prefs';
+import { dateOf } from './lib/dates';
 import { badgeCount, dayTargets, dayTotals, targetsCrossed } from './lib/nutrition';
 
 export default function App() {
@@ -74,6 +75,17 @@ export default function App() {
     }, 3000);
     return () => clearTimeout(t);
   }, [unlocked, hasKey, synced, auto, today]);
+
+  // Training days chosen in Profile get the boost by themselves, once a day (turning it off again sticks).
+  const trainDays = usePrefs((p) => p.trainDays);
+  useEffect(() => {
+    if (!unlocked) return;
+    const p = usePrefs.getState();
+    const s = useStore.getState();
+    if (!autoBoostDue(today, dateOf(today).getDay(), trainDays, p.lastAutoBoost, !!s.days[today]?.boost)) return;
+    s.setBoost(today, p.boostKcal);
+    p.setLastAutoBoost(today);
+  }, [unlocked, today, trainDays]);
 
   // What's left today on the home-screen icon, where the phone supports app badges (installed PWA).
   // ponytail: set only while the app runs, so after midnight it shows yesterday's number until it's opened.

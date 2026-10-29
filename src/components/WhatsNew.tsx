@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29za';
+export const NEWS_ID = '2026-10-29zb';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Automatic training days', 'Pick your gym days in Profile and the training-day boost switches on by itself on those days.', '#/profile?open=today'],
   ['Notes on a food', 'Tap a logged food to add a short note, like “homemade, extra ghee”. It shows under the food in the log, and Search your log finds it.'],
   ['Tidier settings', 'Profile’s settings are split into Look, Today page and Reminders, so things are quicker to find.', '#/profile?open=today'],
   ['Don’t go too long without eating', 'With reminders on, pick 3, 4 or 5 hours in Profile and the app nudges you with a food idea until you hit your energy target.', '#/profile?open=reminders'],

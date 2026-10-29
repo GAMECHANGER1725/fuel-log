@@ -11,7 +11,7 @@ import { findByBarcode, parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
-import { ORDER, addShopping, cleanShopping, shoppingText, cleanTags, pushSearch, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
+import { ORDER, addShopping, autoBoostDue, cleanShopping, shoppingText, cleanTags, pushSearch, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
 import { daySummary, rangeStats, usualNow, waterWeek, foodHistory, hasTag, searchLog, weekBalance, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
@@ -614,6 +614,15 @@ describe('eat reminder', () => {
     expect(eatDue(at('14:00'), at('10:30'), 0, 1500, 3000, 0)).toBe(false); // off
     expect(eatDue(at('22:00'), at('10:30'), 0, 1500, 3000, 3 * H)).toBe(false); // after 9 pm
     expect(eatDue(at('11:00'), 0, 0, 0, 3000, 3 * H)).toBe(true); // nothing since 8 am
+  });
+});
+
+describe('auto training day', () => {
+  it('boosts a chosen weekday once, and leaves it off if you turn it off', () => {
+    expect(autoBoostDue('2026-10-28', 3, [1, 3, 5], '', false)).toBe(true);
+    expect(autoBoostDue('2026-10-28', 3, [1, 3, 5], '2026-10-28', false)).toBe(false); // done today, then turned off
+    expect(autoBoostDue('2026-10-28', 3, [1, 3, 5], '', true)).toBe(false); // already boosted
+    expect(autoBoostDue('2026-10-29', 4, [1, 3, 5], '', false)).toBe(false); // not a training day
   });
 });
 

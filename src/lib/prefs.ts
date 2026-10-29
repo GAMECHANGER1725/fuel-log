@@ -159,6 +159,10 @@ export const cleanShopping = (v: unknown): ShopItem[] =>
         .slice(-60)
     : [];
 
+/** Whether to switch on today's training-day boost by itself: a chosen weekday (0 = Sunday), not already done today, no boost yet. */
+export const autoBoostDue = (today: string, weekday: number, trainDays: number[], lastAuto: string, hasBoost: boolean): boolean =>
+  trainDays.includes(weekday) && lastAuto !== today && !hasBoost;
+
 export const cleanSort = (v: unknown): FoodSort => FOOD_SORTS.find(([id]) => id === v)?.[0] ?? 'match';
 
 export const cleanAccent = (v: unknown): Accent => ACCENTS.find(([id]) => id === v)?.[0] ?? 'ember';
@@ -186,6 +190,11 @@ interface Prefs {
   /** What the home-screen icon's badge shows. */
   badge: BadgeMode;
   setBadge: (b: BadgeMode) => void;
+  /** Weekdays (0 = Sunday) that get the training-day boost by themselves, and the last day it was switched on that way. */
+  trainDays: number[];
+  setTrainDays: (d: number[]) => void;
+  lastAutoBoost: string;
+  setLastAutoBoost: (k: string) => void;
   /** Days after a weigh-in before Today asks for the next. */
   weighEvery: number;
   setWeighEvery: (d: number) => void;
@@ -231,6 +240,10 @@ export const usePrefs = create<Prefs>()(
       bottleMl: 500,
       badge: 'off',
       weighEvery: 7,
+      trainDays: [],
+      setTrainDays: (trainDays) => set({ trainDays }),
+      lastAutoBoost: '',
+      setLastAutoBoost: (lastAutoBoost) => set({ lastAutoBoost }),
       start: 'today',
       shopping: [],
       setShopping: (shopping) => set({ shopping }),
@@ -261,9 +274,9 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches, weighEvery: s.weighEvery, start: s.start, shopping: s.shopping }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches, weighEvery: s.weighEvery, start: s.start, shopping: s.shopping, trainDays: s.trainDays, lastAutoBoost: s.lastAutoBoost }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown; weighEvery?: unknown; start?: unknown; shopping?: unknown };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown; weighEvery?: unknown; start?: unknown; shopping?: unknown; trainDays?: unknown; lastAutoBoost?: unknown };
         return {
           ...cur,
           hidden: cleanHidden(saved.hidden),
@@ -276,6 +289,8 @@ export const usePrefs = create<Prefs>()(
           foodSort: cleanSort(saved.foodSort),
           tags: cleanTags(saved.tags),
           shopping: cleanShopping(saved.shopping),
+          trainDays: Array.isArray(saved.trainDays) ? [...new Set(saved.trainDays.filter((x): x is number => Number.isInteger(x) && x >= 0 && x <= 6))] : [],
+          lastAutoBoost: typeof saved.lastAutoBoost === 'string' ? saved.lastAutoBoost.slice(0, 10) : '',
           start: STARTS.find(([id]) => id === saved.start)?.[0] ?? 'today',
           weighEvery: WEIGH_EVERY.includes(saved.weighEvery as number) ? (saved.weighEvery as number) : 7,
           searches: Array.isArray(saved.searches) ? saved.searches.filter((x): x is string => typeof x === 'string').reduceRight((a: string[], x) => pushSearch(a, x), []) : [],

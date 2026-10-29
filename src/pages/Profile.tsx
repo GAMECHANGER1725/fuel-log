@@ -367,6 +367,8 @@ function TodayForm() {
       <BottlePicker />
       <span className="mono mut">Training day adds (this device)</span>
       <BoostPicker />
+      <span className="mono mut">Training days (this device)</span>
+      <TrainDaysPicker />
       <span className="mono mut">Weigh-in reminder (this device)</span>
       <WeighPicker />
       <span className="mono mut">Show on Today (this device)</span>
@@ -521,6 +523,22 @@ function BoostPicker() {
     <div className="row" style={{ flexWrap: 'wrap' }} role="group" aria-label="Training day boost">
       {BOOSTS.map((k) => <button key={k} className="chip" aria-pressed={boostKcal === k} onClick={() => setBoostKcal(k)}>+{unit === 'kJ' ? Math.round(k * KJ) : k} {unit}</button>)}
     </div>
+  );
+}
+
+/** Weekdays whose target gets the training-day boost by itself. */
+function TrainDaysPicker() {
+  const { trainDays, setTrainDays } = usePrefs();
+  const days: [number, string][] = [[1, 'Mon'], [2, 'Tue'], [3, 'Wed'], [4, 'Thu'], [5, 'Fri'], [6, 'Sat'], [0, 'Sun']];
+  return (
+    <>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 6 }} role="group" aria-label="Training days">
+        {days.map(([d, l]) => (
+          <button key={d} className="chip" aria-pressed={trainDays.includes(d)} onClick={() => setTrainDays(trainDays.includes(d) ? trainDays.filter((x) => x !== d) : [...trainDays, d])}>{l}</button>
+        ))}
+      </div>
+      <span className="small mut">On these days the boost switches on by itself when you open the app. Turn it off on Today if you skip a session.</span>
+    </>
   );
 }
 
