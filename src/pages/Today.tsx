@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store';
 import { addDays, fmtDate, hhmmOf } from '../lib/dates';
-import { dayTotals, energy, entryMacros, fmt, sinceLast, timeOf } from '../lib/nutrition';
+import { KJ, dayTotals, energy, entryMacros, fmt, sinceLast, timeOf } from '../lib/nutrition';
 import { FOCUS_LABEL, FOODS, MOMENT_LABEL, gapFocus, gapSuggestions, momentOf, remaining } from '../lib/foods';
 import { XP } from '../lib/game';
 import type { Entry, Food } from '../lib/types';
-import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, useEatenAt, useGame, useNow, useRoute, useToday } from '../components/ui';
+import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, toastAdded, useEatenAt, useGame, useNow, useRoute, useToday } from '../components/ui';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card } from '../lib/prefs';
@@ -51,8 +51,8 @@ export default function Today() {
     : [];
 
   const addFood = (f: Food) => {
-    s.addEntries(date, [{ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty: 1, source: 'db', foodId: f.id }], [f]);
-    toast(`Added ${f.name}`, XP.meal);
+    const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty: 1, source: 'db', foodId: f.id }], [f]);
+    toastAdded(`Added ${f.name}`, XP.meal, date, ids);
     setOpen(null);
   };
 
@@ -291,7 +291,25 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
   const today = useToday();
   const [qty, setQty] = useState(entry.qty);
   const when = useEatenAt(date, entry.at);
-  const m = entryMacros({ ...entry, qty });
+  const unit = s.settings.unit;
+  // Name and per-serving numbers, editable to correct an estimate after logging.
+  const toUnit = (kcal: number) => String(Math.round(unit === 'kJ' ? kcal * KJ : kcal));
+  const [info, setInfo] = useState({ name: entry.name, serving: entry.serving, energy: toUnit(entry.base.kcal), protein: String(entry.base.protein), carbs: String(entry.base.carbs), fat: String(entry.base.fat) });
+  const n = (v: string) => Math.max(0, parseFloat(v) || 0);
+  const kcalIn = unit === 'kJ' ? n(info.energy) / KJ : n(info.energy);
+  const base = info.energy === toUnit(entry.base.kcal) ? { ...entry.base } : { ...entry.base, kcal: Math.round(kcalIn) };
+  base.protein = n(info.protein);
+  base.carbs = n(info.carbs);
+  base.fat = n(info.fat);
+  const name = info.name.trim().slice(0, 80) || entry.name;
+  const infoPatch = name !== entry.name || info.serving !== entry.serving || (['kcal', 'protein', 'carbs', 'fat'] as const).some((k) => base[k] !== entry.base[k]) ? { name, serving: info.serving.trim().slice(0, 60), base } : {};
+  const field = (k: keyof typeof info, label: string, numeric = true) => (
+    <label className="field">
+      <span>{label}</span>
+      <input className="input" value={info[k]} inputMode={numeric ? 'decimal' : undefined} type={numeric ? 'number' : 'text'} min={numeric ? '0' : undefined} onChange={(e) => setInfo({ ...info, [k]: e.target.value })} />
+    </label>
+  );
+  const m = entryMacros({ ...entry, ...infoPatch, qty });
   const fav = s.favourites.some((f) => f.name.toLowerCase() === entry.name.toLowerCase());
   return (
     <Sheet onClose={onClose} label={`Edit ${entry.name}`}>
@@ -302,6 +320,19 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
       <Stepper value={qty} onChange={setQty} label="servings" presets={SERVING_PRESETS} />
       <MacroGrid {...m} unit={s.settings.unit} />
       <TimeField value={when.hhmm} onChange={when.setHhmm} />
+      <details className="rule">
+        <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 600 }}>Change name or numbers</summary>
+        <div className="stack" style={{ gap: 10, paddingBottom: 6 }}>
+          {field('name', 'Food', false)}
+          {field('serving', 'One serving is', false)}
+          <div className="grid2">
+            {field('energy', `Energy per serving (${unit})`)}
+            {field('protein', 'Protein (g)')}
+            {field('carbs', 'Carbs (g)')}
+            {field('fat', 'Fat (g)')}
+          </div>
+        </div>
+      </details>
       <div className="row">
         <button
           className="btn danger"
@@ -326,13 +357,13 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
         >
           <Icon name="star" size={18} />
         </button>
-        <button className="btn primary grow" onClick={() => { s.updateEntry(date, entry.id, when.hhmm === hhmmOf(entry.at) ? { qty } : { qty, at: when.at }); onClose(); }}>Save</button>
+        <button className="btn primary grow" onClick={() => { s.updateEntry(date, entry.id, { qty, ...infoPatch, ...(when.hhmm === hhmmOf(entry.at) ? {} : { at: when.at }) }); onClose(); }}>Save</button>
       </div>
       <button
         className="btn dashed"
         onClick={() => {
-          s.addEntries(today, [{ name: entry.name, serving: entry.serving, base: entry.base, qty, source: entry.source, foodId: entry.foodId }]);
-          toast(`Logged ${entry.name} again${date === today ? '' : ' today'}`, XP.meal);
+          const ids = s.addEntries(today, [{ name: entry.name, serving: entry.serving, base: entry.base, ...infoPatch, qty, source: entry.source, foodId: entry.foodId }]);
+          toastAdded(`Logged ${name} again${date === today ? '' : ' today'}`, XP.meal, today, ids);
           onClose();
         }}
       >

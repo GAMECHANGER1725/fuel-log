@@ -187,6 +187,9 @@ export const useToast = create<{ msg: string | null; xp: number; n: number; acti
   show: (msg, xp = 0, action) => set((s) => ({ msg, xp, action, n: s.n + 1 })),
 }));
 export const toast = (msg: string, xp = 0, action?: ToastAction) => useToast.getState().show(msg, xp, action);
+/** Toast for food just logged, with Undo that takes it back off the log. */
+export const toastAdded = (msg: string, xp: number, date: string, ids: string[]) =>
+  toast(msg, xp, { label: 'Undo', run: () => ids.forEach((id) => useStore.getState().removeEntry(date, id)) });
 
 export function Toast() {
   const { msg, xp, n, action } = useToast();

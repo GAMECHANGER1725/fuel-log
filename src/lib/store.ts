@@ -19,8 +19,8 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 export type NewEntry = Omit<Entry, 'id' | 'at'>;
 
 interface Actions {
-  /** `at` = when it was eaten (epoch ms), now if left out. */
-  addEntries: (date: string, items: NewEntry[], foods?: Food[], at?: number) => void;
+  /** `at` = when it was eaten (epoch ms), now if left out. Returns the new entry ids (for undo). */
+  addEntries: (date: string, items: NewEntry[], foods?: Food[], at?: number) => string[];
   updateEntry: (date: string, id: string, patch: Partial<Entry>) => void;
   removeEntry: (date: string, id: string) => void;
   /** Put a removed entry back (undo). It gets a new id, since the old one stays in `tomb`. */
@@ -57,12 +57,14 @@ export const useStore = create<AppData & Actions>()(
           const now = Date.now();
           // A picked time can be later than now, so stamp the edit time too: sync compares `upd ?? at`.
           const stamp = at == null ? {} : { upd: now };
-          editDay(date, (d) => ({ ...d, entries: [...d.entries, ...items.map((e, i) => ({ ...e, id: uid(), at: (at ?? now) + i, ...stamp }))] }));
+          const added = items.map((e, i) => ({ ...e, id: uid(), at: (at ?? now) + i, ...stamp }));
+          editDay(date, (d) => ({ ...d, entries: [...d.entries, ...added] }));
           if (foods.length)
             set((s) => {
               const names = new Set(foods.map((f) => f.name.toLowerCase()));
               return { recents: [...foods, ...s.recents.filter((r) => !names.has(r.name.toLowerCase()))].slice(0, 20) };
             });
+          return added.map((e) => e.id);
         },
         updateEntry: (date, id, patch) => editDay(date, (d) => ({ ...d, entries: d.entries.map((e) => (e.id === id ? { ...e, ...patch, upd: Date.now() } : e)) })),
         removeEntry: (date, id) => {

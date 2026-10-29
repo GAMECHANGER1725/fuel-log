@@ -5,7 +5,7 @@ import { searchProducts } from '../lib/off';
 import { energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
 import type { Food, Source } from '../lib/types';
-import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, useEatenAt, useRoute, useToday } from '../components/ui';
+import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toastAdded, useEatenAt, useRoute, useToday } from '../components/ui';
 import Scanner from '../components/Scanner';
 import AiSheet from '../components/AiSheet';
 import type { AiMode } from '../lib/ai';
@@ -50,19 +50,25 @@ export default function FoodPage() {
 
   const usual = useMemo(() => mealGroups(s.days, today), [s.days, today]);
   const logMeal = (g: MealGroup) => {
-    s.addEntries(date, g.items.map(({ name, serving, base, qty, source, foodId }) => ({ name, serving, base, qty, source, foodId })));
-    toast(`Added ${g.items.length} items`, Math.min(g.items.length, XP.mealCap) * XP.meal);
+    const ids = s.addEntries(date, g.items.map(({ name, serving, base, qty, source, foodId }) => ({ name, serving, base, qty, source, foodId })));
+    toastAdded(`Added ${g.items.length} items`, Math.min(g.items.length, XP.mealCap) * XP.meal, date, ids);
     back();
   };
 
   const back = () => go(date === today ? 'today' : `today?d=${date}`);
+  // + logs one serving straight away; tapping the name opens the sheet for amount and time.
+  const quickAdd = (food: Food, source: Source) => {
+    const f = withEdit(food, s.recipeEdits);
+    const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: foodMacros(f), qty: 1, source, foodId: f.id }], [f]);
+    toastAdded(`Added ${f.name}`, XP.meal + (source === 'scan' ? XP.scan : 0), date, ids);
+  };
   const row = (f: Food, source: Source) => (
     <div key={`${source}-${f.id}`} className="item">
       <button className="item-btn" onClick={() => setPicked({ food: f, source })}>
         <span>{f.name}</span>
         <span className="mono mut">{f.serving} · {energy(f.kcal, unit)} {unit} · {f.protein} g P{recipeFor(f, s.recipeEdits) ? ' · recipe' : ''}</span>
       </button>
-      <button className="btn icon" aria-label={`Add ${f.name}`} onClick={() => setPicked({ food: f, source })}>+</button>
+      <button className="btn icon" aria-label={`Add one ${f.name} now`} onClick={() => quickAdd(f, source)}>+</button>
     </div>
   );
 
@@ -186,8 +192,8 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
       useGrams && food.per100
         ? { name: food.name, serving: `${grams} g`, base: m, qty: 1 }
         : { name: food.name, serving: food.serving, base: foodMacros(food), qty };
-    s.addEntries(date, [{ ...entry, source, foodId: food.id }], [food], when.at);
-    toast(`Added ${food.name}`, xp);
+    const ids = s.addEntries(date, [{ ...entry, source, foodId: food.id }], [food], when.at);
+    toastAdded(`Added ${food.name}`, xp, date, ids);
     onClose();
   };
 
@@ -245,9 +251,9 @@ function ManualSheet({ date, onClose }: { date: string; onClose: () => void }) {
   const save = () => {
     const base = { kcal: Math.round(kcal), protein: n(f.protein), carbs: n(f.carbs), fat: n(f.fat) };
     const food: Food = { id: `fav-${Date.now().toString(36)}`, name: f.name.trim().slice(0, 60), serving: f.serving.trim() || '1 serve', ...base };
-    s.addEntries(date, [{ name: food.name, serving: food.serving, base, qty: 1, source: 'custom' }], [food], when.at);
+    const ids = s.addEntries(date, [{ name: food.name, serving: food.serving, base, qty: 1, source: 'custom' }], [food], when.at);
     if (f.fav) s.toggleFavourite(food);
-    toast(`Added ${food.name}`, XP.meal);
+    toastAdded(`Added ${food.name}`, XP.meal, date, ids);
     onClose();
   };
 
