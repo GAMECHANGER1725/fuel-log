@@ -5,7 +5,7 @@ import { FOODS, browseFoods, proteinPer100kcal, sortFoods, wordForms, gapFocus, 
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
 import { addDays, atOn, daysSinceWeighIn, hhmmOf, weekStart } from '../src/lib/dates';
 import { chartWindow, goalProgress, suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
-import { computeGame, levelFromXp, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
+import { computeGame, levelFromXp, nextBadge, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
 import { DEFAULT_CHECKS, DEFAULT_DATA, cleanChecks, exportCsv, exportText, normalize, parseBackup } from '../src/lib/backup';
 import { findByBarcode, parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
@@ -673,6 +673,15 @@ describe('sortFoods', () => {
   it('measures protein per 100 kcal', () => {
     expect(proteinPer100kcal(f('Whey', 120, 24))).toBe(20);
     expect(proteinPer100kcal(f('Water', 0, 0))).toBe(0);
+  });
+});
+
+describe('nextBadge', () => {
+  const b = (id: string, have: number, need: number) => ({ id, name: id, desc: '', glyph: '', tone: 'ink' as const, have, need, earned: have >= need });
+  it('picks the started badge furthest along', () => {
+    expect(nextBadge([b('a', 1, 1), b('b', 3, 7), b('c', 40, 50), b('d', 0, 1)])?.id).toBe('c');
+    expect(nextBadge([b('x', 5, 10), b('y', 1, 2)])?.id).toBe('y'); // same share, smaller goal
+    expect(nextBadge([b('a', 1, 1), b('d', 0, 5)])).toBeNull();
   });
 });
 

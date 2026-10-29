@@ -210,6 +210,16 @@ export interface Badge {
   earned: boolean;
 }
 
+/** The badge you're closest to: started but not earned, furthest along (the smaller goal wins a tie). */
+export function nextBadge(badges: Badge[]): Badge | null {
+  const open = badges.filter((b) => !b.earned && b.have > 0);
+  if (!open.length) return null;
+  return open.reduce((a, b) => {
+    const fa = a.have / a.need, fb = b.have / b.need;
+    return fb > fa || (fb === fa && b.need < a.need) ? b : a;
+  });
+}
+
 // ----- Everything at once -------------------------------------------------------
 
 export function computeGame(d: AppData, today: string) {

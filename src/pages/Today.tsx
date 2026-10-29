@@ -3,7 +3,7 @@ import { useStore } from '../lib/store';
 import { addDays, daysSinceWeighIn, fmtDate, hhmmOf, weekStart } from '../lib/dates';
 import { KJ, dayTargets, dayTotals, energy, energySplit, entryMacros, fmt, paceGap, sinceLast, timeOf } from '../lib/nutrition';
 import { FOCUS_LABEL, FOODS, MOMENT_LABEL, gapFocus, gapSuggestions, momentOf, remaining } from '../lib/foods';
-import { XP } from '../lib/game';
+import { XP, nextBadge } from '../lib/game';
 import type { Entry, Food } from '../lib/types';
 import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, toastAdded, useEatenAt, useGame, useLongPress, useNow, useRoute, useSwipe, useToday } from '../components/ui';
 import RecipeView from '../components/RecipeView';
@@ -129,6 +129,18 @@ export default function Today() {
               <span className={`mono ${q.isDone ? 'fuel' : 'mut'}`}>+{q.xp} XP</span>
             </div>
           ))}
+          {(() => {
+            const nb = nextBadge(g.badges);
+            return nb && (
+              <a href="#/profile" className="stack rule" style={{ gap: 6, paddingTop: 10, marginTop: 4, color: 'var(--ink)', textDecoration: 'none' }}>
+                <div className="between" style={{ gap: 8 }}>
+                  <span className="small"><span className="mut">Next badge:</span> {nb.name} <span className="mut">· {nb.desc.toLowerCase()}</span></span>
+                  <span className="mono mut" style={{ flex: 'none' }}>{nb.id.startsWith('gained') ? `${(nb.have / 10).toFixed(1)} / ${nb.need / 10} kg` : `${fmt(nb.have)} / ${fmt(nb.need)}`}</span>
+                </div>
+                <Bar value={nb.have} max={nb.need} color="var(--fuel)" />
+              </a>
+            );
+          })()}
         </section>
       )
     ),
