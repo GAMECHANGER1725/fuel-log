@@ -9,7 +9,7 @@ import { todayKey, fmtDate } from '../lib/dates';
 import type { AppData, Macros } from '../lib/types';
 import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
-import { EAT_GAPS, FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
+import { EAT_GAPS, FOOD_HOURS, WATER_GAPS, hourLabel, pauseToday, pausedToday, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
 import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, PROGRESS_CARDS, QUICK_COUNTS, STARTS, WEIGH_EVERY, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
 import { NOTE_TAGS } from '../lib/meals';
@@ -125,7 +125,7 @@ export default function ProfilePage() {
             </label>
           ))}
         </Section>
-        <Section title="Reminders" hint={remindersOn() ? 'On' : 'Off'} hintColor={remindersOn() ? 'var(--pro)' : undefined} open={open === 'reminders'}>
+        <Section title="Reminders" hint={!remindersOn() ? 'Off' : pausedToday() ? 'Paused today' : 'On'} hintColor={remindersOn() && !pausedToday() ? 'var(--pro)' : undefined} open={open === 'reminders'}>
           <ReminderToggle />
           {'setAppBadge' in navigator && (
             <>
@@ -623,6 +623,7 @@ function ReminderToggle() {
   const [on, setOn] = useState(remindersOn);
   const [times, setTimes] = useState(reminderTimes);
   const [wrap, setWrapState] = useState(wrapOn);
+  const [paused, setPaused] = useState(pausedToday);
   const pick = (p: Partial<typeof times>) => {
     setReminderTimes(p);
     setTimes({ ...times, ...p });
@@ -645,6 +646,18 @@ function ReminderToggle() {
       </label>
       {on && (
         <>
+          <button
+            className="btn sm"
+            style={{ alignSelf: 'flex-start' }}
+            aria-pressed={paused}
+            onClick={() => {
+              pauseToday(!paused);
+              setPaused(!paused);
+              toast(paused ? 'Reminders back on' : 'Reminders paused until tomorrow');
+            }}
+          >
+            {paused ? 'Paused today · tap to resume' : 'Pause for today'}
+          </button>
           <span className="small mut">Water reminder after</span>
           <div className="row" style={{ flexWrap: 'wrap' }}>
             {WATER_GAPS.map((h) => <button key={h} className="chip" aria-pressed={times.waterGapH === h} onClick={() => pick({ waterGapH: h })}>{h} h</button>)}

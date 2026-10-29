@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29zh';
+export const NEWS_ID = '2026-10-29zi';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Pause reminders for today', 'Busy day? Pause every reminder until tomorrow in Profile, Reminders.', '#/profile?open=reminders'],
   ['Quieter level-ups', 'Prefer no full-screen moment? Pick Just a message under Level-ups in Profile, Look.', '#/profile?open=look'],
   ['Fold a meal', 'Tap Breakfast, Lunch or any meal heading in the log to fold it away; its totals stay. Tap again to open it.'],
   ['Notes in Share this day', 'Sharing a day now includes the day note and any notes on foods.'],

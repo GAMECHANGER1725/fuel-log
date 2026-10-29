@@ -30,8 +30,10 @@ interface Saved {
   /** Hours without food before a nudge; 0 = off. */
   eatGapH: number;
   lastEatRemind: number;
+  /** A day (yyyy-MM-dd) with every reminder paused. */
+  pausedDate: string;
 }
-const DEFAULTS: Saved = { on: false, lastWaterAt: 0, lastWaterRemind: 0, foodDate: '', waterGapH: 2, foodHour: 17, wrapOn: false, wrapDate: '', eatGapH: 0, lastEatRemind: 0 };
+const DEFAULTS: Saved = { on: false, lastWaterAt: 0, lastWaterRemind: 0, foodDate: '', waterGapH: 2, foodHour: 17, wrapOn: false, wrapDate: '', eatGapH: 0, lastEatRemind: 0, pausedDate: '' };
 const WRAP_HOUR = 21;
 export const WATER_GAPS = [1, 1.5, 2, 3];
 export const FOOD_HOURS = [15, 16, 17, 18, 19];
@@ -62,6 +64,9 @@ export const reminderTimes = () => {
 };
 export const setReminderTimes = (p: Partial<Pick<Saved, 'waterGapH' | 'foodHour' | 'eatGapH'>>) => patch(p);
 export const wrapOn = () => read().wrapOn;
+/** Pause every reminder until tomorrow, or undo that. */
+export const pausedToday = () => read().pausedDate === todayKey();
+export const pauseToday = (on: boolean) => patch({ pausedDate: on ? todayKey() : '' });
 export const setWrap = (on: boolean) => patch({ wrapOn: on });
 
 /** "5 PM" for an hour of the day. */
@@ -145,7 +150,7 @@ export function foodReminder(): { title: string; body: string } | null {
 }
 
 function tick() {
-  if (!remindersOn()) return;
+  if (!remindersOn() || pausedToday()) return;
   const now = Date.now();
   const r = read();
   const s = useStore.getState();
