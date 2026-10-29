@@ -11,7 +11,7 @@ import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
-import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, WEIGH_EVERY, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
+import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, STARTS, WEIGH_EVERY, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
 import { NOTE_TAGS } from '../lib/meals';
 import WhatsNew from '../components/WhatsNew';
 
@@ -335,6 +335,8 @@ function DisplayForm() {
       {opt(s.settings.unit, (unit) => s.setSettings({ unit }), [['kcal', 'Calories (kcal)'], ['kJ', 'Kilojoules (kJ)']])}
       <span className="mono mut">Theme</span>
       {opt(s.settings.theme, (theme) => s.setSettings({ theme }), [['auto', 'Match device'], ['dark', 'Dark'], ['light', 'Light']])}
+      <span className="mono mut">Open the app on (this device)</span>
+      <StartPicker />
       <span className="mono mut">Accent colour (this device)</span>
       <AccentPicker />
       <span className="mono mut">Text size (this device)</span>
@@ -464,6 +466,15 @@ function BadgePicker() {
       </div>
       <span className="small mut">Shows on the home-screen icon while the app is installed. It updates when you open the app.</span>
     </>
+  );
+}
+
+function StartPicker() {
+  const { start, setStart } = usePrefs();
+  return (
+    <div className="row" style={{ flexWrap: 'wrap' }} role="group" aria-label="Open the app on">
+      {STARTS.map(([id, label]) => <button key={id} className="chip" aria-pressed={start === id} onClick={() => setStart(id)}>{label}</button>)}
+    </div>
   );
 }
 

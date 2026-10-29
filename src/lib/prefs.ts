@@ -79,6 +79,14 @@ export const ACCENTS = [
 export type Accent = (typeof ACCENTS)[number][0];
 export const BOOSTS = [200, 300, 500];
 export const BOTTLES = [500, 600, 750, 1000];
+/** Pages the app can open on. */
+export const STARTS = [
+  ['today', 'Today'],
+  ['food', 'Add food'],
+  ['progress', 'Progress'],
+] as const;
+export type Start = (typeof STARTS)[number][0];
+
 /** Days between weigh-in reminders on Today. */
 export const WEIGH_EVERY = [1, 3, 7, 14];
 
@@ -140,6 +148,9 @@ interface Prefs {
   /** Days after a weigh-in before Today asks for the next. */
   weighEvery: number;
   setWeighEvery: (d: number) => void;
+  /** Page the app opens on when launched without one (e.g. from the home-screen icon). */
+  start: Start;
+  setStart: (s: Start) => void;
   /** One-tap tags under the day note. ponytail: per device, so a phone and laptop can differ. */
   tags: string[];
   setTags: (t: string[]) => void;
@@ -176,6 +187,8 @@ export const usePrefs = create<Prefs>()(
       bottleMl: 500,
       badge: 'off',
       weighEvery: 7,
+      start: 'today',
+      setStart: (start) => set({ start }),
       setWeighEvery: (weighEvery) => set({ weighEvery }),
       tags: [...NOTE_TAGS],
       searches: [],
@@ -202,9 +215,9 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches, weighEvery: s.weighEvery }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches, weighEvery: s.weighEvery, start: s.start }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown; weighEvery?: unknown };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown; weighEvery?: unknown; start?: unknown };
         return {
           ...cur,
           hidden: cleanHidden(saved.hidden),
@@ -216,6 +229,7 @@ export const usePrefs = create<Prefs>()(
           boostKcal: BOOSTS.includes(saved.boostKcal as number) ? (saved.boostKcal as number) : 300,
           foodSort: cleanSort(saved.foodSort),
           tags: cleanTags(saved.tags),
+          start: STARTS.find(([id]) => id === saved.start)?.[0] ?? 'today',
           weighEvery: WEIGH_EVERY.includes(saved.weighEvery as number) ? (saved.weighEvery as number) : 7,
           searches: Array.isArray(saved.searches) ? saved.searches.filter((x): x is string => typeof x === 'string').reduceRight((a: string[], x) => pushSearch(a, x), []) : [],
           badge: saved.badge === 'protein' || saved.badge === 'kcal' ? saved.badge : 'off',
