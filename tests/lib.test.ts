@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCrossed } from '../src/lib/nutrition';
+import { coverage, dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCrossed } from '../src/lib/nutrition';
 import { foodDue, hourLabel, waterDue } from '../src/lib/reminders';
 import { FOODS, browseFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
@@ -591,5 +591,16 @@ describe('records', () => {
     };
     expect(records(days)).toEqual({ kcal: { date: '2026-10-20', value: 3400 }, protein: { date: '2026-10-21', value: 140 }, water: { date: '2026-10-21', value: 9 } });
     expect(records({})).toEqual({ kcal: null, protein: null, water: null });
+  });
+});
+
+describe('coverage', () => {
+  const T = { kcal: 3000, protein: 120, carbs: 0, fat: 0 };
+  const m = (kcal: number, protein: number) => ({ kcal, protein, carbs: 0, fat: 0 });
+  it('gives the share of what is left', () => {
+    expect(coverage(m(500, 20), m(2000, 80), T)).toEqual({ kcal: 50, protein: 50, overKcal: false });
+  });
+  it('caps at 100, skips a target already hit, and flags a big overshoot', () => {
+    expect(coverage(m(1500, 10), m(2000, 130), T)).toEqual({ kcal: 100, protein: null, overKcal: true });
   });
 });
