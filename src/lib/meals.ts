@@ -92,7 +92,7 @@ export interface LogHit {
 }
 
 /**
- * Logged entries whose name has every word of `q` (any order, ignoring case), newest first, at most `max`.
+ * Logged entries whose name and note together have every word of `q` (any order, ignoring case), newest first, at most `max`.
  * `total` counts every match, so the list can say "and N more".
  */
 export function searchLog(days: Record<string, DayLog>, q: string, max = 30): { hits: LogHit[]; total: number } {
@@ -101,8 +101,8 @@ export function searchLog(days: Record<string, DayLog>, q: string, max = 30): { 
   const all: LogHit[] = [];
   for (const [date, d] of Object.entries(days)) {
     for (const entry of d.entries) {
-      const name = entry.name.toLowerCase();
-      if (words.every((w) => name.includes(w))) all.push({ date, entry });
+      const text = `${entry.name} ${entry.note ?? ''}`.toLowerCase();
+      if (words.every((w) => text.includes(w))) all.push({ date, entry });
     }
   }
   all.sort((a, b) => (a.date === b.date ? b.entry.at - a.entry.at : a.date < b.date ? 1 : -1));

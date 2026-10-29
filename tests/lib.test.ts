@@ -732,6 +732,8 @@ describe('search the log', () => {
     expect(searchLog(days, 'bhurji paneer').total).toBe(2);
     expect(searchLog(days, 'paneer', 1).hits).toHaveLength(1);
     expect(searchLog(days, ' p ').total).toBe(0);
+    const noted = { '2026-10-05': day([entry(100, 5, { name: 'Dal', note: 'Nani made it' })]) };
+    expect(searchLog(noted, 'nani dal').total).toBe(1);
   });
 });
 

@@ -378,7 +378,10 @@ function LogSearch({ today }: { today: string }) {
               <div key={e.id} className="item" style={{ padding: '4px 0', gap: 4 }}>
                 <a href={date === today ? '#/today' : `#/today?d=${date}`} className="grow" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, padding: '4px 0', color: 'var(--ink)', textDecoration: 'none' }}>
                   <span className="mono dim" style={{ width: 92, flex: 'none' }}>{fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short' })}<br />{timeOf(e.at)}</span>
-                  <span className="grow" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
+                  <span className="grow stack" style={{ gap: 0, minWidth: 0, overflowWrap: 'anywhere' }}>
+                    <span>{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
+                    {e.note && <span className="small mut">{e.note}</span>}
+                  </span>
                   <span className="mono mut" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)} · {fmt(entryMacros(e).protein)} g</span>
                 </a>
                 <button
