@@ -3,6 +3,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { FOOD_SORTS, type FoodSort } from './foods';
 
 export const CARDS = [
   ['train', 'Training day button'],
@@ -16,7 +17,13 @@ export const CARDS = [
   ['note', 'Day note'],
   ['weigh', 'Weigh-in reminder'],
   ['tips', 'Eating tips'],
+  ['qscan', 'Scan'],
+  ['qsnap', 'Snap meal'],
+  ['qnum', 'Numbers'],
+  ['qagain', 'Meal again'],
 ] as const;
+/** Quick log's action buttons, which can be hidden one by one. */
+export const QUICK_ACTIONS = ['qscan', 'qsnap', 'qnum', 'qagain'] as const;
 export type Card = (typeof CARDS)[number][0];
 
 const IDS: readonly string[] = CARDS.map(([id]) => id);
@@ -79,6 +86,8 @@ export const SIZES = [
 export type TextSize = (typeof SIZES)[number][0];
 export const cleanSize = (v: unknown): TextSize => SIZES.find(([id]) => id === v)?.[0] ?? 'normal';
 
+export const cleanSort = (v: unknown): FoodSort => FOOD_SORTS.find(([id]) => id === v)?.[0] ?? 'match';
+
 export const cleanAccent = (v: unknown): Accent => ACCENTS.find(([id]) => id === v)?.[0] ?? 'ember';
 
 /** Keep only known card ids, once each (saved prefs are untrusted). */
@@ -104,6 +113,9 @@ interface Prefs {
   /** Lower-case names Close the gap shouldn't suggest. ponytail: per device, not synced. */
   noSuggest: string[];
   toggleSuggest: (name: string) => void;
+  /** How Add food sorts search and browse results. */
+  foodSort: FoodSort;
+  setFoodSort: (s: FoodSort) => void;
   toggle: (c: Card) => void;
   flipRing: () => void;
   move: (id: OrderCard, dir: -1 | 1) => void;
@@ -125,6 +137,8 @@ export const usePrefs = create<Prefs>()(
       boostKcal: 300,
       noSuggest: [],
       bottleMl: 500,
+      foodSort: 'match',
+      setFoodSort: (foodSort) => set({ foodSort }),
       setBottleMl: (bottleMl) => set({ bottleMl }),
       toggleSuggest: (name) =>
         set((s) => {
@@ -142,9 +156,9 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown };
         return {
           ...cur,
           hidden: cleanHidden(saved.hidden),
@@ -154,6 +168,7 @@ export const usePrefs = create<Prefs>()(
           order: cleanOrder(saved.order),
           ring: saved.ring === 'eaten' ? 'eaten' : 'left',
           boostKcal: BOOSTS.includes(saved.boostKcal as number) ? (saved.boostKcal as number) : 300,
+          foodSort: cleanSort(saved.foodSort),
           bottleMl: BOTTLES.includes(saved.bottleMl as number) ? (saved.bottleMl as number) : 500,
           noSuggest: Array.isArray(saved.noSuggest) ? saved.noSuggest.filter((x): x is string => typeof x === 'string').map((x) => x.slice(0, 80)).slice(-200) : [],
         };
