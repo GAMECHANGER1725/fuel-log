@@ -567,7 +567,7 @@ export default function Today() {
 
         {order.map((id) => <Fragment key={id}>{cards[id]}</Fragment>)}
 
-        <a href="#/profile?open=display" className="btn sm" style={{ alignSelf: 'center' }}><Icon name="pencil" size={14} /> Customise this page</a>
+        <a href="#/profile?open=today" className="btn sm" style={{ alignSelf: 'center' }}><Icon name="pencil" size={14} /> Customise this page</a>
       </div>
 
       {editing && <EditSheet date={date} entry={editing} onClose={() => setEditing(null)} />}

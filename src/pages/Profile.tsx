@@ -108,8 +108,20 @@ export default function ProfilePage() {
         <Section title="Food-quality checks" hint={`${s.settings.checks.length} checks`} open={open === 'checks'}>
           <ChecksForm />
         </Section>
-        <Section title="Display and food" hint={`${s.settings.unit} · ${s.settings.theme === 'auto' ? 'match device' : s.settings.theme}`} open={open === 'display'}>
-          <DisplayForm />
+        <Section title="Look" hint={`${s.settings.unit} · ${s.settings.theme === 'auto' ? 'match device' : s.settings.theme}`} open={open === 'look' || open === 'display'}>
+          <LookForm />
+        </Section>
+        <Section title="Today page" hint="Cards, buttons, tags" open={open === 'today'}>
+          <TodayForm />
+        </Section>
+        <Section title="Reminders" hint={remindersOn() ? 'On' : 'Off'} hintColor={remindersOn() ? 'var(--pro)' : undefined} open={open === 'reminders'}>
+          <ReminderToggle />
+          {'setAppBadge' in navigator && (
+            <>
+              <span className="mono mut">App icon badge (this device)</span>
+              <BadgePicker />
+            </>
+          )}
         </Section>
         <Section title="Backup and import" hint={s.lastExport ? `Last export ${fmtDate(s.lastExport)}` : 'Never exported'} open={open === 'backup'}>
           <BackupForm />
@@ -322,7 +334,8 @@ function KeyForm(p: {
   );
 }
 
-function DisplayForm() {
+/** Units, theme and per-device look. */
+function LookForm() {
   const s = useStore();
   const opt = <T extends string>(cur: T, set: (v: T) => void, items: [T, string][]) => (
     <div className="row" style={{ flexWrap: 'wrap' }}>
@@ -341,6 +354,15 @@ function DisplayForm() {
       <AccentPicker />
       <span className="mono mut">Text size (this device)</span>
       <TextSizePicker />
+    </>
+  );
+}
+
+/** What Today shows and how its buttons behave. */
+function TodayForm() {
+  const s = useStore();
+  return (
+    <>
       <span className="mono mut">Water bottle button (this device)</span>
       <BottlePicker />
       <span className="mono mut">Training day adds (this device)</span>
@@ -357,14 +379,6 @@ function DisplayForm() {
         Include whey protein in “Close the gap” (off by default; whey can make acne worse for some people)
       </label>
       <HiddenSuggestions />
-      <span className="mono mut">Reminders</span>
-      <ReminderToggle />
-      {'setAppBadge' in navigator && (
-        <>
-          <span className="mono mut">App icon badge (this device)</span>
-          <BadgePicker />
-        </>
-      )}
     </>
   );
 }
