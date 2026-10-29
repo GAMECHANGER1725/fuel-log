@@ -87,7 +87,10 @@ interface Prefs {
   /** Id of the last What's new sheet seen on this device. */
   newsSeen: string;
   order: OrderCard[];
+  /** What the ring's centre shows: energy still to eat, or eaten so far. */
+  ring: 'left' | 'eaten';
   toggle: (c: Card) => void;
+  flipRing: () => void;
   move: (id: OrderCard, dir: -1 | 1) => void;
   resetOrder: () => void;
   markNews: (id: string) => void;
@@ -103,6 +106,8 @@ export const usePrefs = create<Prefs>()(
       size: 'normal',
       newsSeen: '',
       order: [...ORDER],
+      ring: 'left',
+      flipRing: () => set((s) => ({ ring: s.ring === 'left' ? 'eaten' : 'left' })),
       move: (id, dir) => set((s) => ({ order: moveIn(s.order, id, dir) })),
       resetOrder: () => set({ order: [...ORDER] }),
       markNews: (newsSeen) => set({ newsSeen }),
@@ -112,9 +117,9 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown };
         return {
           ...cur,
           hidden: cleanHidden(saved.hidden),
@@ -122,6 +127,7 @@ export const usePrefs = create<Prefs>()(
           size: cleanSize(saved.size),
           newsSeen: typeof saved.newsSeen === 'string' ? saved.newsSeen.slice(0, 20) : '',
           order: cleanOrder(saved.order),
+          ring: saved.ring === 'eaten' ? 'eaten' : 'left',
         };
       },
     },
