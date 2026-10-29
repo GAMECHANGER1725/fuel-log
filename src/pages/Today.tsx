@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
-import { SECTION_LABEL, combineAsFood, hasTag, toggleTag, daySummary, drinkMl, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals } from '../lib/meals';
+import { SECTION_LABEL, combineAsFood, hasTag, toggleTag, daySummary, drinkMl, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals, topFoods } from '../lib/meals';
 
 export default function Today() {
   const today = useToday();
@@ -316,6 +316,7 @@ export default function Today() {
           ) : (
             <p className="empty">Nothing logged {isToday ? 'yet today' : 'this day'}.</p>
           )}
+          {!picked && day.entries.length >= 3 && <DaySources date={date} />}
           {picked && (
             <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
               <button className="btn sm" onClick={() => setPicked(picked.size === day.entries.length ? new Set() : new Set(day.entries.map((e) => e.id)))}>
@@ -563,6 +564,35 @@ export default function Today() {
       {editing && <EditSheet date={date} entry={editing} onClose={() => setEditing(null)} />}
       {saving && <SaveMealSheet entries={saving} onClose={() => setSaving(null)} onSaved={() => { setSaving(null); setPicked(null); }} />}
     </>
+  );
+}
+
+/** Which foods gave the day's protein or energy, biggest first; folded away until opened. */
+function DaySources({ date }: { date: string }) {
+  const days = useStore((s) => s.days);
+  const unit = useStore((s) => s.settings.unit);
+  const [what, setWhat] = useState<'protein' | 'kcal'>('protein');
+  const top = topFoods(days, date, what, 1, 6);
+  const color = what === 'kcal' ? 'var(--fuel)' : 'var(--pro)';
+  return (
+    <details className="card tight">
+      <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 600 }}>Where it came from</summary>
+      <div className="stack" style={{ gap: 10, paddingBottom: 8 }}>
+        <div className="row" style={{ gap: 6 }}>
+          <button className="chip" aria-pressed={what === 'protein'} onClick={() => setWhat('protein')}>Protein</button>
+          <button className="chip" aria-pressed={what === 'kcal'} onClick={() => setWhat('kcal')}>Energy</button>
+        </div>
+        {top.length ? top.map((f) => (
+          <div key={f.name} className="stack" style={{ gap: 4 }}>
+            <div className="between" style={{ gap: 8 }}>
+              <span className="grow" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{f.name}{f.times > 1 && <span className="mono dim"> ×{f.times}</span>}</span>
+              <span className="mono mut" style={{ flex: 'none' }}>{what === 'kcal' ? `${energy(f.value, unit)} ${unit}` : `${fmt(f.value)} g`} · {Math.round(f.share * 100)}%</span>
+            </div>
+            <Bar value={Math.round(f.share * 100)} max={100} color={color} />
+          </div>
+        )) : <p className="small mut" style={{ margin: 0 }}>No {what === 'kcal' ? 'energy' : 'protein'} logged.</p>}
+      </div>
+    </details>
   );
 }
 
