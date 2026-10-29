@@ -31,7 +31,7 @@ There is no linter. CI (`.github/workflows/deploy.yml`) runs `npm test` then `np
 
 **Reminders.** `reminders.ts` shows water (2 h without a drink by default, 8 am to 9 pm) and evening food notifications (5 PM by default; both times are chosen in Profile) via the service worker (`public/sw-extra.js` is pulled into the generated SW by `workbox.importScripts`). It runs only while the app is alive, since there is no server; its on/off flag and timestamps are per device in localStorage, not in the store or the gist.
 
-**Sync (the part that needs several files to understand).** `sync.ts` talks to the GitHub Gist API and schedules syncs; `syncdoc.ts` defines the synced document and the merge rules (union of entries by id, tombstones in `tomb` for deletions, newer `m` wins for water/checks, newest `mod` wins for the whole profile/targets/weigh-ins/favourites block). Consequences when changing the store:
+**Sync (the part that needs several files to understand).** `sync.ts` talks to the GitHub Gist API and schedules syncs; `syncdoc.ts` defines the synced document and the merge rules (union of entries by id, tombstones in `tomb` for deletions, newer `m` wins for water/checks/day note, newest `mod` wins for the whole profile/targets/weigh-ins/favourites block). Consequences when changing the store:
 - Mutations that should sync must bump the right timestamp (`Entry.upd`, `DayLog.m`, or `mod`) and deletions must write to `tomb`.
 - Per-device fields (AI keys/models/`aiFirst`, theme, recents, GitHub token) must stay out of the gist; `LOCAL_ONLY` in `store.ts` and `SmallData` in `syncdoc.ts` both encode this.
 - The document is canonicalised (sorted keys) so equal docs compare equal; keep it that way or sync will write on every tick.

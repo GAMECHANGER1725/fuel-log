@@ -45,7 +45,9 @@ export interface DayLog {
   /** 250 ml glasses. */
   water: number;
   checks: Record<string, boolean>;
-  /** Epoch ms of the last water/checks change, for syncing. */
+  /** A short free-text note about the day ("gym day", "felt full"). */
+  note?: string;
+  /** Epoch ms of the last water/checks/note change, for syncing. */
   m?: number;
 }
 

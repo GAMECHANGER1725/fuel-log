@@ -12,6 +12,7 @@ export const CARDS = [
   ['gap', 'Close the gap'],
   ['water', 'Water'],
   ['quality', 'Food quality'],
+  ['note', 'Day note'],
   ['tips', 'Eating tips'],
 ] as const;
 export type Card = (typeof CARDS)[number][0];
