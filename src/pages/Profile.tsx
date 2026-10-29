@@ -11,7 +11,7 @@ import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { remindersOn, remindersSupported, setReminders } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
-import { ACCENTS, CARDS, usePrefs } from '../lib/prefs';
+import { ACCENTS, CARDS, SIZES, usePrefs } from '../lib/prefs';
 
 const TONE = { fuel: 'var(--fuel)', protein: 'var(--pro)', sand: 'var(--carb)', ink: 'var(--ink)' };
 
@@ -329,6 +329,8 @@ function DisplayForm() {
       {opt(s.settings.theme, (theme) => s.setSettings({ theme }), [['auto', 'Match device'], ['dark', 'Dark'], ['light', 'Light']])}
       <span className="mono mut">Accent colour (this device)</span>
       <AccentPicker />
+      <span className="mono mut">Text size (this device)</span>
+      <TextSizePicker />
       <span className="mono mut">Show on Today (this device)</span>
       <TodayCards />
       <span className="mono mut">Suggestions</span>
@@ -352,6 +354,15 @@ function AccentPicker() {
           {label}
         </button>
       ))}
+    </div>
+  );
+}
+
+function TextSizePicker() {
+  const { size, setSize } = usePrefs();
+  return (
+    <div className="row" style={{ flexWrap: 'wrap' }} role="group" aria-label="Text size">
+      {SIZES.map(([id, label]) => <button key={id} className="chip" aria-pressed={size === id} onClick={() => setSize(id)}>{label}</button>)}
     </div>
   );
 }

@@ -11,7 +11,7 @@ import { parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
-import { cleanAccent, cleanHidden, toggleIn } from '../src/lib/prefs';
+import { cleanAccent, cleanHidden, cleanSize, toggleIn } from '../src/lib/prefs';
 import { daySummary, logSections, mealGroups } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
@@ -438,5 +438,12 @@ describe('day summary', () => {
     const e = (name: string, hhmm: string, qty = 1): Entry => ({ id: name, name, serving: '', base: { kcal: 300, protein: 10, carbs: 0, fat: 0 }, qty, source: 'db', at: atOn(k, hhmm) });
     const text = daySummary('Thursday', [e('Toast', '07:00', 2), e('Dal', '19:00')], { kcal: 3000, protein: 115 }, 'kcal', hhmmOf);
     expect(text).toBe(['Thursday: 900 kcal of 3,000 kcal, 30 g of 115 g protein', '', 'Breakfast (600 kcal, 20 g)', '• 07:00 2× Toast', '', 'Dinner (300 kcal, 10 g)', '• 19:00 Dal'].join('\n'));
+  });
+});
+
+describe('text size', () => {
+  it('falls back to normal for anything unknown', () => {
+    expect(cleanSize('xl')).toBe('xl');
+    expect(cleanSize('huge')).toBe('normal');
   });
 });
