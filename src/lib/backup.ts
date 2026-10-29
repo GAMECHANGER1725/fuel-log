@@ -2,8 +2,8 @@
 // Imported files are untrusted, so everything is re-validated field by field.
 
 import type { AppData, DayLog, Entry, Food, Macros, Source } from './types';
-import { isKey } from './dates';
-import { r1 } from './nutrition';
+import { hhmmOf, isKey } from './dates';
+import { dayTotals, entryMacros, r1 } from './nutrition';
 import { DEFAULT_GEMINI_MODEL, DEFAULT_MODEL } from './ai';
 import type { Recipe, RecipeEdits } from './recipes';
 
@@ -230,6 +230,28 @@ export function fromFuelLogV2(raw: unknown): AppData {
     weighIns: arr(r.checkins).map((c) => ({ date: obj(c).date, kg: obj(c).weight })),
     favourites: arr(r.quick).map((q) => ({ ...obj(q), serving: '1 serve', carbs: 0, fat: 0 })),
   });
+}
+
+/** One CSV field: quoted when needed, and text that a spreadsheet would run as a formula is prefixed with '. */
+const csvField = (v: string | number) => {
+  if (typeof v === 'number') return String(v);
+  const t = /^[=+\-@]/.test(v) ? `'${v}` : v;
+  return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+};
+
+/** The whole log as CSV: a row per food, then a 'day' row with that day's totals, water and note. */
+export function exportCsv(d: AppData): string {
+  const rows: (string | number)[][] = [['type', 'date', 'time', 'food', 'serving', 'servings', 'kcal', 'protein_g', 'carbs_g', 'fat_g', 'water_l', 'note']];
+  for (const date of Object.keys(d.days).sort()) {
+    const day = d.days[date];
+    for (const e of [...day.entries].sort((a, b) => a.at - b.at)) {
+      const m = entryMacros(e);
+      rows.push(['food', date, hhmmOf(e.at), e.name, e.serving, e.qty, Math.round(m.kcal), r1(m.protein), r1(m.carbs), r1(m.fat), '', '']);
+    }
+    const t = dayTotals(day);
+    if (day.entries.length || day.water || day.note) rows.push(['day', date, '', '', '', '', Math.round(t.kcal), r1(t.protein), r1(t.carbs), r1(t.fat), day.water * 0.25, day.note ?? '']);
+  }
+  return rows.map((r) => r.map(csvField).join(',')).join('\r\n') + '\r\n';
 }
 
 export function exportText(d: AppData): string {
