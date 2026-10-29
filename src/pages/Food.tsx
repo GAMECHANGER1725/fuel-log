@@ -94,12 +94,18 @@ export default function FoodPage() {
     const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: foodMacros(f), qty, source, foodId: f.id }], [f]);
     toastAdded(`Added ${qty !== 1 ? `${qty}× ` : ''}${f.name}`, XP.meal + (source === 'scan' ? XP.scan : 0), date, ids);
   };
-  const row = (f: Food, source: Source, remove?: () => void, onOpen?: () => void) => (
+  const row = (f: Food, source: Source, remove?: () => void, onOpen?: () => void, move?: { up: boolean; down: boolean }) => (
     <div key={`${source}-${f.id}`} className="item">
       <button className="item-btn" onClick={onOpen ?? (() => setPicked({ food: f, source }))}>
         <span>{f.name}</span>
         <span className="mono mut">{f.serving} · {energy(f.kcal, unit)} {unit} · {f.protein} g P{recipeFor(f, s.recipeEdits) ? ' · recipe' : ''}</span>
       </button>
+      {move && (
+        <>
+          <button className="btn icon sm" style={{ width: 36 }} aria-label={`Move ${f.name} up`} disabled={!move.up} onClick={() => s.moveFavourite(f.id, -1)}><span style={{ transform: 'rotate(90deg)', display: 'flex' }}><Icon name="left" size={16} /></span></button>
+          <button className="btn icon sm" style={{ width: 36 }} aria-label={`Move ${f.name} down`} disabled={!move.down} onClick={() => s.moveFavourite(f.id, 1)}><span style={{ transform: 'rotate(90deg)', display: 'flex' }}><Icon name="right" size={16} /></span></button>
+        </>
+      )}
       {remove ? (
         <button className="btn icon danger" aria-label={`Remove ${f.name} from this list`} onClick={remove}><Icon name="close" size={18} /></button>
       ) : (
@@ -202,10 +208,16 @@ export default function FoodPage() {
             {s.favourites.length > 0 && (
               <section>
                 {listHead('Favourites', 'fav')}
-                {tidy === 'fav' && <p className="small mut" style={{ margin: '-2px 0 4px' }}>Tap a favourite to change its name or numbers.</p>}
-                {s.favourites.map((f) =>
+                {tidy === 'fav' && <p className="small mut" style={{ margin: '-2px 0 4px' }}>Tap a favourite to change its name or numbers. Arrows set the order (also used by Quick log on Today).</p>}
+                {s.favourites.map((f, i) =>
                   tidy === 'fav'
-                    ? row(f, f.barcode ? 'off' : 'db', () => { s.toggleFavourite(f); toast(`Removed ${f.name} from favourites`, 0, { label: 'Undo', run: () => useStore.getState().toggleFavourite(f) }); }, () => setEditingFav(f))
+                    ? row(
+                        f,
+                        f.barcode ? 'off' : 'db',
+                        () => { s.toggleFavourite(f); toast(`Removed ${f.name} from favourites`, 0, { label: 'Undo', run: () => useStore.getState().toggleFavourite(f) }); },
+                        () => setEditingFav(f),
+                        { up: i > 0, down: i < s.favourites.length - 1 },
+                      )
                     : row(f, f.barcode ? 'off' : 'db'),
                 )}
               </section>
