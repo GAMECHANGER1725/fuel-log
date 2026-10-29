@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useStore, dataOf } from '../lib/store';
 import { addDays, dateOf, daysBetween, fmtDate, weekStart } from '../lib/dates';
-import { dayTotals, energy, fmt, r1 } from '../lib/nutrition';
+import { dayTotals, energy, entryMacros, fmt, r1, timeOf } from '../lib/nutrition';
 import { chartWindow, goalProgress, projectedDate, trendLine, weeklyNudge, weeklyRate, withKcal } from '../lib/targets';
 
 import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
-import { records, tagStats, topFoods, weekdayAverages, weekStats, weekSummary } from '../lib/meals';
+import { records, searchLog, tagStats, topFoods, weekdayAverages, weekStats, weekSummary } from '../lib/meals';
 import { hasAi } from '../lib/ai';
 import { usePrefs } from '../lib/prefs';
 import { Bar, Icon, Sheet, toast, useGame, useRoute, useToday } from '../components/ui';
@@ -171,6 +171,7 @@ export default function Progress() {
         })()}
 
         <TopFoods today={today} />
+        <LogSearch today={today} />
 
         <section className="card">
           <h2 className="h2" style={{ marginBottom: 8 }}>Weekly averages</h2>
@@ -336,6 +337,44 @@ function TopFoods({ today }: { today: string }) {
           </div>
         </div>
       ))}
+    </section>
+  );
+}
+
+/** Find every time you logged a food, newest first; each row opens that day. */
+function LogSearch({ today }: { today: string }) {
+  const days = useStore((s) => s.days);
+  const unit = useStore((s) => s.settings.unit);
+  const [q, setQ] = useState('');
+  const [more, setMore] = useState(false);
+  const { hits, total } = searchLog(days, q);
+  const shown = more ? hits : hits.slice(0, 10);
+  const dayCount = new Set(hits.map((h) => h.date)).size;
+  return (
+    <section className="card stack" style={{ gap: 10 }}>
+      <h2 className="h2">Search your log</h2>
+      <label className="search" style={{ background: 'var(--s2)', boxShadow: 'none' }}>
+        <span className="mut"><Icon name="search" size={20} /></span>
+        <input aria-label="Search your log" placeholder="When did I last have…" value={q} onChange={(e) => { setQ(e.target.value); setMore(false); }} enterKeyHint="search" />
+        {q && <button className="btn icon sm" style={{ border: 0, width: 32 }} aria-label="Clear log search" onClick={() => setQ('')}><Icon name="close" size={18} /></button>}
+      </label>
+      {q.trim().length >= 2 && (
+        total ? (
+          <div className="stack" style={{ gap: 0 }}>
+            <span className="mono mut" style={{ paddingBottom: 4 }}>
+              {total} time{total === 1 ? '' : 's'}{total > hits.length ? `, newest ${hits.length} shown` : ` on ${dayCount} day${dayCount === 1 ? '' : 's'}`}
+            </span>
+            {shown.map(({ date, entry: e }) => (
+              <a key={e.id} href={date === today ? '#/today' : `#/today?d=${date}`} className="item" style={{ padding: '8px 0', color: 'var(--ink)', textDecoration: 'none', gap: 8 }}>
+                <span className="mono dim" style={{ width: 92, flex: 'none' }}>{fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short' })}<br />{timeOf(e.at)}</span>
+                <span className="grow" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
+                <span className="mono mut" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)} · {fmt(entryMacros(e).protein)} g</span>
+              </a>
+            ))}
+            {shown.length < hits.length && <button className="btn sm" style={{ marginTop: 6 }} onClick={() => setMore(true)}>Show {hits.length - shown.length} more</button>}
+          </div>
+        ) : <p className="small mut" style={{ margin: 0 }}>Nothing logged called “{q.trim()}”.</p>
+      )}
     </section>
   );
 }

@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanTags, pushSearch, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, foodHistory, hasTag, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
+import { daySummary, foodHistory, hasTag, searchLog, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -608,6 +608,22 @@ describe('custom tags', () => {
     expect(cleanTags([' Gym ', 'gym', 'a,b', '', 3, 'x'.repeat(40)])).toEqual(['Gym', 'a b', 'x'.repeat(24)]);
     expect(cleanTags(Array.from({ length: 20 }, (_, i) => `t${i}`))).toHaveLength(12);
     expect(cleanTags([])).toEqual([]);
+  });
+});
+
+describe('search the log', () => {
+  it('finds entries by every word, newest first', () => {
+    const e = (name: string, at: number) => entry(100, 5, { name, at });
+    const days: Record<string, DayLog> = {
+      '2026-10-01': day([e('Paneer bhurji', 1), e('Milk', 2)]),
+      '2026-10-03': day([e('paneer tikka wrap', 5), e('Bhurji, paneer', 9)]),
+    };
+    const r = searchLog(days, 'PANEER');
+    expect(r.total).toBe(3);
+    expect(r.hits.map((h) => h.entry.name)).toEqual(['Bhurji, paneer', 'paneer tikka wrap', 'Paneer bhurji']);
+    expect(searchLog(days, 'bhurji paneer').total).toBe(2);
+    expect(searchLog(days, 'paneer', 1).hits).toHaveLength(1);
+    expect(searchLog(days, ' p ').total).toBe(0);
   });
 });
 

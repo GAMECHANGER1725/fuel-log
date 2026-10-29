@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29k';
+export const NEWS_ID = '2026-10-29l';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Search your log', 'On Progress, type a food to see every time you logged it and when. Tap one to open that day.', '#/progress'],
   ['Where it came from', 'Under the log, open Where it came from to see which foods gave the day’s protein or energy.'],
   ['Tag the day', 'Tap Gym, Rest day, Eating out and more under the day note to add them without typing. Tap again to take one off. Progress then compares those days with the rest. Make your own tags in Profile.', '#/profile?open=display'],
   ['Badge on the app icon', 'Show protein or energy still to eat on the home-screen icon. Turn it on in Profile, under Reminders.', '#/profile?open=display'],
