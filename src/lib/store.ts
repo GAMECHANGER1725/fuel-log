@@ -37,6 +37,8 @@ interface Actions {
   addWeighIn: (date: string, kg: number) => void;
   removeWeighIn: (date: string) => void;
   toggleFavourite: (f: Food) => void;
+  /** Move a favourite one place up (-1) or down (+1); the order syncs. */
+  moveFavourite: (id: string, dir: -1 | 1) => void;
   /** Change a favourite's name, serving or numbers (synced with the favourites block). */
   updateFavourite: (id: string, patch: Partial<Food>) => void;
   /** Drop a food from Recent (per device, so no sync stamp). */
@@ -123,6 +125,15 @@ export const useStore = create<AppData & Actions>()(
                 : [{ ...f, id: f.id.startsWith('fav-') ? f.id : `fav-${uid()}` }, ...s.favourites],
               mod: Date.now(),
             };
+          }),
+        moveFavourite: (id, dir) =>
+          set((s) => {
+            const i = s.favourites.findIndex((f) => f.id === id);
+            const j = i + dir;
+            if (i < 0 || j < 0 || j >= s.favourites.length) return {};
+            const favourites = [...s.favourites];
+            [favourites[i], favourites[j]] = [favourites[j], favourites[i]];
+            return { favourites, mod: Date.now() };
           }),
         updateFavourite: (id, patch) => set((s) => ({ favourites: s.favourites.map((f) => (f.id === id ? { ...f, ...patch } : f)), mod: Date.now() })),
         removeRecent: (name) => set((s) => ({ recents: s.recents.filter((r) => r.name.toLowerCase() !== name.toLowerCase()) })),
