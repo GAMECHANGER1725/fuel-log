@@ -6,6 +6,7 @@ import { persist } from 'zustand/middleware';
 
 export const CARDS = [
   ['macros', 'Carbs and fat'],
+  ['week', 'This week'],
   ['quests', 'Daily quests'],
   ['gap', 'Close the gap'],
   ['water', 'Water'],

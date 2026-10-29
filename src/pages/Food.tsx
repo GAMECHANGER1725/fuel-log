@@ -244,13 +244,13 @@ function ManualSheet({ date, onClose }: { date: string; onClose: () => void }) {
   const [f, setF] = useState({ name: '', serving: '', energy: '', protein: '', carbs: '', fat: '', fav: false });
   const n = (v: string) => Math.max(0, parseFloat(v) || 0);
   const kcal = unit === 'kJ' ? n(f.energy) / KJ : n(f.energy);
-  const ok = f.name.trim() && kcal > 0;
+  const ok = kcal > 0;
   const when = useEatenAt(date);
   const set = (k: keyof typeof f) => (e: ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: k === 'fav' ? e.target.checked : e.target.value });
 
   const save = () => {
     const base = { kcal: Math.round(kcal), protein: n(f.protein), carbs: n(f.carbs), fat: n(f.fat) };
-    const food: Food = { id: `fav-${Date.now().toString(36)}`, name: f.name.trim().slice(0, 60), serving: f.serving.trim() || '1 serve', ...base };
+    const food: Food = { id: `fav-${Date.now().toString(36)}`, name: f.name.trim().slice(0, 60) || 'Quick add', serving: f.serving.trim() || '1 serve', ...base };
     const ids = s.addEntries(date, [{ name: food.name, serving: food.serving, base, qty: 1, source: 'custom' }], [food], when.at);
     if (f.fav) s.toggleFavourite(food);
     toastAdded(`Added ${food.name}`, XP.meal, date, ids);
@@ -260,7 +260,7 @@ function ManualSheet({ date, onClose }: { date: string; onClose: () => void }) {
   return (
     <Sheet onClose={onClose} label="Enter food">
       <h2 className="h2" style={{ fontSize: 26 }}>Enter it yourself</h2>
-      <label className="field"><span>Food</span><input className="input" value={f.name} onChange={set('name')} placeholder="Mum's paneer paratha" maxLength={60} /></label>
+      <label className="field"><span>Food (optional)</span><input className="input" value={f.name} onChange={set('name')} placeholder="Mum's paneer paratha" maxLength={60} /></label>
       <label className="field"><span>Serving</span><input className="input" value={f.serving} onChange={set('serving')} placeholder="1 paratha" maxLength={40} /></label>
       <div className="grid2">
         <label className="field"><span>Energy ({unit})</span><input className="input" inputMode="decimal" type="number" min="0" value={f.energy} onChange={set('energy')} /></label>

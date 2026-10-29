@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store';
-import { addDays, fmtDate, hhmmOf } from '../lib/dates';
+import { addDays, fmtDate, hhmmOf, weekStart } from '../lib/dates';
 import { KJ, dayTotals, energy, entryMacros, fmt, sinceLast, timeOf } from '../lib/nutrition';
 import { FOCUS_LABEL, FOODS, MOMENT_LABEL, gapFocus, gapSuggestions, momentOf, remaining } from '../lib/foods';
 import { XP } from '../lib/game';
@@ -134,6 +134,8 @@ export default function Today() {
             </div>
           </div>}
         </section>
+
+        {show('week') && <WeekStrip date={date} today={today} onPick={setDate} />}
 
         {isToday && show('quests') && (
           <section className="card">
@@ -292,6 +294,39 @@ export default function Today() {
 
       {editing && <EditSheet date={date} entry={editing} onClose={() => setEditing(null)} />}
     </>
+  );
+}
+
+/** Monday to Sunday of the shown day's week: energy and protein against target. Tap a day to open it. */
+function WeekStrip({ date, today, onPick }: { date: string; today: string; onPick: (k: string) => void }) {
+  const days = useStore((s) => s.days);
+  const T = useStore((s) => s.settings.targets);
+  const start = weekStart(date);
+  const H = 56;
+  const bar = (frac: number, color: string) => <i style={{ height: Math.max(3, Math.min(1, frac) * H), background: color }} />;
+  return (
+    <section className="card tight">
+      <div className="between" style={{ marginBottom: 8 }}>
+        <span className="mono mut">This week</span>
+        <span className="mono dim">Energy · protein</span>
+      </div>
+      <div className="week">
+        {Array.from({ length: 7 }, (_, i) => {
+          const k = addDays(start, i);
+          const t = dayTotals(days[k]);
+          const future = k > today;
+          return (
+            <button key={k} className="week-day" aria-current={k === date ? 'date' : undefined} disabled={future} aria-label={`${fmtDate(k, { weekday: 'long' })}: ${fmt(t.kcal)} kcal, ${fmt(t.protein)} g protein`} onClick={() => onPick(k)}>
+              <span className="week-bars" style={{ height: H }}>
+                {bar(t.kcal / T.kcal, 'var(--fuel)')}
+                {bar(t.protein / T.protein, 'var(--pro)')}
+              </span>
+              <span className="mono" style={{ fontSize: 11 }}>{fmtDate(k, { weekday: 'narrow' })}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

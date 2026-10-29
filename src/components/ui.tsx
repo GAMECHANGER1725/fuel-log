@@ -188,8 +188,10 @@ export const useToast = create<{ msg: string | null; xp: number; n: number; acti
 }));
 export const toast = (msg: string, xp = 0, action?: ToastAction) => useToast.getState().show(msg, xp, action);
 /** Toast for food just logged, with Undo that takes it back off the log. */
-export const toastAdded = (msg: string, xp: number, date: string, ids: string[]) =>
+export const toastAdded = (msg: string, xp: number, date: string, ids: string[]) => {
+  navigator.vibrate?.(12); // a light tap where supported (Android); iOS ignores it
   toast(msg, xp, { label: 'Undo', run: () => ids.forEach((id) => useStore.getState().removeEntry(date, id)) });
+};
 
 export function Toast() {
   const { msg, xp, n, action } = useToast();
