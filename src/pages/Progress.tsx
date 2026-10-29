@@ -28,10 +28,12 @@ export default function Progress() {
   const nudge = coachAuto ? null : weeklyNudge(dataOf(s), today);
   const proj = latest ? projectedDate(latest.trend, s.profile.goalKg, rate, today) : null;
 
-  // Heatmap: 5 weeks, Monday first.
-  const start = addDays(weekStart(today), -28);
-  const cells = Array.from({ length: 35 }, (_, i) => addDays(start, i));
+  // Heatmap: 5 weeks, Monday first; ‹ › page back through older 5-week stretches.
+  const [page, setPage] = useState(0);
   const firstDay = g.stats[0]?.date ?? today;
+  const start = addDays(weekStart(today), -28 - page * 35);
+  const cells = Array.from({ length: 35 }, (_, i) => addDays(start, i));
+  const olderExists = start > weekStart(firstDay);
   const elapsed = cells.filter((k) => k < today && k >= firstDay);
   const hitBoth = elapsed.filter((k) => {
     const st = g.byDate.get(k);
@@ -103,6 +105,13 @@ export default function Progress() {
         <section className="card">
           <div className="between" style={{ marginBottom: 12 }}>
             <h2 className="h2">Days hit</h2>
+            <div className="row" style={{ gap: 6 }}>
+              <button className="btn icon sm" style={{ width: 34 }} aria-label="Older weeks" disabled={!olderExists} onClick={() => setPage(page + 1)}><Icon name="left" size={16} /></button>
+              <button className="btn icon sm" style={{ width: 34 }} aria-label="Newer weeks" disabled={page === 0} onClick={() => setPage(page - 1)}><Icon name="right" size={16} /></button>
+            </div>
+          </div>
+          <div className="between" style={{ margin: '-4px 0 10px' }}>
+            <span className="mono dim">{fmtDate(cells[0])} – {fmtDate(cells[34])}</span>
             <span className="mono mut">{hitBoth} of {elapsed.length} · tap a day</span>
           </div>
           <div className="heat" role="img" aria-label={`Hit both targets on ${hitBoth} of the last ${elapsed.length} days`}>
