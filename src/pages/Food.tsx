@@ -22,6 +22,7 @@ export default function FoodPage() {
   const [q, setQ] = useState('');
   const [browse, setBrowse] = useState<Browse | null>(null);
   const [tidy, setTidy] = useState<'fav' | 'recent' | null>(null); // which list shows remove buttons
+  const [editingFav, setEditingFav] = useState<Food | null>(null);
   const [picked, setPicked] = useState<Picked | null>(null);
   // #/food?open=scan comes from the app-icon shortcut.
   const [sheet, setSheet] = useState<'scan' | 'manual' | AiMode | null>(params.get('open') === 'scan' ? 'scan' : null);
@@ -69,9 +70,9 @@ export default function FoodPage() {
     const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: foodMacros(f), qty: 1, source, foodId: f.id }], [f]);
     toastAdded(`Added ${f.name}`, XP.meal + (source === 'scan' ? XP.scan : 0), date, ids);
   };
-  const row = (f: Food, source: Source, remove?: () => void) => (
+  const row = (f: Food, source: Source, remove?: () => void, onOpen?: () => void) => (
     <div key={`${source}-${f.id}`} className="item">
-      <button className="item-btn" onClick={() => setPicked({ food: f, source })}>
+      <button className="item-btn" onClick={onOpen ?? (() => setPicked({ food: f, source }))}>
         <span>{f.name}</span>
         <span className="mono mut">{f.serving} · {energy(f.kcal, unit)} {unit} · {f.protein} g P{recipeFor(f, s.recipeEdits) ? ' · recipe' : ''}</span>
       </button>
@@ -177,7 +178,12 @@ export default function FoodPage() {
             {s.favourites.length > 0 && (
               <section>
                 {listHead('Favourites', 'fav')}
-                {s.favourites.map((f) => row(f, f.barcode ? 'off' : 'db', tidy === 'fav' ? () => { s.toggleFavourite(f); toast(`Removed ${f.name} from favourites`, 0, { label: 'Undo', run: () => useStore.getState().toggleFavourite(f) }); } : undefined))}
+                {tidy === 'fav' && <p className="small mut" style={{ margin: '-2px 0 4px' }}>Tap a favourite to change its name or numbers.</p>}
+                {s.favourites.map((f) =>
+                  tidy === 'fav'
+                    ? row(f, f.barcode ? 'off' : 'db', () => { s.toggleFavourite(f); toast(`Removed ${f.name} from favourites`, 0, { label: 'Undo', run: () => useStore.getState().toggleFavourite(f) }); }, () => setEditingFav(f))
+                    : row(f, f.barcode ? 'off' : 'db'),
+                )}
               </section>
             )}
             <section>
@@ -188,6 +194,7 @@ export default function FoodPage() {
         )}
       </div>
 
+      {editingFav && <FavEditSheet food={editingFav} onClose={() => setEditingFav(null)} />}
       {picked && <AddSheet date={date} picked={picked} onClose={() => setPicked(null)} />}
       {sheet === 'manual' && <ManualSheet date={date} onClose={() => setSheet(null)} />}
       {sheet === 'scan' && (
@@ -281,9 +288,24 @@ function ManualSheet({ date, onClose }: { date: string; onClose: () => void }) {
   const when = useEatenAt(date);
   const set = (k: keyof typeof f) => (e: ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: k === 'fav' ? e.target.checked : e.target.value });
 
+  const build = (): Food => ({
+    id: `fav-${Date.now().toString(36)}`,
+    name: f.name.trim().slice(0, 60) || 'Quick add',
+    serving: f.serving.trim() || '1 serve',
+    kcal: Math.round(kcal),
+    protein: n(f.protein),
+    carbs: n(f.carbs),
+    fat: n(f.fat),
+  });
+  const saveOnly = () => {
+    const food = build();
+    if (!s.favourites.some((x) => x.name.toLowerCase() === food.name.toLowerCase())) s.toggleFavourite(food);
+    toast(`Saved ${food.name} to favourites`);
+    onClose();
+  };
   const save = () => {
-    const base = { kcal: Math.round(kcal), protein: n(f.protein), carbs: n(f.carbs), fat: n(f.fat) };
-    const food: Food = { id: `fav-${Date.now().toString(36)}`, name: f.name.trim().slice(0, 60) || 'Quick add', serving: f.serving.trim() || '1 serve', ...base };
+    const food = build();
+    const base = { kcal: food.kcal, protein: food.protein, carbs: food.carbs, fat: food.fat };
     const ids = s.addEntries(date, [{ name: food.name, serving: food.serving, base, qty: 1, source: 'custom' }], [food], when.at);
     if (f.fav) s.toggleFavourite(food);
     toastAdded(`Added ${food.name}`, XP.meal, date, ids);
@@ -304,6 +326,41 @@ function ManualSheet({ date, onClose }: { date: string; onClose: () => void }) {
       <TimeField value={when.hhmm} onChange={when.setHhmm} />
       <label className="row small"><input type="checkbox" checked={f.fav} onChange={set('fav')} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} /> Save as a favourite for one-tap adding</label>
       <button className="btn primary block" disabled={!ok} onClick={save}>Add · +{XP.meal} XP</button>
+      <button className="btn block" disabled={!ok || !f.name.trim()} onClick={saveOnly}><Icon name="star" size={16} /> Save as favourite only (don’t log)</button>
+    </Sheet>
+  );
+}
+
+/** Change a favourite's name, serving or numbers. */
+function FavEditSheet({ food, onClose }: { food: Food; onClose: () => void }) {
+  const s = useStore();
+  const unit = s.settings.unit;
+  const toUnit = (kcal: number) => String(Math.round(unit === 'kJ' ? kcal * KJ : kcal));
+  const [f, setF] = useState({ name: food.name, serving: food.serving, energy: toUnit(food.kcal), protein: String(food.protein), carbs: String(food.carbs), fat: String(food.fat) });
+  const n = (v: string) => Math.max(0, parseFloat(v) || 0);
+  const kcal = f.energy === toUnit(food.kcal) ? food.kcal : Math.round(unit === 'kJ' ? n(f.energy) / KJ : n(f.energy));
+  const ok = f.name.trim() && kcal > 0;
+  const set = (k: keyof typeof f) => (e: ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  const save = () => {
+    const numbers = { kcal, protein: n(f.protein), carbs: n(f.carbs), fat: n(f.fat) };
+    const changed = (['kcal', 'protein', 'carbs', 'fat'] as const).some((k) => numbers[k] !== food[k]);
+    // Per-100 g values no longer match hand-edited numbers, so drop them.
+    s.updateFavourite(food.id, { name: f.name.trim().slice(0, 60), serving: f.serving.trim().slice(0, 40) || '1 serve', ...numbers, ...(changed ? { per100: undefined, servingGrams: undefined } : {}) });
+    toast('Favourite saved');
+    onClose();
+  };
+  return (
+    <Sheet onClose={onClose} label={`Edit ${food.name}`}>
+      <h2 className="h2" style={{ fontSize: 26 }}>Edit favourite</h2>
+      <label className="field"><span>Food</span><input className="input" value={f.name} onChange={set('name')} maxLength={60} /></label>
+      <label className="field"><span>One serving is</span><input className="input" value={f.serving} onChange={set('serving')} maxLength={40} /></label>
+      <div className="grid2">
+        <label className="field"><span>Energy ({unit})</span><input className="input" inputMode="decimal" type="number" min="0" value={f.energy} onChange={set('energy')} /></label>
+        <label className="field"><span>Protein (g)</span><input className="input" inputMode="decimal" type="number" min="0" value={f.protein} onChange={set('protein')} /></label>
+        <label className="field"><span>Carbs (g)</span><input className="input" inputMode="decimal" type="number" min="0" value={f.carbs} onChange={set('carbs')} /></label>
+        <label className="field"><span>Fat (g)</span><input className="input" inputMode="decimal" type="number" min="0" value={f.fat} onChange={set('fat')} /></label>
+      </div>
+      <button className="btn primary block" disabled={!ok} onClick={save}>Save</button>
     </Sheet>
   );
 }
