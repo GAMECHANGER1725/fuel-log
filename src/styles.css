@@ -255,6 +255,9 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 :root[data-theme='light'][data-accent='leaf'] { --fuel: #3d7f1f; }
 :root[data-theme='light'][data-accent='gold'] { --fuel: #8a6400; }
 
+/* Black theme (Profile > Theme): true-black ground and darker surfaces on top of the dark tokens, for OLED screens. */
+:root[data-black] { --bg: #000; --s1: #0f0d0b; --s2: #1a1714; --s3: #25201c; --track: #25201c; --line: #1a1714; --line2: #2c2621; --nav: rgba(26, 23, 20, 0.92); }
+
 /* This-week strip on Today */
 .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .week-day { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 0; border: 0; border-radius: 14px; background: none; color: var(--mut); min-height: 48px; }

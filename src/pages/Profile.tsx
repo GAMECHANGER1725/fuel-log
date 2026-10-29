@@ -334,7 +334,7 @@ function DisplayForm() {
       <span className="mono mut">Energy units</span>
       {opt(s.settings.unit, (unit) => s.setSettings({ unit }), [['kcal', 'Calories (kcal)'], ['kJ', 'Kilojoules (kJ)']])}
       <span className="mono mut">Theme</span>
-      {opt(s.settings.theme, (theme) => s.setSettings({ theme }), [['auto', 'Match device'], ['dark', 'Dark'], ['light', 'Light']])}
+      {opt(s.settings.theme, (theme) => s.setSettings({ theme }), [['auto', 'Match device'], ['dark', 'Dark'], ['black', 'Black (OLED)'], ['light', 'Light']])}
       <span className="mono mut">Open the app on (this device)</span>
       <StartPicker />
       <span className="mono mut">Accent colour (this device)</span>

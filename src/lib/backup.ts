@@ -174,7 +174,7 @@ export function normalize(raw: unknown): AppData {
       gainLow,
       gainHigh: Math.max(gainLow, num(s.gainHigh, D.settings.gainHigh, 0, 2)),
       unit: s.unit === 'kJ' ? 'kJ' : 'kcal',
-      theme: s.theme === 'dark' || s.theme === 'light' ? s.theme : 'auto',
+      theme: s.theme === 'dark' || s.theme === 'light' || s.theme === 'black' ? s.theme : 'auto',
       aiKey: str(s.aiKey, 200).trim(),
       aiModel: str(s.aiModel, 60).trim() || DEFAULT_MODEL,
       // Saves from before the switch to DeepSeek still carry geminiKey, so an old backup brings it back.

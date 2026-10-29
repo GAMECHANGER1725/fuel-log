@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29s';
+export const NEWS_ID = '2026-10-29t';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Black theme', 'A true-black theme for OLED screens, easier on the eyes at night. Pick Black in Profile, under Theme.', '#/profile?open=display'],
   ['Water this week', 'The water card shows your average over the last 7 days and how often you hit the goal.'],
   ['Usually now', 'Quick log puts the foods you often have around this time first, marked with a clock.'],
   ['This month vs last', 'Progress’s comparison card now switches between week and month.', '#/progress'],

@@ -249,6 +249,10 @@ describe('game', () => {
 });
 
 describe('backup', () => {
+  it('keeps a known theme, black included, and drops others', () => {
+    expect(normalize({ settings: { theme: 'black' } }).settings.theme).toBe('black');
+    expect(normalize({ settings: { theme: 'neon' } }).settings.theme).toBe('auto');
+  });
   it('round-trips v3', () => {
     const d = data({ days: { '2026-10-07': day([entry(500, 20)], 3) }, weighIns: [{ date: '2026-10-07', kg: 58.3 }] });
     const back = parseBackup(exportText(d));

@@ -76,7 +76,8 @@ export interface Settings {
   gainLow: number;
   gainHigh: number;
   unit: 'kcal' | 'kJ';
-  theme: 'auto' | 'dark' | 'light';
+  /** 'black' is dark with true-black surfaces (for OLED screens). */
+  theme: 'auto' | 'dark' | 'light' | 'black';
   /** TokenHarbor key and model (DeepSeek). */
   aiKey: string;
   aiModel: string;
