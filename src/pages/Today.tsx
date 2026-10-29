@@ -29,6 +29,7 @@ export default function Today() {
   const ring = usePrefs((p) => p.ring);
   const flipRing = usePrefs((p) => p.flipRing);
   const boostKcal = usePrefs((p) => p.boostKcal);
+  const bottleMl = usePrefs((p) => p.bottleMl);
   const show = (c: Card) => !hidden.includes(c);
 
   const day = s.days[date] ?? { entries: [], water: 0, checks: {} };
@@ -336,12 +337,12 @@ export default function Today() {
           </div>
           <div className="row">
             <button className="btn icon" aria-label="Remove a glass" onClick={() => s.setWater(date, day.water - 1)}>−</button>
-            <button className="btn sm" aria-label="Add a 500 ml bottle" onClick={() => addWater(2)}>+500 ml</button>
+            <button className="btn sm" aria-label={`Add a ${bottleMl} ml bottle`} onClick={() => addWater(bottleMl / 250)}>+{bottleMl >= 1000 ? `${bottleMl / 1000} L` : `${bottleMl} ml`}</button>
             <button className="btn icon ink" aria-label="Add a 250 ml glass" onClick={() => addWater(1)}>+</button>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(waterGoal, day.water)}, minmax(0,1fr))`, gap: 4, marginTop: 12 }}>
-          {Array.from({ length: Math.max(waterGoal, day.water) }, (_, i) => (
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(waterGoal, Math.ceil(day.water))}, minmax(0,1fr))`, gap: 4, marginTop: 12 }}>
+          {Array.from({ length: Math.max(waterGoal, Math.ceil(day.water)) }, (_, i) => (
             // Tap a bar to set that many glasses; tapping the last full one takes it off.
             <button
               key={i}

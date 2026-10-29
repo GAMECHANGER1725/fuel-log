@@ -11,7 +11,7 @@ import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
-import { ACCENTS, BOOSTS, CARDS, ORDER_LABEL, SIZES, usePrefs, type Card } from '../lib/prefs';
+import { ACCENTS, BOOSTS, BOTTLES, CARDS, ORDER_LABEL, SIZES, usePrefs, type Card } from '../lib/prefs';
 import WhatsNew from '../components/WhatsNew';
 
 const TONE = { fuel: 'var(--fuel)', protein: 'var(--pro)', sand: 'var(--carb)', ink: 'var(--ink)' };
@@ -338,6 +338,8 @@ function DisplayForm() {
       <AccentPicker />
       <span className="mono mut">Text size (this device)</span>
       <TextSizePicker />
+      <span className="mono mut">Water bottle button (this device)</span>
+      <BottlePicker />
       <span className="mono mut">Training day adds (this device)</span>
       <BoostPicker />
       <span className="mono mut">Show on Today (this device)</span>
@@ -409,6 +411,15 @@ function ChecksForm() {
         <button className="btn sm" onClick={() => save(DEFAULT_CHECKS)}>Reset to default</button>
       </div>
     </>
+  );
+}
+
+function BottlePicker() {
+  const { bottleMl, setBottleMl } = usePrefs();
+  return (
+    <div className="row" style={{ flexWrap: 'wrap' }} role="group" aria-label="Bottle size">
+      {BOTTLES.map((ml) => <button key={ml} className="chip" aria-pressed={bottleMl === ml} onClick={() => setBottleMl(ml)}>{ml >= 1000 ? `${ml / 1000} L` : `${ml} ml`}</button>)}
+    </div>
   );
 }
 
