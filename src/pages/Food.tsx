@@ -6,7 +6,7 @@ import { searchProducts } from '../lib/off';
 import { coverage, dayTargets, dayTotals, energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
 import type { Food, Macros, Source } from '../lib/types';
-import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, toastAdded, useEatenAt, useRoute, useToday } from '../components/ui';
+import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, toastAdded, useDictation, useEatenAt, useRoute, useToday } from '../components/ui';
 import Scanner from '../components/Scanner';
 import AiSheet from '../components/AiSheet';
 import { hasAi, type AiMode } from '../lib/ai';
@@ -58,6 +58,7 @@ export default function FoodPage() {
   const [off, setOff] = useState<{ q: string; foods: Food[]; loading: boolean; failed: boolean }>({ q: '', foods: [], loading: false, failed: false });
   const s = useStore();
   const unit = s.settings.unit;
+  const speak = useDictation(setQ);
 
   const local = useMemo(() => {
     const mine = new Set([...s.favourites, ...s.recents].map((f) => f.name.toLowerCase()));
@@ -162,6 +163,11 @@ export default function FoodPage() {
           <span className="mut"><Icon name="search" size={20} /></span>
           <input ref={searchRef} aria-label="Search foods" placeholder="Search foods or products" value={q} onChange={(e) => setQ(e.target.value)} enterKeyHint="search" />
           {q && <button className="btn icon sm" style={{ border: 0, width: 32 }} aria-label="Clear search" onClick={() => setQ('')}><Icon name="close" size={18} /></button>}
+          {speak.ok && (!q || speak.on) && (
+            <button className="btn icon sm" style={{ border: 0, width: 32, ...(speak.on ? { color: 'var(--fuel)' } : {}) }} aria-label={speak.on ? 'Stop listening' : 'Speak a search'} aria-pressed={speak.on} onClick={speak.toggle}>
+              <Icon name="mic" size={18} />
+            </button>
+          )}
         </label>
 
         {!q && (

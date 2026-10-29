@@ -2,9 +2,11 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29c';
+export const NEWS_ID = '2026-10-29d';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Speak instead of typing', 'Tap the mic in Add food’s search, or Speak it under Describe it, and say what you ate.', '#/food'],
+  ['How often you have it', 'A food’s Add sheet shows how many days you had it in the last month and when you last did.'],
   ['Training days', 'Tap Training day on Today to add 200 to 500 kcal to that day’s target (size in Profile). The week strip marks boosted days and days with a note.'],
   ['Goal weight', 'Progress shows how far you are toward your goal weight, and you can share this week vs last as text.', '#/progress'],
   ['Your checks, your bottle', 'Write your own food-quality checks, and pick a bottle size so one tap logs a whole bottle of water.', '#/profile?open=checks'],
