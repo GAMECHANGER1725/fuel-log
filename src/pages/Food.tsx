@@ -9,7 +9,7 @@ import type { Food, Macros, Source } from '../lib/types';
 import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, toastAdded, useEatenAt, useRoute, useToday } from '../components/ui';
 import Scanner from '../components/Scanner';
 import AiSheet from '../components/AiSheet';
-import type { AiMode } from '../lib/ai';
+import { hasAi, type AiMode } from '../lib/ai';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { lastQty, mealGroups, type MealGroup } from '../lib/meals';
@@ -177,7 +177,10 @@ export default function FoodPage() {
             <p className="mono mut" style={{ padding: '12px 0' }}>
               {off.loading ? 'Searching Australian products…' : off.failed ? 'Product search failed. Try again.' : !navigator.onLine ? 'Offline: showing built-in foods only.' : !local.length && !off.foods.length && q.trim().length >= 3 ? 'No matches.' : ''}
             </p>
-            <button className="btn dashed" style={{ width: '100%' }} onClick={() => setSheet('text')}>Not here? Describe “{q}” to the AI</button>
+            <div className="stack" style={{ gap: 8 }}>
+              {hasAi(s.settings) && <button className="btn dashed" style={{ width: '100%' }} onClick={() => setSheet('text')}>Not here? Describe “{q}” to the AI</button>}
+              <button className="btn dashed" style={{ width: '100%' }} onClick={() => setSheet('manual')}><Icon name="pencil" size={16} /> Enter “{q}” with your own numbers</button>
+            </div>
           </section>
         ) : browse ? (
           <section>
@@ -243,7 +246,7 @@ export default function FoodPage() {
           }}
         />
       )}
-      {sheet === 'manual' && <ManualSheet date={date} onClose={closeSheet} />}
+      {sheet === 'manual' && <ManualSheet date={date} initialName={q.trim()} onClose={closeSheet} />}
       {sheet === 'scan' && (
         <Scanner
           onClose={closeSheet}
@@ -329,10 +332,10 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
   );
 }
 
-function ManualSheet({ date, onClose }: { date: string; onClose: () => void }) {
+function ManualSheet({ date, initialName = '', onClose }: { date: string; initialName?: string; onClose: () => void }) {
   const s = useStore();
   const unit = s.settings.unit;
-  const [f, setF] = useState({ name: '', serving: '', energy: '', protein: '', carbs: '', fat: '', fav: false });
+  const [f, setF] = useState({ name: initialName.slice(0, 60), serving: '', energy: '', protein: '', carbs: '', fat: '', fav: false });
   const n = (v: string) => Math.max(0, parseFloat(v) || 0);
   const kcal = unit === 'kJ' ? n(f.energy) / KJ : n(f.energy);
   const ok = kcal > 0;
