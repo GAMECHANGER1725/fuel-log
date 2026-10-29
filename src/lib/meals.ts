@@ -197,3 +197,16 @@ export function insights(days: Record<string, DayLog>, today: string, target: { 
   if (all > 0 && late / all > 0.3) out.push({ tone: 'tip', text: `About ${Math.round((late / all) * 100)}% of your energy comes after 9 pm. Moving some earlier can help sleep.` });
   return out.slice(0, 4);
 }
+
+/** Plain-text week summary for sharing: this week's stats, last week's for comparison, and weight change. */
+export function weekSummary(title: string, w: WeekStats, last: WeekStats, kgChange: number | null, fmtKcal: (k: number) => string): string {
+  const lines = [title];
+  if (!w.logged) lines.push('Nothing logged yet this week.');
+  else {
+    lines.push(`Average ${fmtKcal(w.kcal ?? 0)} and ${Math.round(w.protein ?? 0)} g protein a day`);
+    lines.push(`${w.logged} day${w.logged === 1 ? '' : 's'} logged, ${w.hit} on both targets`);
+  }
+  if (last.logged && last.kcal !== null) lines.push(`Last week: ${fmtKcal(last.kcal)}, ${Math.round(last.protein ?? 0)} g protein, ${last.hit} of ${last.logged} days on target`);
+  if (kgChange !== null) lines.push(`Weight trend: ${kgChange >= 0 ? '+' : ''}${kgChange.toFixed(2)} kg a week`);
+  return lines.join('\n');
+}

@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats } from '../src/lib/meals';
+import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -697,5 +697,20 @@ describe('goal progress', () => {
     expect(goalProgress(58, 70, 66)).toBe(1);
     expect(goalProgress(58, 60, null)).toBeNull();
     expect(goalProgress(58, 60, 55)).toBeNull();
+  });
+});
+
+describe('week summary', () => {
+  it('lists this week, last week and the weight trend', () => {
+    const w = { logged: 4, hit: 2, kcal: 2950, protein: 112 };
+    const last = { logged: 6, hit: 3, kcal: 2800, protein: 100 };
+    const text = weekSummary('Week of 26 October', w, last, 0.31, (k) => `${Math.round(k)} kcal`);
+    expect(text.split('\n')).toEqual([
+      'Week of 26 October',
+      'Average 2950 kcal and 112 g protein a day',
+      '4 days logged, 2 on both targets',
+      'Last week: 2800 kcal, 100 g protein, 3 of 6 days on target',
+      'Weight trend: +0.31 kg a week',
+    ]);
   });
 });
