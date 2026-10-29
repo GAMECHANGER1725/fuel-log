@@ -261,6 +261,19 @@ export function browseFoods(list: Food[], kind: Browse, limit = 40): Food[] {
   return picked.slice(0, limit);
 }
 
+export type FoodSort = 'match' | 'protein' | 'lean' | 'kcal';
+export const FOOD_SORTS: [FoodSort, string][] = [['match', 'Best match'], ['protein', 'Most protein'], ['lean', 'Protein per kcal'], ['kcal', 'Most energy']];
+
+/** Grams of protein per 100 kcal: how protein-dense a food is. */
+export const proteinPer100kcal = (f: Macros): number => (f.kcal > 0 ? (f.protein / f.kcal) * 100 : 0);
+
+/** Re-orders a result list; 'match' keeps the order it came in. Stable, so ties keep their order. */
+export function sortFoods<F extends Food>(list: F[], by: FoodSort): F[] {
+  if (by === 'match') return list;
+  const key = (f: F) => (by === 'protein' ? f.protein : by === 'kcal' ? f.kcal : proteinPer100kcal(f));
+  return [...list].sort((a, b) => key(b) - key(a));
+}
+
 /** What is still to eat today (negative once a target is passed). */
 export const remaining = (targets: Macros, eaten: Macros): Macros => ({
   kcal: targets.kcal - eaten.kcal,

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useStore } from '../lib/store';
 import { fmtDate, todayKey } from '../lib/dates';
-import { BROWSE, FOODS, browseFoods, foodMacros, searchFoods, type Browse } from '../lib/foods';
+import { BROWSE, FOODS, FOOD_SORTS, browseFoods, foodMacros, proteinPer100kcal, searchFoods, sortFoods, type Browse, type FoodSort } from '../lib/foods';
 import { searchProducts } from '../lib/off';
 import { coverage, dayTargets, dayTotals, energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
@@ -22,6 +22,7 @@ export default function FoodPage() {
   const date = params.get('d') ?? today;
   const [q, setQ] = useState('');
   const [browse, setBrowse] = useState<Browse | null>(null);
+  const [sort, setSort] = useState<FoodSort>('match');
   // "/" jumps to the search box on a keyboard.
   const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -104,7 +105,9 @@ export default function FoodPage() {
     <div key={`${source}-${f.id}`} className="item">
       <button className="item-btn" onClick={onOpen ?? (() => setPicked({ food: f, source }))}>
         <span>{f.name}</span>
-        <span className="mono mut">{f.serving} · {energy(f.kcal, unit)} {unit} · {f.protein} g P{recipeFor(f, s.recipeEdits) ? ' · recipe' : ''}</span>
+        <span className="mono mut">
+          {f.serving} · {energy(f.kcal, unit)} {unit} · {f.protein} g P{sort === 'lean' && (q || browse) ? ` · ${Math.round(proteinPer100kcal(f))} g per 100 kcal` : ''}{recipeFor(f, s.recipeEdits) ? ' · recipe' : ''}
+        </span>
       </button>
       {move && (
         <>
@@ -117,6 +120,13 @@ export default function FoodPage() {
       ) : (
         <button className="btn icon" aria-label={`Add one ${f.name} now`} onClick={() => quickAdd(f, source)}>+</button>
       )}
+    </div>
+  );
+  const sortChips = (
+    <div className="quick" role="group" aria-label="Sort foods" style={{ marginBottom: 6 }}>
+      {FOOD_SORTS.map(([id, label]) => (
+        <button key={id} className="chip" aria-pressed={sort === id} onClick={() => setSort(id)}>{label}</button>
+      ))}
     </div>
   );
   const listHead = (title: string, list: 'fav' | 'recent') => (
@@ -178,8 +188,10 @@ export default function FoodPage() {
               <h2 className="h2">Results</h2>
               <span className="mono mut">Built-in · Open Food Facts</span>
             </div>
-            {local.map((f) => row(f, 'db'))}
-            {off.foods.map((f) => row(f, 'off'))}
+            {sortChips}
+            {sort === 'match'
+              ? [...local.map((f) => row(f, 'db')), ...off.foods.map((f) => row(f, 'off'))]
+              : sortFoods([...local.map((f) => ({ ...f, src: 'db' as Source })), ...off.foods.map((f) => ({ ...f, src: 'off' as Source }))], sort).map(({ src, ...f }) => row(f, src))}
             <p className="mono mut" style={{ padding: '12px 0' }}>
               {off.loading ? 'Searching Australian products…' : off.failed ? 'Product search failed. Try again.' : !navigator.onLine ? 'Offline: showing built-in foods only.' : !local.length && !off.foods.length && q.trim().length >= 3 ? 'No matches.' : ''}
             </p>
@@ -194,7 +206,8 @@ export default function FoodPage() {
               <h2 className="h2">{BROWSE.find(([id]) => id === browse)?.[1]}</h2>
               <button className="btn sm" onClick={() => setBrowse(null)}>Close</button>
             </div>
-            {browsed.length ? browsed.map((f) => row(f, f.barcode ? 'off' : 'db')) : <p className="empty">Nothing here yet.</p>}
+            {sortChips}
+            {browsed.length ? sortFoods(browsed, sort).map((f) => row(f, f.barcode ? 'off' : 'db')) : <p className="empty">Nothing here yet.</p>}
           </section>
         ) : (
           <>
