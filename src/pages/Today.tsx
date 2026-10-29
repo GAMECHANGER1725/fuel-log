@@ -26,6 +26,9 @@ export default function Today() {
   const s = useStore();
   const g = useGame();
   const [editing, setEditing] = useState<Entry | null>(null);
+  // Select mode on the log: ids of ticked entries, or null when off.
+  const [picked, setPicked] = useState<Set<string> | null>(null);
+  useEffect(() => setPicked(null), [date]);
   const [round, setRound] = useState(0); // how many times Close the gap was refreshed
   const [open, setOpen] = useState<string | null>(null); // which idea's recipe is showing
   const hidden = usePrefs((p) => p.hidden);
@@ -189,7 +192,10 @@ export default function Today() {
               {ago && <span className="mono mut">Last ate {ago}{ago === 'just now' ? '' : ' ago'}</span>}
             </div>
             <div className="row" style={{ gap: 6 }}>
-            <label className="btn sm date-pick">
+            {day.entries.length > 0 && (
+              <button className="btn sm" aria-pressed={!!picked} onClick={() => setPicked(picked ? null : new Set())}>{picked ? 'Done' : 'Select'}</button>
+            )}
+            {!picked && <label className="btn sm date-pick">
               <Icon name="copy" size={16} /> Copy from…
               <input
                 type="date"
@@ -203,8 +209,8 @@ export default function Today() {
                   toast(n ? `Copied ${n} item${n === 1 ? '' : 's'} from ${fmtDate(from, { weekday: 'short', day: 'numeric', month: 'short' })}` : 'Nothing logged that day', Math.min(n, XP.mealCap) * XP.meal);
                 }}
               />
-            </label>
-            {(s.days[addDays(date, -1)]?.entries.length ?? 0) > 0 && (
+            </label>}
+            {!picked && (s.days[addDays(date, -1)]?.entries.length ?? 0) > 0 && (
               <button
                 className="btn sm"
                 onClick={() => {
@@ -226,7 +232,19 @@ export default function Today() {
                     <span className="mono dim">{energy(sec.kcal, unit)} {unit} · {fmt(sec.protein)} g</span>
                   </div>
                   {sec.entries.map((e, i) => (
-                    <button key={e.id} className="item-btn" style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, borderTop: i ? '1px solid var(--line)' : 0 }} onClick={() => setEditing(e)}>
+                    <button
+                      key={e.id}
+                      className="item-btn"
+                      aria-pressed={picked ? picked.has(e.id) : undefined}
+                      style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, borderTop: i ? '1px solid var(--line)' : 0 }}
+                      onClick={() => {
+                        if (!picked) return setEditing(e);
+                        const next = new Set(picked);
+                        if (!next.delete(e.id)) next.add(e.id);
+                        setPicked(next);
+                      }}
+                    >
+                      {picked && <span className={`check${picked.has(e.id) ? ' on' : ''}`}>{picked.has(e.id) && <Icon name="check" size={14} stroke={3.5} />}</span>}
                       <span className="mono dim" style={{ width: 64, flex: 'none' }}>{timeOf(e.at)}</span>
                       <span className="grow">{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
                       <span className="mono mut" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)} · {fmt(entryMacros(e).protein)} g</span>
@@ -237,6 +255,39 @@ export default function Today() {
             </div>
           ) : (
             <p className="empty">Nothing logged {isToday ? 'yet today' : 'this day'}.</p>
+          )}
+          {picked && (
+            <div className="row" style={{ gap: 6 }}>
+              <button className="btn sm" onClick={() => setPicked(picked.size === day.entries.length ? new Set() : new Set(day.entries.map((e) => e.id)))}>
+                {picked.size === day.entries.length ? 'None' : 'All'}
+              </button>
+              <button
+                className="btn sm danger grow"
+                disabled={!picked.size}
+                onClick={() => {
+                  const gone = day.entries.filter((e) => picked.has(e.id));
+                  gone.forEach((e) => s.removeEntry(date, e.id));
+                  toast(`Removed ${gone.length} item${gone.length === 1 ? '' : 's'}`, 0, { label: 'Undo', run: () => gone.forEach((e) => useStore.getState().restoreEntry(date, e)) });
+                  setPicked(null);
+                }}
+              >
+                <Icon name="trash" size={16} /> Delete {picked.size || ''}
+              </button>
+              {!isToday && (
+                <button
+                  className="btn sm grow"
+                  disabled={!picked.size}
+                  onClick={() => {
+                    const items = day.entries.filter((e) => picked.has(e.id)).map(({ name, serving, base, qty, source, foodId }) => ({ name, serving, base, qty, source, foodId }));
+                    const ids = s.addEntries(today, items);
+                    toastAdded(`Copied ${items.length} to today`, Math.min(items.length, XP.mealCap) * XP.meal, today, ids);
+                    setPicked(null);
+                  }}
+                >
+                  <Icon name="copy" size={16} /> Copy to today
+                </button>
+              )}
+            </div>
           )}
           <a href={addHref} className="btn primary block"><Icon name="plus" size={18} stroke={3} /> Add food</a>
           {sections.length > 0 && (
