@@ -31,6 +31,7 @@ export default function Today() {
   const flipRing = usePrefs((p) => p.flipRing);
   const boostKcal = usePrefs((p) => p.boostKcal);
   const bottleMl = usePrefs((p) => p.bottleMl);
+  const weighEvery = usePrefs((p) => p.weighEvery);
   const show = (c: Card) => !hidden.includes(c);
 
   const day = s.days[date] ?? { entries: [], water: 0, checks: {} };
@@ -114,11 +115,11 @@ export default function Today() {
   const cards: Record<OrderCard, ReactNode> = {
     weigh: isToday && show('weigh') && (() => {
       const since = daysSinceWeighIn(s.weighIns, today);
-      if (since !== null && since < 7) return null;
+      if (since !== null && since < weighEvery) return null;
       return (
         <a href="#/progress?weigh=1" className="card tight" style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--ink)', textDecoration: 'none' }}>
           <span className="pro"><Icon name="trend" size={22} /></span>
-          <span className="grow small">{since === null ? 'Log your first weigh-in to start your trend line.' : `It’s been ${since} days since your last weigh-in. Time for a quick one?`}</span>
+          <span className="grow small">{since === null ? 'Log your first weigh-in to start your trend line.' : `It’s been ${since === 1 ? 'a day' : `${since} days`} since your last weigh-in. Time for a quick one?`}</span>
           <Icon name="right" size={18} />
         </a>
       );

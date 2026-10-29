@@ -11,7 +11,7 @@ import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
-import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
+import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, WEIGH_EVERY, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
 import { NOTE_TAGS } from '../lib/meals';
 import WhatsNew from '../components/WhatsNew';
 
@@ -343,6 +343,8 @@ function DisplayForm() {
       <BottlePicker />
       <span className="mono mut">Training day adds (this device)</span>
       <BoostPicker />
+      <span className="mono mut">Weigh-in reminder (this device)</span>
+      <WeighPicker />
       <span className="mono mut">Show on Today (this device)</span>
       <TodayCards />
       <span className="mono mut">Day note tags (this device)</span>
@@ -461,6 +463,19 @@ function BadgePicker() {
         {items.map(([id, label]) => <button key={id} className="chip" aria-pressed={badge === id} onClick={() => setBadge(id)}>{label}</button>)}
       </div>
       <span className="small mut">Shows on the home-screen icon while the app is installed. It updates when you open the app.</span>
+    </>
+  );
+}
+
+function WeighPicker() {
+  const { weighEvery, setWeighEvery } = usePrefs();
+  const label: Record<number, string> = { 1: 'Daily', 3: 'Every 3 days', 7: 'Weekly', 14: 'Fortnightly' };
+  return (
+    <>
+      <div className="row" style={{ flexWrap: 'wrap' }} role="group" aria-label="Weigh-in reminder">
+        {WEIGH_EVERY.map((d) => <button key={d} className="chip" aria-pressed={weighEvery === d} onClick={() => setWeighEvery(d)}>{label[d]}</button>)}
+      </div>
+      <span className="small mut">Daily weigh-ins bounce around; the trend line on Progress smooths them out. Weigh at the same time each day, before eating.</span>
     </>
   );
 }

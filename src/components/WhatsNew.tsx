@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29m';
+export const NEWS_ID = '2026-10-29n';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Weigh-in reminder', 'Choose daily, every 3 days, weekly or fortnightly for the weigh-in reminder on Today, in Profile.', '#/profile?open=display'],
   ['Week so far', 'This week on Today says how far ahead or behind your energy target the week is, and how much a day catches up.'],
   ['Search your log', 'On Progress, type a food to see every time you logged it and when. Tap one to open that day.', '#/progress'],
   ['Where it came from', 'Under the log, open Where it came from to see which foods gave the day’s protein or energy.'],
