@@ -8,6 +8,9 @@ const FIELDS = 'code,product_name,product_name_en,brands,serving_size,serving_qu
 
 export const isValidBarcode = (code: string) => /^\d{8,14}$/.test(code.trim());
 
+/** A product you've scanned before (from favourites or recents), so a re-scan needs no lookup. */
+export const findByBarcode = (foods: Food[], code: string): Food | undefined => foods.find((f) => f.barcode && f.barcode === code.trim());
+
 const num = (v: unknown): number | null => {
   const n = typeof v === 'string' ? Number(v) : v;
   return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : null;
