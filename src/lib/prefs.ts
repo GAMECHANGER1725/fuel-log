@@ -97,6 +97,9 @@ interface Prefs {
   /** Extra kcal the Training day button adds. */
   boostKcal: number;
   setBoostKcal: (k: number) => void;
+  /** Lower-case names Close the gap shouldn't suggest. ponytail: per device, not synced. */
+  noSuggest: string[];
+  toggleSuggest: (name: string) => void;
   toggle: (c: Card) => void;
   flipRing: () => void;
   move: (id: OrderCard, dir: -1 | 1) => void;
@@ -116,6 +119,12 @@ export const usePrefs = create<Prefs>()(
       order: [...ORDER],
       ring: 'left',
       boostKcal: 300,
+      noSuggest: [],
+      toggleSuggest: (name) =>
+        set((s) => {
+          const n = name.trim().toLowerCase();
+          return { noSuggest: s.noSuggest.includes(n) ? s.noSuggest.filter((x) => x !== n) : [...s.noSuggest, n].slice(-200) };
+        }),
       setBoostKcal: (boostKcal) => set({ boostKcal }),
       flipRing: () => set((s) => ({ ring: s.ring === 'left' ? 'eaten' : 'left' })),
       move: (id, dir) => set((s) => ({ order: moveIn(s.order, id, dir) })),
@@ -127,9 +136,9 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown };
         return {
           ...cur,
           hidden: cleanHidden(saved.hidden),
@@ -139,6 +148,7 @@ export const usePrefs = create<Prefs>()(
           order: cleanOrder(saved.order),
           ring: saved.ring === 'eaten' ? 'eaten' : 'left',
           boostKcal: BOOSTS.includes(saved.boostKcal as number) ? (saved.boostKcal as number) : 300,
+          noSuggest: Array.isArray(saved.noSuggest) ? saved.noSuggest.filter((x): x is string => typeof x === 'string').map((x) => x.slice(0, 80)).slice(-200) : [],
         };
       },
     },
