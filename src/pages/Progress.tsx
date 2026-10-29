@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useStore, dataOf } from '../lib/store';
 import { addDays, dateOf, daysBetween, fmtDate, weekStart } from '../lib/dates';
 import { dayTotals, energy, fmt, r1 } from '../lib/nutrition';
-import { goalProgress, projectedDate, trendLine, weeklyNudge, weeklyRate, withKcal } from '../lib/targets';
+import { chartWindow, goalProgress, projectedDate, trendLine, weeklyNudge, weeklyRate, withKcal } from '../lib/targets';
 
 import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
@@ -30,6 +30,7 @@ export default function Progress() {
 
   // Heatmap: 5 weeks, Monday first; ‹ › page back through older 5-week stretches.
   const [page, setPage] = useState(0);
+  const [span, setSpan] = useState<number | null>(56);
   const firstDay = g.stats[0]?.date ?? today;
   const start = addDays(weekStart(today), -28 - page * 35);
   const cells = Array.from({ length: 35 }, (_, i) => addDays(start, i));
@@ -69,7 +70,14 @@ export default function Progress() {
             <Stat label="Per week" value={rate === null ? '–' : `${rate >= 0 ? '+' : ''}${rate.toFixed(2)}`} color={rate === null ? undefined : rate < s.settings.gainLow ? 'var(--carb)' : rate > s.settings.gainHigh * 1.4 ? 'var(--danger)' : 'var(--fuel)'} />
             <Stat label="Since start" value={since === null ? '–' : `${since >= 0 ? '+' : ''}${since.toFixed(1)}`} color="var(--fuel)" />
           </div>
-          <WeightChart line={line} today={today} low={s.settings.gainLow} high={s.settings.gainHigh} />
+          {line.length >= 2 && daysBetween(line[0].date, today) > 56 && (
+            <div className="row" style={{ gap: 6, marginTop: 12 }} role="group" aria-label="Chart range">
+              {([[56, '8 weeks'], [182, '6 months'], [null, 'All']] as const).map(([d, label]) => (
+                <button key={label} className="chip" aria-pressed={span === d} onClick={() => setSpan(d)}>{label}</button>
+              ))}
+            </div>
+          )}
+          <WeightChart line={line} today={today} low={s.settings.gainLow} high={s.settings.gainHigh} span={span} />
           <p className="small mut" style={{ marginTop: 8 }}>
             {rate === null
               ? 'Weigh in once or twice a week: same morning, before breakfast, same scales. The trend appears after two weigh-ins a week apart.'
@@ -407,10 +415,10 @@ function WeekRow({ label, cells }: { label: string; cells: string[] }) {
   );
 }
 
-function WeightChart({ line, today, low, high }: { line: { date: string; kg: number; trend: number }[]; today: string; low: number; high: number }) {
+function WeightChart({ line, today, low, high, span: days }: { line: { date: string; kg: number; trend: number }[]; today: string; low: number; high: number; span: number | null }) {
   if (line.length < 2) return <p className="empty" style={{ marginTop: 14 }}>{line.length ? 'One more weigh-in and your trend line appears.' : 'Your first weigh-in starts the line.'}</p>;
   const W = 326, H = 180, L = 36, R = 316, T = 10, B = 150;
-  const pts = line.filter((p) => daysBetween(p.date, today) <= 56);
+  const pts = chartWindow(line, today, days);
   const first = pts[0];
   const span = Math.max(7, daysBetween(first.date, today));
   const weeks = span / 7;
