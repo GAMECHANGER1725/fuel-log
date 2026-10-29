@@ -1,4 +1,5 @@
-// Reminders: a water nudge after 2 hours without a drink, and a "what to eat" nudge at 5 PM.
+// Reminders: a water nudge after 2 hours without a drink, a "what to eat" nudge at 5 PM, and an opt-in nudge after
+// some hours without eating.
 // Shown as system notifications through the service worker, so they work in the installed app.
 // ponytail: no server, so this only runs while the app is open (or alive in the background).
 // Reminders when the app is fully closed need Web Push from a server (e.g. a Cloudflare Worker cron).
@@ -26,15 +27,19 @@ interface Saved {
   /** The 9 PM wrap-up is opt-in. */
   wrapOn: boolean;
   wrapDate: string;
+  /** Hours without food before a nudge; 0 = off. */
+  eatGapH: number;
+  lastEatRemind: number;
 }
-const DEFAULTS: Saved = { on: false, lastWaterAt: 0, lastWaterRemind: 0, foodDate: '', waterGapH: 2, foodHour: 17, wrapOn: false, wrapDate: '' };
+const DEFAULTS: Saved = { on: false, lastWaterAt: 0, lastWaterRemind: 0, foodDate: '', waterGapH: 2, foodHour: 17, wrapOn: false, wrapDate: '', eatGapH: 0, lastEatRemind: 0 };
 const WRAP_HOUR = 21;
 export const WATER_GAPS = [1, 1.5, 2, 3];
 export const FOOD_HOURS = [15, 16, 17, 18, 19];
+export const EAT_GAPS = [0, 3, 4, 5];
 const read = (): Saved => {
   try {
     const r = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') } as Saved;
-    return { ...r, waterGapH: WATER_GAPS.includes(r.waterGapH) ? r.waterGapH : 2, foodHour: FOOD_HOURS.includes(r.foodHour) ? r.foodHour : 17 };
+    return { ...r, waterGapH: WATER_GAPS.includes(r.waterGapH) ? r.waterGapH : 2, foodHour: FOOD_HOURS.includes(r.foodHour) ? r.foodHour : 17, eatGapH: EAT_GAPS.includes(r.eatGapH) ? r.eatGapH : 0 };
   } catch {
     return DEFAULTS;
   }
@@ -53,9 +58,9 @@ export const remindersOn = () => remindersSupported() && read().on && Notificati
 /** The chosen water gap and food time (per device). */
 export const reminderTimes = () => {
   const r = read();
-  return { waterGapH: r.waterGapH, foodHour: r.foodHour };
+  return { waterGapH: r.waterGapH, foodHour: r.foodHour, eatGapH: r.eatGapH };
 };
-export const setReminderTimes = (p: Partial<Pick<Saved, 'waterGapH' | 'foodHour'>>) => patch(p);
+export const setReminderTimes = (p: Partial<Pick<Saved, 'waterGapH' | 'foodHour' | 'eatGapH'>>) => patch(p);
 export const wrapOn = () => read().wrapOn;
 export const setWrap = (on: boolean) => patch({ wrapOn: on });
 
@@ -79,6 +84,17 @@ export function waterDue(now: number, lastWaterAt: number, lastRemind: number, g
   if (d.getHours() < AWAKE[0] || d.getHours() >= AWAKE[1] || glasses >= goal) return false;
   const morning = new Date(d.getFullYear(), d.getMonth(), d.getDate(), AWAKE[0]).getTime();
   return now - Math.max(lastWaterAt, lastRemind, morning) >= gapMs;
+}
+
+/**
+ * Eating: awake hours, energy target not hit, and `gapMs` since the last thing eaten today, the last nudge, or 8 am.
+ * Off when `gapMs` is 0.
+ */
+export function eatDue(now: number, lastAteAt: number, lastRemind: number, kcal: number, target: number, gapMs: number): boolean {
+  const d = new Date(now);
+  if (!gapMs || d.getHours() < AWAKE[0] || d.getHours() >= AWAKE[1] || kcal >= target) return false;
+  const morning = new Date(d.getFullYear(), d.getMonth(), d.getDate(), AWAKE[0]).getTime();
+  return now - Math.max(lastAteAt, lastRemind, morning) >= gapMs;
 }
 
 /** Food: once a day, from `fromHour` (5 PM by default) for 3 hours. */
@@ -138,6 +154,14 @@ function tick() {
     patch({ lastWaterRemind: now });
     notify('Drink some water', glasses ? `You've had ${glasses * 250} ml today. Time for a glass.` : 'No water logged yet today. Time for a glass.', 'water');
   }
+  const day = s.days[todayKey()];
+  const lastAte = Math.max(0, ...(day?.entries ?? []).map((e) => e.at).filter((t) => t <= now));
+  if (eatDue(now, lastAte, r.lastEatRemind, dayTotals(day).kcal, dayTargets(s.settings.targets, day).kcal, r.eatGapH * HOUR)) {
+    patch({ lastEatRemind: now });
+    const f = foodReminder();
+    const h = lastAte ? Math.floor((now - lastAte) / HOUR) : 0;
+    if (f) notify(lastAte ? `${h} hours since you last ate` : 'Nothing eaten yet today', `How about ${f.title.replace('Time to eat: ', '')}? ${f.body}`, 'eat');
+  }
   if (foodDue(now, r.foodDate, r.foodHour)) {
     patch({ foodDate: todayKey() });
     const f = foodReminder();
@@ -145,7 +169,6 @@ function tick() {
   }
   if (r.wrapOn && wrapDue(now, r.wrapDate)) {
     patch({ wrapDate: todayKey() });
-    const day = s.days[todayKey()];
     if (day?.entries.length) {
       const w = wrapText(dayTotals(day), dayTargets(s.settings.targets, day));
       notify(w.title, w.body, 'wrap');

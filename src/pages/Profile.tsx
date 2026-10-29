@@ -9,7 +9,7 @@ import { todayKey, fmtDate } from '../lib/dates';
 import type { AppData, Macros } from '../lib/types';
 import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
-import { FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
+import { EAT_GAPS, FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
 import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, STARTS, WEIGH_EVERY, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
 import { NOTE_TAGS } from '../lib/meals';
@@ -591,6 +591,10 @@ function ReminderToggle() {
           <span className="small mut">Food reminder at</span>
           <div className="row" style={{ flexWrap: 'wrap' }}>
             {FOOD_HOURS.map((h) => <button key={h} className="chip" aria-pressed={times.foodHour === h} onClick={() => pick({ foodHour: h })}>{hourLabel(h)}</button>)}
+          </div>
+          <span className="small mut">Nudge me if I haven’t eaten for (until the energy target is hit)</span>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            {EAT_GAPS.map((h) => <button key={h} className="chip" aria-pressed={times.eatGapH === h} onClick={() => pick({ eatGapH: h })}>{h ? `${h} h` : 'Off'}</button>)}
           </div>
           <label className="row small">
             <input type="checkbox" checked={wrap} onChange={(e) => { setWrap(e.target.checked); setWrapState(e.target.checked); }} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />

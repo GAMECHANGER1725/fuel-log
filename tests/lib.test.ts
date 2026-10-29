@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { badgeCount, coverage, dayTargets, dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCrossed } from '../src/lib/nutrition';
-import { foodDue, hourLabel, waterDue, wrapDue, wrapText } from '../src/lib/reminders';
+import { eatDue, foodDue, hourLabel, waterDue, wrapDue, wrapText } from '../src/lib/reminders';
 import { FOODS, browseFoods, planRest, proteinPer100kcal, sortFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
 import { addDays, atOn, daysSinceWeighIn, monthRange, hhmmOf, weekStart } from '../src/lib/dates';
@@ -595,6 +595,20 @@ describe('note tags', () => {
     expect(toggleTag('felt great, gym ', 'Gym')).toBe('felt great');
     expect(hasTag('Rest day, tired', 'rest day')).toBe(true);
     expect(hasTag('Gymnastics', 'Gym')).toBe(false);
+  });
+});
+
+describe('eat reminder', () => {
+  const at = (hhmm: string) => atOn('2026-10-29', hhmm);
+  const H = 3_600_000;
+  it('nudges after the gap, in awake hours, until the target is hit', () => {
+    expect(eatDue(at('14:00'), at('10:30'), 0, 1500, 3000, 3 * H)).toBe(true);
+    expect(eatDue(at('13:00'), at('10:30'), 0, 1500, 3000, 3 * H)).toBe(false);
+    expect(eatDue(at('14:00'), at('10:30'), at('13:30'), 1500, 3000, 3 * H)).toBe(false); // nudged recently
+    expect(eatDue(at('14:00'), at('10:30'), 0, 3000, 3000, 3 * H)).toBe(false); // target hit
+    expect(eatDue(at('14:00'), at('10:30'), 0, 1500, 3000, 0)).toBe(false); // off
+    expect(eatDue(at('22:00'), at('10:30'), 0, 1500, 3000, 3 * H)).toBe(false); // after 9 pm
+    expect(eatDue(at('11:00'), 0, 0, 0, 3000, 3 * H)).toBe(true); // nothing since 8 am
   });
 });
 
