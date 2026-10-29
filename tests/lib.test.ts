@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { badgeCount, coverage, dayTargets, dayTotals, energy, energySplit, forGrams, paceGap, sinceLast, targetsCrossed } from '../src/lib/nutrition';
 import { eatDue, foodDue, hourLabel, waterDue, wrapDue, wrapText } from '../src/lib/reminders';
 import { FOODS, browseFoods, planRest, proteinPer100kcal, sortFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
-import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
+import { RECIPES, recipeFor, recipeMacros, scaleAmount, scaleItem } from '../src/lib/recipes';
 import { addDays, atOn, daysSinceWeighIn, monthRange, hhmmOf, weekStart } from '../src/lib/dates';
 import { chartWindow, goalProgress, suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
 import { computeGame, levelFromXp, nextBadge, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
@@ -616,6 +616,22 @@ describe('eat reminder', () => {
     expect(eatDue(at('14:00'), at('10:30'), 0, 1500, 3000, 0)).toBe(false); // off
     expect(eatDue(at('22:00'), at('10:30'), 0, 1500, 3000, 3 * H)).toBe(false); // after 9 pm
     expect(eatDue(at('11:00'), 0, 0, 0, 3000, 3 * H)).toBe(true); // nothing since 8 am
+  });
+});
+
+describe('recipe scaling', () => {
+  it('scales the leading number of an amount, fractions included', () => {
+    expect(scaleAmount('250 ml', 2)).toBe('500 ml');
+    expect(scaleAmount('1', 4)).toBe('4');
+    expect(scaleAmount('½ cup', 2)).toBe('1 cup');
+    expect(scaleAmount('1½ tsp', 2)).toBe('3 tsp');
+    expect(scaleAmount('¾ cup', 2)).toBe('1½ cup');
+    expect(scaleAmount('⅓ cup', 2)).toBe('⅔ cup');
+    expect(scaleAmount('pinch', 2)).toBe('2 × pinch');
+    expect(scaleAmount('1 tbsp', 1)).toBe('1 tbsp');
+    expect(scaleItem('rolled oats (½ cup)', 2)).toBe('rolled oats (1 cup)');
+    expect(scaleItem('banana (about 120 g)', 2)).toBe('banana (about 240 g)');
+    expect(scaleItem('tofu (firm)', 2)).toBe('tofu (firm)');
   });
 });
 

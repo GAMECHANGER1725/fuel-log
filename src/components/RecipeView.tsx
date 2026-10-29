@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { recipeMacros, type Recipe } from '../lib/recipes';
+import { recipeMacros, scaleAmount, scaleItem, type Recipe } from '../lib/recipes';
 import { editRecipe } from '../lib/coach';
 import { friendlyError, hasAi } from '../lib/ai';
 import { energy } from '../lib/nutrition';
@@ -7,21 +7,25 @@ import { useStore } from '../lib/store';
 import { Icon, go, toast } from './ui';
 import { addShopping, usePrefs } from '../lib/prefs';
 
-/** Ingredients with exact amounts, then numbered steps. For one serving. `editable` adds "Edit with AI". */
+/** Ingredients with exact amounts (scaled to 1, 2 or 4 servings), then numbered steps. `editable` adds "Edit with AI". */
 export default function RecipeView({ recipe, editable = false }: { recipe: Recipe; editable?: boolean }) {
+  const [n, setN] = useState(1);
   return (
     <div className="stack" style={{ gap: 12 }}>
-      <div className="between">
-        <span className="mono mut">Recipe · 1 serving</span>
-        <span className="mono mut">{recipe.time}</span>
+      <div className="between" style={{ alignItems: 'center' }}>
+        <span className="mono mut">Recipe · {recipe.time}</span>
+        <div className="row" style={{ gap: 4, alignItems: 'center' }} role="group" aria-label="Recipe makes">
+          <span className="mono mut">Makes</span>
+          {[1, 2, 4].map((x) => <button key={x} className="chip" style={{ minHeight: 32, padding: '0 12px' }} aria-pressed={n === x} aria-label={`Makes ${x} serving${x === 1 ? '' : 's'}`} onClick={() => setN(x)}>{x}</button>)}
+        </div>
       </div>
       <div>
         <span className="mono fuel">Ingredients</span>
         <ul style={{ listStyle: 'none', margin: '4px 0 0', padding: 0 }}>
           {recipe.lines.map(([, , amount, item], i) => (
             <li key={i} className="item" style={{ padding: '8px 0', gap: 10, alignItems: 'baseline' }}>
-              <span className="num" style={{ fontSize: 17, width: 78, flex: 'none', textAlign: 'left' }}>{amount}</span>
-              <span className="grow small">{item}</span>
+              <span className="num" style={{ fontSize: 17, width: 78, flex: 'none', textAlign: 'left' }}>{scaleAmount(amount, n)}</span>
+              <span className="grow small">{scaleItem(item, n)}</span>
             </li>
           ))}
         </ul>
@@ -30,11 +34,11 @@ export default function RecipeView({ recipe, editable = false }: { recipe: Recip
           style={{ marginTop: 6 }}
           onClick={() => {
             const p = usePrefs.getState();
-            p.setShopping(addShopping(p.shopping, recipe.lines.map(([, , amount, item]) => [amount, item])));
+            p.setShopping(addShopping(p.shopping, recipe.lines.map(([, , amount, item]) => [scaleAmount(amount, n), scaleItem(item, n)])));
             toast(`Added ${recipe.lines.length} ingredient${recipe.lines.length === 1 ? '' : 's'} to your shopping list`, 0, { label: 'View', run: () => go('food?list=1') });
           }}
         >
-          <Icon name="plus" size={14} /> Shopping list
+          <Icon name="cart" size={14} /> Ingredients to shopping list
         </button>
       </div>
       <div>

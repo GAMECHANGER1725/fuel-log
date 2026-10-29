@@ -412,3 +412,31 @@ export function withEdit(f: Food, edits: RecipeEdits): Food {
   const r = edits[f.name.toLowerCase()];
   return r ? { ...f, serving: r.serving, ...recipeMacros(r) } : f;
 }
+
+const FRAC: Record<string, number> = { '¼': 0.25, '½': 0.5, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3 };
+const fracText = (v: number): string => {
+  const whole = Math.floor(v + 1e-9);
+  const rest = v - whole;
+  const f = Object.entries(FRAC).find(([, x]) => Math.abs(x - rest) < 0.02)?.[0];
+  if (f) return whole ? `${whole}${f}` : f;
+  return String(Math.round(v * 10) / 10);
+};
+
+/**
+ * An ingredient amount for `n` servings: "250 ml" × 2 → "500 ml", "½ cup" × 2 → "1 cup", "1½ tsp" × 2 → "3 tsp".
+ * Text with no leading number ("pinch") becomes "2 × pinch".
+ */
+export function scaleAmount(amount: string, n: number): string {
+  if (n === 1) return amount;
+  const m = /^\s*(\d+(?:\.\d+)?)?\s*([¼½¾⅓⅔])?(.*)$/.exec(amount);
+  if (!m || (m[1] === undefined && m[2] === undefined)) return `${n} × ${amount.trim()}`;
+  const v = (m[1] ? Number(m[1]) : 0) + (m[2] ? FRAC[m[2]] : 0);
+  const rest = m[3].trim();
+  return `${fracText(v * n)}${rest ? ` ${rest}` : ''}`;
+}
+
+/** An ingredient's name for `n` servings: a bracketed amount ("rolled oats (½ cup)", "banana (about 120 g)") scales too. */
+export function scaleItem(item: string, n: number): string {
+  if (n === 1) return item;
+  return item.replace(/\((about\s+)?([\d¼½¾⅓⅔][^()]*)\)/, (_, about: string | undefined, amt: string) => `(${about ?? ''}${scaleAmount(amt, n)})`);
+}
