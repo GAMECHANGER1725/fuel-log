@@ -166,9 +166,9 @@ export default function FoodPage() {
         <label className="search">
           <span className="mut"><Icon name="search" size={20} /></span>
           <input ref={searchRef} aria-label="Search foods" placeholder="Search foods or products" value={q} onChange={(e) => setQ(e.target.value)} enterKeyHint="search" />
-          {q && <button className="btn icon sm" style={{ border: 0, width: 32, padding: 0 }} aria-label="Clear search" onClick={() => setQ('')}><Icon name="close" size={18} /></button>}
+          {q && <button className="btn icon sm" style={{ border: 0, width: 32 }} aria-label="Clear search" onClick={() => setQ('')}><Icon name="close" size={18} /></button>}
           {speak.ok && (!q || speak.on) && (
-            <button className="btn icon sm" style={{ border: 0, width: 32, padding: 0, ...(speak.on ? { color: 'var(--fuel)' } : {}) }} aria-label={speak.on ? 'Stop listening' : 'Speak a search'} aria-pressed={speak.on} onClick={speak.toggle}>
+            <button className="btn icon sm" style={{ border: 0, width: 32, ...(speak.on ? { color: 'var(--fuel)' } : {}) }} aria-label={speak.on ? 'Stop listening' : 'Speak a search'} aria-pressed={speak.on} onClick={speak.toggle}>
               <Icon name="mic" size={18} />
             </button>
           )}

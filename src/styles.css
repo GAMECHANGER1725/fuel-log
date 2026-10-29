@@ -176,6 +176,8 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 @keyframes pop { from { transform: scale(0.9); opacity: 0; } }
 
 /* ----- Fuel Log only ----- */
+/* Small icon buttons: .btn.sm's side padding squeezed the icon in narrow ones (34-36 px) to a dot. */
+.btn.sm.icon { padding: 0; }
 /* Small labels: sentence case now, no more all-caps mono. */
 .mono { font-size: 13px; font-weight: 600; letter-spacing: 0; }
 .fuel { color: var(--fuel); }
