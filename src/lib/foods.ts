@@ -138,6 +138,18 @@ const ROWS: Row[] = [
   ['Vegetarian sausage roll', '1 roll', 330, 10, 28, 19, 's'],
   ['Vegetarian sushi hand roll', '1 roll', 190, 4, 36, 3.5, 'pm'],
   ['Pizza', '1 large slice', 280, 12, 33, 11, 'm'],
+  ['Veggie sub with cheese', '6-inch sub', 330, 15, 50, 9, 'm'],
+  ['Paneer kathi roll', '1 roll', 520, 20, 55, 24, 'm'],
+  ['Vegetable fried rice', '1 takeaway box (~400 g)', 650, 14, 100, 20, 'm'],
+  ['Veg thali (restaurant)', '1 thali', 950, 28, 120, 38, 'm'],
+  ['Vegetarian pad thai with egg', '1 plate', 700, 22, 90, 26, 'm'],
+  ['Nachos with beans and cheese', '1 plate', 850, 28, 80, 45, 'm'],
+  ['Vegetable spring rolls', '2 rolls', 260, 5, 30, 13, 's'],
+  ['Vegetable dumplings, steamed', '6 dumplings', 300, 9, 45, 8, 's'],
+  ['Mango kulfi', '1 stick', 180, 4, 20, 9, 's'],
+  ['Masala chai with milk', '250 ml cup', 120, 4, 16, 4.5, 'd'],
+  ['Iced coffee (café)', 'large (~450 ml)', 380, 12, 45, 17, 'd'],
+  ['Chocolate milkshake', 'large (~500 ml)', 600, 16, 85, 22, 'd'],
 ];
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -206,11 +218,13 @@ export function searchFoods(list: Food[], query: string, limit = 30, mine: Set<s
   const words = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
   if (!words.length) return [];
   const q = words.join(' ');
-  const forms = words.map(wordForms);
+  // What you typed matches anywhere; other names only at the start of a word ("tea" shouldn't hit "steamed").
+  const atWord = (hay: string, a: string) => new RegExp(`(^|[^a-z])${a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(hay);
+  const forms = words.map((w) => ({ w, alts: wordForms(w) }));
   return list
     .filter((f) => {
       const hay = `${f.name} ${f.serving}`.toLowerCase();
-      return forms.every((alts) => alts.some((a) => hay.includes(a)));
+      return forms.every(({ w, alts }) => hay.includes(w) || alts.some((a) => a !== w && atWord(hay, a)));
     })
     .sort(
       (a, b) =>

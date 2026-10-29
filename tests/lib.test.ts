@@ -495,6 +495,8 @@ describe('search aliases', () => {
     expect(names('paneer')[0]).toMatch(/^Paneer/);
     expect(names('glass')).not.toHaveLength(0); // 'ss' isn't treated as a plural
     expect(wordForms('dal')).toEqual(['dal']);
+    expect(names('chai')).not.toContain('Vegetable dumplings, steamed'); // alias 'tea' only at a word start
+    expect(names('chai')).toContain('Masala chai with milk');
   });
 });
 
