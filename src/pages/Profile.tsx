@@ -9,7 +9,7 @@ import { todayKey, fmtDate } from '../lib/dates';
 import type { AppData, Macros } from '../lib/types';
 import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
-import { FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders } from '../lib/reminders';
+import { FOOD_HOURS, WATER_GAPS, hourLabel, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
 import { ACCENTS, BOOSTS, BOTTLES, CARDS, ORDER_LABEL, SIZES, usePrefs, type Card } from '../lib/prefs';
 import WhatsNew from '../components/WhatsNew';
@@ -476,6 +476,7 @@ function TodayCards() {
 function ReminderToggle() {
   const [on, setOn] = useState(remindersOn);
   const [times, setTimes] = useState(reminderTimes);
+  const [wrap, setWrapState] = useState(wrapOn);
   const pick = (p: Partial<typeof times>) => {
     setReminderTimes(p);
     setTimes({ ...times, ...p });
@@ -506,6 +507,10 @@ function ReminderToggle() {
           <div className="row" style={{ flexWrap: 'wrap' }}>
             {FOOD_HOURS.map((h) => <button key={h} className="chip" aria-pressed={times.foodHour === h} onClick={() => pick({ foodHour: h })}>{hourLabel(h)}</button>)}
           </div>
+          <label className="row small">
+            <input type="checkbox" checked={wrap} onChange={(e) => { setWrap(e.target.checked); setWrapState(e.target.checked); }} style={{ width: 20, height: 20, accentColor: 'var(--fuel)' }} />
+            9 PM wrap-up: today’s totals and what’s left
+          </label>
         </>
       )}
       <p className="small mut" style={{ margin: 0 }}>Reminders arrive while the app is open or running in the background. They can’t fire once your phone has fully closed it.</p>
