@@ -16,7 +16,7 @@ import { autoDue, checkIn, useCoach } from './lib/coach';
 import { startReminders } from './lib/reminders';
 import { autoBoostDue, usePrefs } from './lib/prefs';
 import { dateOf } from './lib/dates';
-import { badgeCount, dayTargets, dayTotals, targetsCrossed } from './lib/nutrition';
+import { badgeCount, dayTargets, dayTotals, energy, targetsCrossed } from './lib/nutrition';
 
 export default function App() {
   const theme = useStore((s) => s.settings.theme);
@@ -96,6 +96,13 @@ export default function App() {
     if (!nav.setAppBadge) return;
     (unlocked && badgeNum ? nav.setAppBadge(badgeNum) : nav.clearAppBadge?.())?.catch(() => {});
   }, [unlocked, badgeNum]);
+
+  // The tab shows what's left today (handy with the app open on a laptop).
+  const leftKcal = useStore((s) => Math.round(dayTargets(s.settings.targets, s.days[today]).kcal - dayTotals(s.days[today]).kcal));
+  const unitTitle = useStore((s) => s.settings.unit);
+  useEffect(() => {
+    document.title = !unlocked ? 'Fuel Log' : leftKcal > 0 ? `${energy(leftKcal, unitTitle)} ${unitTitle} to go · Fuel Log` : 'Target hit · Fuel Log';
+  }, [unlocked, leftKcal, unitTitle]);
 
   const online = useOnline();
   if (!unlocked) return <Lock />;

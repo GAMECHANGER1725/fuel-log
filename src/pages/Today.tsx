@@ -363,7 +363,7 @@ export default function Today() {
               className="btn sm"
               style={{ alignSelf: 'center' }}
               onClick={async () => {
-                const text = daySummary(fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long' }), day.entries, T, unit, timeOf);
+                const text = daySummary(fmtDate(date, { weekday: 'long', day: 'numeric', month: 'long' }), day.entries, T, unit, timeOf, day.note);
                 try {
                   if (navigator.share) await navigator.share({ text });
                   else {

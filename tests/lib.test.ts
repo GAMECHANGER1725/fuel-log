@@ -450,6 +450,8 @@ describe('day summary', () => {
     const e = (name: string, hhmm: string, qty = 1): Entry => ({ id: name, name, serving: '', base: { kcal: 300, protein: 10, carbs: 0, fat: 0 }, qty, source: 'db', at: atOn(k, hhmm) });
     const text = daySummary('Thursday', [e('Toast', '07:00', 2), e('Dal', '19:00')], { kcal: 3000, protein: 115 }, 'kcal', hhmmOf);
     expect(text).toBe(['Thursday: 900 kcal of 3,000 kcal, 30 g of 115 g protein', '', 'Breakfast (600 kcal, 20 g)', '• 07:00 2× Toast', '', 'Dinner (300 kcal, 10 g)', '• 19:00 Dal'].join('\n'));
+    const noted = daySummary('Thursday', [{ ...e('Dal', '19:00'), note: 'extra ghee' }], { kcal: 3000, protein: 115 }, 'kcal', hhmmOf, 'Gym');
+    expect(noted.split('\n')).toEqual(['Thursday: 300 kcal of 3,000 kcal, 10 g of 115 g protein', 'Gym', '', 'Dinner (300 kcal, 10 g)', '• 19:00 Dal (extra ghee)']);
   });
 });
 
