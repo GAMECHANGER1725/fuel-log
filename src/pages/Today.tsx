@@ -307,7 +307,10 @@ export default function Today() {
                     >
                       {picked && <span className={`check${picked.has(e.id) ? ' on' : ''}`}>{picked.has(e.id) && <Icon name="check" size={14} stroke={3.5} />}</span>}
                       <span className="mono dim" style={{ width: 64, flex: 'none' }}>{timeOf(e.at)}</span>
-                      <span className="grow">{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
+                      <span className="grow stack" style={{ gap: 0, minWidth: 0 }}>
+                        <span>{e.qty !== 1 ? `${e.qty}× ` : ''}{e.name}</span>
+                        {e.note && <span className="small mut" style={{ overflowWrap: 'anywhere' }}>{e.note}</span>}
+                      </span>
                       <span className="mono mut" style={{ flex: 'none' }}>{energy(entryMacros(e).kcal, unit)} · {fmt(entryMacros(e).protein)} g</span>
                     </button>
                   ))}
@@ -790,6 +793,8 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
   base.carbs = n(info.carbs);
   base.fat = n(info.fat);
   const name = info.name.trim().slice(0, 80) || entry.name;
+  const [note, setNote] = useState(entry.note ?? '');
+  const notePatch = note.trim() !== (entry.note ?? '') ? { note: note.trim().slice(0, 80) || undefined } : {};
   const infoPatch = name !== entry.name || info.serving !== entry.serving || (['kcal', 'protein', 'carbs', 'fat'] as const).some((k) => base[k] !== entry.base[k]) ? { name, serving: info.serving.trim().slice(0, 60), base } : {};
   const field = (k: keyof typeof info, label: string, numeric = true) => (
     <label className="field">
@@ -808,6 +813,10 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
       <Stepper value={qty} onChange={setQty} label="servings" presets={SERVING_PRESETS} />
       <MacroGrid {...m} unit={s.settings.unit} />
       <TimeField value={when.hhmm} onChange={when.setHhmm} />
+      <label className="field">
+        <span>Note (optional)</span>
+        <input className="input" value={note} maxLength={80} placeholder="Homemade, extra ghee…" onChange={(e) => setNote(e.target.value)} />
+      </label>
       <label className="field">
         <span>Day eaten</span>
         <input className="input" type="date" max={today} value={day} onChange={(e) => e.target.value && setDay(e.target.value <= today ? e.target.value : today)} aria-label="Day eaten" />
@@ -853,9 +862,9 @@ function EditSheet({ date, entry, onClose }: { date: string; entry: Entry; onClo
           className="btn primary grow"
           onClick={() => {
             if (day !== date) {
-              s.moveEntry(date, day, { ...entry, qty, ...infoPatch, at: when.at });
+              s.moveEntry(date, day, { ...entry, qty, ...infoPatch, ...notePatch, at: when.at });
               toast(`Moved to ${fmtDate(day, { weekday: 'short', day: 'numeric', month: 'short' })}`);
-            } else s.updateEntry(date, entry.id, { qty, ...infoPatch, ...(when.hhmm === hhmmOf(entry.at) ? {} : { at: when.at }) });
+            } else s.updateEntry(date, entry.id, { qty, ...infoPatch, ...notePatch, ...(when.hhmm === hhmmOf(entry.at) ? {} : { at: when.at }) });
             onClose();
           }}
         >

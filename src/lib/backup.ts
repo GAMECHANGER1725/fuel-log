@@ -128,6 +128,7 @@ function entry(v: unknown): Entry {
     at: num(e.at, Date.now(), 0, 4e12),
     upd: e.upd == null ? undefined : num(e.upd, 0, 0, 4e12),
     foodId: str(e.foodId, 80) || undefined,
+    note: str(e.note, 80) || undefined,
   };
 }
 
@@ -269,7 +270,7 @@ export function exportCsv(d: AppData): string {
     const day = d.days[date];
     for (const e of [...day.entries].sort((a, b) => a.at - b.at)) {
       const m = entryMacros(e);
-      rows.push(['food', date, hhmmOf(e.at), e.name, e.serving, e.qty, Math.round(m.kcal), r1(m.protein), r1(m.carbs), r1(m.fat), '', '']);
+      rows.push(['food', date, hhmmOf(e.at), e.name, e.serving, e.qty, Math.round(m.kcal), r1(m.protein), r1(m.carbs), r1(m.fat), '', e.note ?? '']);
     }
     const t = dayTotals(day);
     if (day.entries.length || day.water || day.note) rows.push(['day', date, '', '', '', '', Math.round(t.kcal), r1(t.protein), r1(t.carbs), r1(t.fat), day.water * 0.25, day.note ?? '']);

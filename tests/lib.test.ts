@@ -249,6 +249,11 @@ describe('game', () => {
 });
 
 describe('backup', () => {
+  it('keeps an entry note, trimmed to 80 characters', () => {
+    const n = normalize({ days: { '2026-10-07': { entries: [{ id: 'a', name: 'Dal', note: 'x'.repeat(100), base: { kcal: 100 } }, { id: 'b', name: 'Roti', base: { kcal: 100 } }] } } });
+    expect(n.days['2026-10-07'].entries[0].note).toBe('x'.repeat(80));
+    expect(n.days['2026-10-07'].entries[1].note).toBeUndefined();
+  });
   it('keeps a known theme, black included, and drops others', () => {
     expect(normalize({ settings: { theme: 'black' } }).settings.theme).toBe('black');
     expect(normalize({ settings: { theme: 'neon' } }).settings.theme).toBe('auto');

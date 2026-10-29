@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29y';
+export const NEWS_ID = '2026-10-29z';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Notes on a food', 'Tap a logged food to add a short note, like “homemade, extra ghee”. It shows under the food in the log.'],
   ['Tidier settings', 'Profile’s settings are split into Look, Today page and Reminders, so things are quicker to find.', '#/profile?open=today'],
   ['Don’t go too long without eating', 'With reminders on, pick 3, 4 or 5 hours in Profile and the app nudges you with a food idea until you hit your energy target.', '#/profile?open=reminders'],
   ['Shopping list', 'Under a recipe’s ingredients, tap Shopping list, or tap the cart on any food. The list is on Add food; tick things off as you shop, add your own items, or share it.', '#/food?list=1'],

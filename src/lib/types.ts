@@ -38,6 +38,8 @@ export interface Entry {
   /** Epoch ms of the last edit, for syncing. */
   upd?: number;
   foodId?: string;
+  /** A short note on this one entry ("homemade, extra ghee"). */
+  note?: string;
 }
 
 export interface DayLog {
