@@ -200,12 +200,12 @@ export default function Today() {
     log: (
       <>
         <section className="stack" style={{ marginTop: 8 }}>
-          <div className="between" style={{ alignItems: 'center' }}>
+          <div className="between" style={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 8 }}>
             <div className="stack" style={{ gap: 0 }}>
               <h2 className="h2">Log</h2>
               {ago && <span className="mono mut">Last ate {ago}{ago === 'just now' ? '' : ' ago'}</span>}
             </div>
-            <div className="row" style={{ gap: 6 }}>
+            <div className="row" style={{ gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' }}>
             {day.entries.length > 0 && (
               <button className="btn sm" aria-pressed={!!picked} onClick={() => setPicked(picked ? null : new Set())}>{picked ? 'Done' : 'Select'}</button>
             )}
@@ -384,8 +384,9 @@ export default function Today() {
 
   return (
     <>
-      <header className="head">
-        <div className="row" style={{ gap: 4 }}>
+      {/* Wraps on narrow screens or large text, so nothing scrolls sideways. */}
+      <header className="head" style={{ flexWrap: 'wrap', rowGap: 8 }}>
+        <div className="row" style={{ gap: 4, minWidth: 0 }}>
           <button className="btn icon sm" style={{ width: 36 }} aria-label="Previous day" onClick={() => setDate(addDays(date, -1))}>
             <Icon name="left" size={18} />
           </button>
@@ -399,9 +400,9 @@ export default function Today() {
               <Icon name="right" size={18} />
             </button>
           )}
+          {date < addDays(today, -1) && <button className="btn sm" style={{ marginLeft: 4 }} onClick={() => setDate(today)}>Today</button>}
         </div>
-        <div className="row">
-          {date < addDays(today, -1) && <button className="btn sm" onClick={() => setDate(today)}>Today</button>}
+        <div className="row" style={{ marginLeft: 'auto' }}>
           <a href="#/profile" className="btn sm" aria-label={`Streak ${g.streak.current} days`}>
             <span className="fuel"><Icon name="flame" size={16} stroke={2.2} /></span>
             <span className="num" style={{ fontSize: 20 }}>{g.streak.current}</span>
