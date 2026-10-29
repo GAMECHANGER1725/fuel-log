@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, lastQty, logSections, mealGroups, records, weekStats } from '../src/lib/meals';
+import { daySummary, insights, lastQty, logSections, mealGroups, records, weekStats } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -649,5 +649,28 @@ describe('custom checks', () => {
     const g = computeGame(data, k);
     const q = g.quests.find((x) => x.id === 'quality');
     if (q) expect(q.isDone).toBe(true);
+  });
+});
+
+describe('insights', () => {
+  const today = '2026-10-29';
+  const e = (k: string, hh: string, kcal: number, protein: number): Entry => ({ id: k + hh, name: 'x', serving: '', base: { kcal, protein, carbs: 0, fat: 0 }, qty: 1, source: 'db', at: atOn(k, hh) });
+  const day = (items: Entry[]): DayLog => ({ entries: items, water: 0, checks: {} });
+  const T = { kcal: 3000, protein: 115 };
+  const f = (k: number) => `${Math.round(k)} kcal`;
+  it('needs at least two logged days', () => {
+    expect(insights({}, today, T, f)).toEqual([]);
+  });
+  it('spots low protein, an energy shortfall, a light breakfast and missed days', () => {
+    const days: Record<string, DayLog> = {};
+    for (const i of [1, 2, 3]) {
+      const k = addDays(today, -i);
+      days[k] = day([e(k, '08:00', 200, 10), e(k, '13:00', 1200, 30), e(k, '19:00', 1200, 30)]);
+    }
+    const text = insights(days, today, T, f).map((x) => x.text).join(' | ');
+    expect(text).toMatch(/Protein was hit on 0 of 3/);
+    expect(text).toMatch(/averaging 400 kcal under/);
+    expect(text).toMatch(/Breakfast averages 200 kcal/);
+    expect(text).toMatch(/4 of the last 7 days have nothing logged/);
   });
 });
