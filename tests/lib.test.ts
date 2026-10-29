@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { dayTotals, energy, forGrams, paceGap, sinceLast } from '../src/lib/nutrition';
 import { foodDue, waterDue } from '../src/lib/reminders';
-import { FOODS, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
+import { FOODS, browseFoods, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
 import { addDays, atOn, hhmmOf, weekStart } from '../src/lib/dates';
 import { suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
@@ -445,5 +445,20 @@ describe('text size', () => {
   it('falls back to normal for anything unknown', () => {
     expect(cleanSize('xl')).toBe('xl');
     expect(cleanSize('huge')).toBe('normal');
+  });
+});
+
+describe('browse foods', () => {
+  it('finds high-protein foods, most protein first', () => {
+    const list = browseFoods(FOODS, 'protein');
+    expect(list.length).toBeGreaterThan(5);
+    expect(list.every((f) => f.protein >= 15 || (f.protein * 4) / f.kcal >= 0.25)).toBe(true);
+    expect(list[0].protein).toBeGreaterThanOrEqual(list[list.length - 1].protein);
+  });
+  it('lists foods by tag and big-calorie foods, without duplicates', () => {
+    expect(browseFoods(FOODS, 'b').every((f) => f.tags?.includes('b'))).toBe(true);
+    expect(browseFoods(FOODS, 'dense').every((f) => f.kcal >= 400)).toBe(true);
+    const twice = browseFoods([...FOODS, ...FOODS], 'd');
+    expect(new Set(twice.map((f) => f.name)).size).toBe(twice.length);
   });
 });
