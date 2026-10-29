@@ -161,14 +161,55 @@ export const FOODS: Food[] = [...ROW_FOODS, ...RECIPE_FOODS];
 export const foodMacros = (f: Food): Macros => ({ kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat });
 
 /** Search by every word in the query, best match (name starts with query) first. */
+/** Other names people type for the same food (Gujarati, Hindi, Australian spellings). Each maps to words in our names. */
+const ALIASES: Record<string, string[]> = {
+  roti: ['rotli'],
+  chapati: ['rotli'],
+  chapatti: ['rotli'],
+  rotli: ['roti'],
+  yogurt: ['yoghurt'],
+  dahi: ['yoghurt', 'raita'],
+  curd: ['yoghurt'],
+  chana: ['chickpea', 'chole'],
+  chickpea: ['chole'],
+  daal: ['dal'],
+  dhal: ['dal'],
+  lentil: ['dal'],
+  sabzi: ['shaak'],
+  sabji: ['shaak'],
+  curry: ['shaak', 'masala'],
+  aloo: ['potato', 'bateta'],
+  potato: ['bateta', 'aloo'],
+  bateta: ['potato'],
+  pb: ['peanut butter'],
+  shake: ['smoothie'],
+  smoothie: ['shake'],
+  milkshake: ['shake', 'flavoured milk'],
+  soy: ['soya'],
+  soya: ['soy'],
+  omelet: ['omelette'],
+  chaas: ['buttermilk'],
+  buttermilk: ['chaas'],
+  chai: ['tea'],
+  chips: ['chips', 'crisps'],
+  crisps: ['chips'],
+};
+
+/** A query word and what else it may match: its aliases, and the singular of a plural ("eggs" → "egg"). */
+export function wordForms(w: string): string[] {
+  const one = w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w;
+  return [...new Set([w, one, ...(ALIASES[w] ?? []), ...(ALIASES[one] ?? [])])];
+}
+
 export function searchFoods(list: Food[], query: string, limit = 30): Food[] {
   const words = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
   if (!words.length) return [];
   const q = words.join(' ');
+  const forms = words.map(wordForms);
   return list
     .filter((f) => {
       const hay = `${f.name} ${f.serving}`.toLowerCase();
-      return words.every((w) => hay.includes(w));
+      return forms.every((alts) => alts.some((a) => hay.includes(a)));
     })
     .sort((a, b) => Number(b.name.toLowerCase().startsWith(q)) - Number(a.name.toLowerCase().startsWith(q)))
     .slice(0, limit);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { dayTotals, energy, forGrams, paceGap, sinceLast } from '../src/lib/nutrition';
 import { foodDue, hourLabel, waterDue } from '../src/lib/reminders';
-import { FOODS, browseFoods, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
+import { FOODS, browseFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
 import { addDays, atOn, hhmmOf, weekStart } from '../src/lib/dates';
 import { suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
@@ -477,5 +477,23 @@ describe('reminder times', () => {
   it('labels hours', () => {
     expect(hourLabel(17)).toBe('5 PM');
     expect(hourLabel(12)).toBe('12 PM');
+  });
+});
+
+describe('search aliases', () => {
+  const names = (q: string) => searchFoods(FOODS, q).map((f) => f.name);
+  it('finds foods by other names and plurals', () => {
+    expect(names('roti')).toContain('Rotli, plain');
+    expect(names('chapati')).toContain('Rotli with ghee');
+    expect(names('dahi')).toContain('Yoghurt, natural');
+    expect(names('chana')).toContain('Chole (chana masala)');
+    expect(names('aloo')).toContain('Bateta nu shaak (potato)');
+    expect(names('eggs')).toContain('Egg, boiled');
+    expect(names('sabzi')).toContain('Mixed veg shaak');
+  });
+  it('keeps plain searches as they were', () => {
+    expect(names('paneer')[0]).toMatch(/^Paneer/);
+    expect(names('glass')).not.toHaveLength(0); // 'ss' isn't treated as a plural
+    expect(wordForms('dal')).toEqual(['dal']);
   });
 });
