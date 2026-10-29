@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayTotals, energy, forGrams, paceGap, sinceLast } from '../src/lib/nutrition';
+import { dayTotals, energy, energySplit, forGrams, paceGap, sinceLast } from '../src/lib/nutrition';
 import { foodDue, hourLabel, waterDue } from '../src/lib/reminders';
 import { FOODS, browseFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
@@ -495,5 +495,14 @@ describe('search aliases', () => {
     expect(names('paneer')[0]).toMatch(/^Paneer/);
     expect(names('glass')).not.toHaveLength(0); // 'ss' isn't treated as a plural
     expect(wordForms('dal')).toEqual(['dal']);
+  });
+});
+
+describe('energy split', () => {
+  it('gives whole percents of energy that add up to 100', () => {
+    expect(energySplit({ kcal: 0, protein: 25, carbs: 50, fat: 11.1 })).toEqual({ protein: 25, carbs: 50, fat: 25 });
+    const s = energySplit({ kcal: 0, protein: 33, carbs: 33, fat: 33 })!;
+    expect(s.protein + s.carbs + s.fat).toBe(100);
+    expect(energySplit({ kcal: 0, protein: 0, carbs: 0, fat: 0 })).toBeNull();
   });
 });
