@@ -8,6 +8,7 @@ import Progress from './pages/Progress';
 import ProfilePage from './pages/Profile';
 import Coach from './pages/Coach';
 import LevelUp from './components/LevelUp';
+import { WhatsNewOnce } from './components/WhatsNew';
 import Lock from './pages/Lock';
 import { useAuth } from './lib/auth';
 import { startSync, useSync } from './lib/sync';
@@ -87,6 +88,7 @@ export default function App() {
       {page}
       <Nav path={path} />
       <Celebrations />
+      <WhatsNewOnce />
       <Toast />
     </div>
   );
