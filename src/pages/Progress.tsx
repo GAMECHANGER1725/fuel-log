@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { useStore, dataOf } from '../lib/store';
 import { addDays, dateOf, daysBetween, fmtDate, weekStart } from '../lib/dates';
 import { dayTotals, energy, fmt, r1 } from '../lib/nutrition';
-import { projectedDate, trendLine, weeklyNudge, weeklyRate, withKcal } from '../lib/targets';
+import { goalProgress, projectedDate, trendLine, weeklyNudge, weeklyRate, withKcal } from '../lib/targets';
 
 import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
 import { records, weekStats } from '../lib/meals';
 import { hasAi } from '../lib/ai';
-import { Icon, Sheet, toast, useGame, useRoute, useToday } from '../components/ui';
+import { Bar, Icon, Sheet, toast, useGame, useRoute, useToday } from '../components/ui';
 
 export default function Progress() {
   const today = useToday();
@@ -73,8 +73,9 @@ export default function Progress() {
               ? 'Weigh in once or twice a week: same morning, before breakfast, same scales. The trend appears after two weigh-ins a week apart.'
               : proj
                 ? `At this rate you reach ${s.profile.goalKg} kg around ${fmtDate(proj, { day: 'numeric', month: 'short', year: 'numeric' })}.`
-                : `Your range is +${s.settings.gainLow} to +${s.settings.gainHigh} kg a week.${s.profile.goalKg ? '' : ' Set a goal weight in Profile to see a finish date.'}`}
+                : `Your range is +${s.settings.gainLow} to +${s.settings.gainHigh} kg a week.`}
           </p>
+          <GoalBar start={line[0]?.trend ?? s.profile.weightKg} now={latest?.trend ?? s.profile.weightKg} />
         </section>
 
         {nudge && (
@@ -279,6 +280,34 @@ function DailyChart({ today }: { today: string }) {
         Line = target ({show(target)}). {avg === null ? 'Log a few days to see your average.' : `Average on logged days: ${show(avg)}, ${logged.filter((v) => v >= target).length} of ${logged.length} hit.`}
       </p>
     </section>
+  );
+}
+
+/** Start → goal weight bar, or a field to set a goal. */
+function GoalBar({ start, now }: { start: number; now: number }) {
+  const goal = useStore((s) => s.profile.goalKg);
+  const setProfile = useStore((s) => s.setProfile);
+  const [text, setText] = useState('');
+  const frac = goalProgress(start, now, goal);
+  if (goal && frac !== null)
+    return (
+      <div className="stack rule" style={{ gap: 6, marginTop: 12, paddingTop: 12 }}>
+        <div className="between">
+          <span className="mono mut">Goal {r1(start).toFixed(1)} → {goal} kg</span>
+          <span className="mono fuel">{Math.round(frac * 100)}% there · {Math.max(0, goal - now).toFixed(1)} kg to go</span>
+        </div>
+        <Bar value={frac} max={1} color="var(--fuel)" height={8} />
+      </div>
+    );
+  const v = parseFloat(text);
+  return (
+    <div className="row rule" style={{ marginTop: 12, paddingTop: 12, gap: 8 }}>
+      <label className="field grow" style={{ margin: 0 }}>
+        <span>{goal ? `Goal ${goal} kg is at or below your start. New goal (kg)` : 'Set a goal weight (kg)'}</span>
+        <input className="input" type="number" inputMode="decimal" step="0.5" value={text} onChange={(e) => setText(e.target.value)} placeholder={String(Math.round(now + 5))} />
+      </label>
+      <button className="btn" style={{ alignSelf: 'flex-end', minHeight: 48 }} disabled={!(v > now && v < 200)} onClick={() => { setProfile({ goalKg: Math.round(v * 10) / 10 }); toast(`Goal set to ${v} kg`); }}>Set</button>
+    </div>
   );
 }
 

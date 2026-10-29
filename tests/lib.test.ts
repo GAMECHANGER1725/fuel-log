@@ -4,7 +4,7 @@ import { foodDue, hourLabel, waterDue, wrapDue, wrapText } from '../src/lib/remi
 import { FOODS, browseFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
 import { addDays, atOn, daysSinceWeighIn, hhmmOf, weekStart } from '../src/lib/dates';
-import { suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
+import { goalProgress, suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
 import { computeGame, levelFromXp, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
 import { DEFAULT_CHECKS, DEFAULT_DATA, cleanChecks, exportCsv, exportText, normalize, parseBackup } from '../src/lib/backup';
 import { findByBarcode, parseProduct } from '../src/lib/off';
@@ -687,5 +687,15 @@ describe('evening wrap-up', () => {
     expect(wrapText({ kcal: 2600, protein: 100 }, T).title).toBe('400 kcal and 15 g protein to go today');
     expect(wrapText({ kcal: 2600, protein: 100 }, T).body).toMatch(/milk and a banana/);
     expect(wrapText({ kcal: 3100, protein: 120 }, T).title).toBe('Both targets hit today');
+  });
+});
+
+describe('goal progress', () => {
+  it('measures start to goal, clamped', () => {
+    expect(goalProgress(58, 60, 66)).toBe(0.25);
+    expect(goalProgress(58, 57, 66)).toBe(0);
+    expect(goalProgress(58, 70, 66)).toBe(1);
+    expect(goalProgress(58, 60, null)).toBeNull();
+    expect(goalProgress(58, 60, 55)).toBeNull();
   });
 });
