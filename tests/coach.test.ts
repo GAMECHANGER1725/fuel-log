@@ -9,7 +9,7 @@ vi.hoisted(() => {
   };
 });
 
-import { allowedChange, applyCheckIn, checkIn, guardTargets, ideasRequest, kcalBounds, MAX_STEP, parseIdeas, parseRecipeEdit, parseReview, snapshot, undoCheckIn, useCoach, type Snapshot } from '../src/lib/coach';
+import { allowedChange, applyCheckIn, briefDue, checkIn, dayReport, digestDue, guardTargets, parseBrief, parseDigest, ideasRequest, kcalBounds, MAX_STEP, parseIdeas, parseRecipeEdit, parseReview, snapshot, undoCheckIn, useCoach, type Snapshot } from '../src/lib/coach';
 import { RECIPES, recipeFor, recipeMacros, withEdit } from '../src/lib/recipes';
 import { FOODS } from '../src/lib/foods';
 import { applyDoc, toDoc } from '../src/lib/syncdoc';
@@ -221,5 +221,48 @@ describe('check-in, apply and undo', () => {
     reply = { headline: 'h' };
     await expect(checkIn()).rejects.toThrow();
     expect(useStore.getState().settings.targets).toEqual(T);
+  });
+});
+
+describe('morning brief and nightly digest', () => {
+  const at = (h: number, m = 0) => new Date(2026, 9, 29, h, m);
+  it('makes the brief once a day from 5 am until the digest time', () => {
+    expect(briefDue(at(4, 59), null)).toBe(false);
+    expect(briefDue(at(5), null)).toBe(true);
+    expect(briefDue(at(13), '2026-10-28')).toBe(true);
+    expect(briefDue(at(13), '2026-10-29')).toBe(false);
+    expect(briefDue(at(21, 30), null)).toBe(false);
+  });
+  it('makes the digest once a day from 9:30 pm until midnight', () => {
+    expect(digestDue(at(21, 29), null)).toBe(false);
+    expect(digestDue(at(21, 30), null)).toBe(true);
+    expect(digestDue(at(23, 59), '2026-10-28')).toBe(true);
+    expect(digestDue(at(22), '2026-10-29')).toBe(false);
+    expect(digestDue(at(6), null)).toBe(false);
+  });
+  it('works out the day in code', () => {
+    const d = data(3000, null, 1);
+    d.days[addDays(today, -1)].water = 6;
+    d.settings.waterL = 2;
+    const r = dayReport(d, addDays(today, -1));
+    expect(r).toMatchObject({ kcal: 3000, protein: 100, meals: 2, kcalPct: 1, hitKcal: true, hitProtein: false, waterL: 1.5, waterGoalL: 2, last: '19:00' });
+    expect(r.target).toEqual(T);
+    expect(dayReport(d, today)).toMatchObject({ kcal: 0, items: 0, last: '' });
+  });
+  it('reads the brief and needs at least one focus point', () => {
+    const r = dayReport(data(3000, null, 1), addDays(today, -1));
+    const b = parseBrief('Sure: {"headline":"Big breakfast day","yesterday":"3,000 kcal, nice.","focus":["a","b","c","d"]}', r, today, 'm', 5);
+    expect(b).toMatchObject({ date: today, headline: 'Big breakfast day', focus: ['a', 'b', 'c'], at: 5, model: 'm' });
+    expect(() => parseBrief('{"headline":"x","focus":[]}', r, today, 'm')).toThrow();
+    expect(() => parseBrief('no json', r, today, 'm')).toThrow();
+  });
+  it('only keeps a before-bed snack when he is really short', () => {
+    const reply = '{"headline":"Close one","wins":["Breakfast"],"fix":["Lunch"],"beforeBed":"Warm milk, 250 ml","tomorrow":"Shake at recess"}';
+    const full = dayReport(data(3000, null, 1), addDays(today, -1)); // 3000 kcal, 100 g protein of 115
+    expect(parseDigest(reply, full, 'm').beforeBed).toBe('');
+    const short = dayReport(data(2000, null, 1), addDays(today, -1));
+    const g = parseDigest(reply, short, 'm');
+    expect(g).toMatchObject({ headline: 'Close one', wins: ['Breakfast'], fix: ['Lunch'], beforeBed: 'Warm milk, 250 ml', tomorrow: 'Shake at recess' });
+    expect(() => parseDigest('{"wins":[]}', short, 'm')).toThrow();
   });
 });

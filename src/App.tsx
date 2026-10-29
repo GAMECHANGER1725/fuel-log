@@ -11,8 +11,8 @@ import LevelUp from './components/LevelUp';
 import Lock from './pages/Lock';
 import { useAuth } from './lib/auth';
 import { startSync, useSync } from './lib/sync';
-import { autoDue, checkIn, useCoach } from './lib/coach';
-import { startReminders } from './lib/reminders';
+import { autoDue, checkIn, dailyDue, makeBrief, makeDigest, useCoach } from './lib/coach';
+import { notifyIfOn, startReminders } from './lib/reminders';
 
 export default function App() {
   const theme = useStore((s) => s.settings.theme);
@@ -57,6 +57,30 @@ export default function App() {
     }, 3000);
     return () => clearTimeout(t);
   }, [unlocked, hasKey, synced, auto, today]);
+
+  // Morning brief (from 5 am) and nightly digest (9:30 pm), checked every minute while the app is alive.
+  useEffect(() => {
+    if (!unlocked || !hasKey || !synced) return;
+    const tick = () => {
+      const due = dailyDue();
+      if (!due) return;
+      const now = Date.now();
+      if (due === 'brief') {
+        useCoach.getState().set({ briefTried: now });
+        makeBrief()
+          .then((b) => notifyIfOn('Your morning brief', `${b.headline} ${b.focus[0] ?? ''}`.trim(), 'brief', 'coach'))
+          .catch(() => {}); // Tried again in 30 minutes.
+      } else {
+        useCoach.getState().set({ digestTried: now });
+        makeDigest()
+          .then((g) => notifyIfOn('Your nightly digest', `${g.headline} ${g.tomorrow}`.trim(), 'digest', 'coach'))
+          .catch(() => {});
+      }
+    };
+    const first = setTimeout(tick, 5000);
+    const every = setInterval(tick, 60_000);
+    return () => (clearTimeout(first), clearInterval(every));
+  }, [unlocked, hasKey, synced]);
 
   if (!unlocked) return <Lock />;
 
