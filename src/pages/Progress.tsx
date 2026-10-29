@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useStore, dataOf } from '../lib/store';
-import { addDays, dateOf, daysBetween, fmtDate, weekStart } from '../lib/dates';
+import { addDays, dateOf, daysBetween, fmtDate, monthRange, weekStart } from '../lib/dates';
 import { dayTotals, energy, entryMacros, fmt, r1, timeOf } from '../lib/nutrition';
 import { chartWindow, goalProgress, projectedDate, trendLine, weeklyNudge, weeklyRate, withKcal } from '../lib/targets';
 
 import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
-import { records, searchLog, tagStats, topFoods, weekdayAverages, weekStats, weekSummary } from '../lib/meals';
+import { rangeStats, records, searchLog, tagStats, topFoods, weekdayAverages, weekStats, weekSummary } from '../lib/meals';
 import { hasAi } from '../lib/ai';
 import { usePrefs } from '../lib/prefs';
 import { Bar, Icon, Sheet, toast, useGame, useRoute, useToday } from '../components/ui';
@@ -250,14 +250,20 @@ export default function Progress() {
   );
 }
 
-/** This week so far next to last week: averages, days logged and days on target. */
+/** This week (or month) so far next to the last one: averages, days logged and days on target. */
 function WeekCompare({ today }: { today: string }) {
   const days = useStore((s) => s.days);
   const T = useStore((s) => s.settings.targets);
   const unit = useStore((s) => s.settings.unit);
+  const [span, setSpan] = useState<'week' | 'month'>('week');
   const thisWk = weekStats(days, weekStart(today), today, T);
   const lastWk = weekStats(days, addDays(weekStart(today), -7), today, T);
-  if (!thisWk.logged && !lastWk.logged) return null;
+  const m0 = monthRange(today);
+  const m1 = monthRange(today, -1);
+  const thisM = rangeStats(days, m0.start, m0.n, today, T);
+  const lastM = rangeStats(days, m1.start, m1.n, today, T);
+  if (!thisWk.logged && !lastWk.logged && !thisM.logged && !lastM.logged) return null;
+  const [cur, prev] = span === 'week' ? [thisWk, lastWk] : [thisM, lastM];
   const row = (label: string, a: number | null, b: number | null, show: (v: number) => string) => {
     const diff = a !== null && b !== null ? a - b : null;
     return (
@@ -274,8 +280,8 @@ function WeekCompare({ today }: { today: string }) {
   return (
     <section className="card">
       <div className="between" style={{ marginBottom: 4 }}>
-        <h2 className="h2">This week vs last</h2>
-        <button
+        <h2 className="h2">This {span} vs last</h2>
+        {span === 'week' && <button
           className="btn sm"
           onClick={async () => {
             const rate = weeklyRate(useStore.getState().weighIns, today);
@@ -292,16 +298,20 @@ function WeekCompare({ today }: { today: string }) {
           }}
         >
           <Icon name="copy" size={14} /> Share
-        </button>
+        </button>}
+      </div>
+      <div className="row" style={{ gap: 6, margin: '6px 0 4px' }} role="group" aria-label="Compare">
+        <button className="chip" aria-pressed={span === 'week'} onClick={() => setSpan('week')}>Week</button>
+        <button className="chip" aria-pressed={span === 'month'} onClick={() => setSpan('month')}>Month</button>
       </div>
       <div className="between" style={{ marginBottom: 2 }}>
         <span />
         <span className="mono dim">Last · This</span>
       </div>
-      {row('Avg energy', thisWk.kcal, lastWk.kcal, (v) => `${energy(v, unit)}`)}
-      {row('Avg protein', thisWk.protein, lastWk.protein, (v) => `${fmt(v)} g`)}
-      {row('Days logged', thisWk.logged, lastWk.logged, (v) => String(v))}
-      {row('Days on target', thisWk.hit, lastWk.hit, (v) => String(v))}
+      {row('Avg energy', cur.kcal, prev.kcal, (v) => `${energy(v, unit)}`)}
+      {row('Avg protein', cur.protein, prev.protein, (v) => `${fmt(v)} g`)}
+      {row('Days logged', cur.logged, prev.logged, (v) => String(v))}
+      {row('Days on target', cur.hit, prev.hit, (v) => String(v))}
     </section>
   );
 }

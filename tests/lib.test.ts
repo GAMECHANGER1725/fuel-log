@@ -3,7 +3,7 @@ import { badgeCount, coverage, dayTargets, dayTotals, energy, energySplit, forGr
 import { foodDue, hourLabel, waterDue, wrapDue, wrapText } from '../src/lib/reminders';
 import { FOODS, browseFoods, planRest, proteinPer100kcal, sortFoods, wordForms, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
-import { addDays, atOn, daysSinceWeighIn, hhmmOf, weekStart } from '../src/lib/dates';
+import { addDays, atOn, daysSinceWeighIn, monthRange, hhmmOf, weekStart } from '../src/lib/dates';
 import { chartWindow, goalProgress, suggestTargets, trendLine, weeklyNudge, weeklyRate, projectedDate } from '../src/lib/targets';
 import { computeGame, levelFromXp, nextBadge, questsFor, rankFor, streaks, type DayStats } from '../src/lib/game';
 import { DEFAULT_CHECKS, DEFAULT_DATA, cleanChecks, exportCsv, exportText, normalize, parseBackup } from '../src/lib/backup';
@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanTags, pushSearch, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, foodHistory, hasTag, searchLog, weekBalance, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
+import { daySummary, rangeStats, foodHistory, hasTag, searchLog, weekBalance, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -608,6 +608,25 @@ describe('custom tags', () => {
     expect(cleanTags([' Gym ', 'gym', 'a,b', '', 3, 'x'.repeat(40)])).toEqual(['Gym', 'a b', 'x'.repeat(24)]);
     expect(cleanTags(Array.from({ length: 20 }, (_, i) => `t${i}`))).toHaveLength(12);
     expect(cleanTags([])).toEqual([]);
+  });
+});
+
+describe('month stats', () => {
+  it('finds a month and its length', () => {
+    expect(monthRange('2026-10-29')).toEqual({ start: '2026-10-01', n: 31 });
+    expect(monthRange('2026-03-31', -1)).toEqual({ start: '2026-02-01', n: 28 });
+    expect(monthRange('2026-01-15', -1)).toEqual({ start: '2025-12-01', n: 31 });
+    expect(monthRange('2028-03-01', -1).n).toBe(29);
+  });
+  it('averages a month of logged days up to today', () => {
+    const T = { kcal: 3000, protein: 100 };
+    const days: Record<string, DayLog> = {
+      '2026-10-02': day([entry(3200, 110)]),
+      '2026-10-20': day([entry(2000, 60)]),
+      '2026-10-30': day([entry(9000, 900)]), // after today
+    };
+    const m = monthRange('2026-10-29');
+    expect(rangeStats(days, m.start, m.n, '2026-10-29', T)).toEqual({ logged: 2, hit: 1, kcal: 2600, protein: 85 });
   });
 });
 

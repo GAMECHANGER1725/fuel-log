@@ -45,6 +45,14 @@ export function atOn(k: string, hhmm: string): number {
 }
 
 /** Days since the last weigh-in (dates sorted ascending), or null with none. */
+/** The month `offset` months from the one holding `k`: its first day and how many days it has. */
+export function monthRange(k: string, offset = 0): { start: string; n: number } {
+  const d = dateOf(k);
+  const first = new Date(d.getFullYear(), d.getMonth() + offset, 1, 12);
+  const n = new Date(first.getFullYear(), first.getMonth() + 1, 0, 12).getDate();
+  return { start: keyOf(first), n };
+}
+
 export const daysSinceWeighIn = (weighIns: { date: string }[], today: string) => (weighIns.length ? daysBetween(weighIns[weighIns.length - 1].date, today) : null);
 
 /** Simple string hash, used to seed daily quests. */

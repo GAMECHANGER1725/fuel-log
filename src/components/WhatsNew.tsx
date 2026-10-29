@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29o';
+export const NEWS_ID = '2026-10-29p';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['This month vs last', 'Progress’s comparison card now switches between week and month.', '#/progress'],
   ['Open straight to Add food', 'Pick which page the app opens on in Profile, so logging is one tap from the home screen.', '#/profile?open=display'],
   ['Weigh-in reminder', 'Choose daily, every 3 days, weekly or fortnightly for the weigh-in reminder on Today, in Profile.', '#/profile?open=display'],
   ['Week so far', 'This week on Today says how far ahead or behind your energy target the week is, and how much a day catches up.'],
