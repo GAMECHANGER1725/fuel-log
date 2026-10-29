@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
-import { SECTION_LABEL, combineAsFood, hasTag, toggleTag, daySummary, drinkMl, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals, topFoods, weekBalance } from '../lib/meals';
+import { SECTION_LABEL, combineAsFood, hasTag, toggleTag, daySummary, drinkMl, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals, topFoods, usualNow, weekBalance } from '../lib/meals';
 
 export default function Today() {
   const today = useToday();
@@ -652,17 +652,21 @@ function QuickLog({ date }: { date: string }) {
   const recents = useStore((s) => s.recents);
   const unit = useStore((s) => s.settings.unit);
   const addEntries = useStore((s) => s.addEntries);
-  const seen = new Set<string>();
-  const foods = [...favourites, ...recents].filter((f) => !seen.has(f.name.toLowerCase()) && seen.add(f.name.toLowerCase())).slice(0, 10);
   const today = useToday();
   const now = useNow();
   const link = (open: string) => `#/food?open=${open}${date === today ? '' : `&d=${date}`}`;
   const hour = new Date(now).getHours() + new Date(now).getMinutes() / 60;
   const days = useStore((s) => s.days);
+  // What you usually have around now goes first (marked with a clock), then favourites and recents.
+  const usual: Food[] = date === today && !hidden.includes('qusual')
+    ? usualNow(days, today, hour).map((e) => ({ id: e.foodId ?? e.id, name: e.name, serving: e.serving, ...e.base }))
+    : [];
+  const seen = new Set<string>(usual.map((f) => f.name.toLowerCase()));
+  const foods = [...favourites, ...recents].filter((f) => !seen.has(f.name.toLowerCase()) && seen.add(f.name.toLowerCase())).slice(0, 10);
   const again = date === today ? lastSection(days, today, momentOf(hour)) : null;
   return (
     <section className="stack" style={{ gap: 6 }}>
-      <span className="mono mut">Quick log{foods.length ? ' · tap a food for your usual amount, hold to choose' : ''}</span>
+      <span className="mono mut">Quick log{foods.length || usual.length ? ' · tap a food for your usual amount, hold to choose' : ''}</span>
       <div className="quick">
         {!hidden.includes('qscan') && <a className="chip" href={link('scan')}><Icon name="barcode" size={16} /> Scan</a>}
         {!hidden.includes('qsnap') && <a className="chip" href={link('photo')}><Icon name="camera" size={16} /> Snap meal</a>}
@@ -681,11 +685,12 @@ function QuickLog({ date }: { date: string }) {
             <span className="mono fuel" style={{ fontSize: 11 }}>{energy(again.kcal, unit)}</span>
           </button>
         )}
-        {foods.map((f) => (
+        {[...usual, ...foods].map((f, i) => (
           <QuickChip
             key={f.id + f.name}
             food={f}
             unit={unit}
+            usual={i < usual.length}
             onTap={() => {
               const qty = lastQty(useStore.getState().days, date, f.name, f.serving);
               const ids = addEntries(date, [{ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty, source: f.barcode ? 'off' : 'db', foodId: f.id }], [f]);
@@ -700,10 +705,11 @@ function QuickLog({ date }: { date: string }) {
 }
 
 /** A Quick log food: tap adds your usual amount, press and hold opens its sheet to choose. */
-function QuickChip({ food, unit, onTap, onHold }: { food: Food; unit: 'kcal' | 'kJ'; onTap: () => void; onHold: () => void }) {
+function QuickChip({ food, unit, usual, onTap, onHold }: { food: Food; unit: 'kcal' | 'kJ'; usual?: boolean; onTap: () => void; onHold: () => void }) {
   const press = useLongPress(onHold);
   return (
-    <button className="chip" {...press.handlers} onClick={() => !press.wasLong() && onTap()} style={{ WebkitTouchCallout: 'none', userSelect: 'none' }}>
+    <button className="chip" {...press.handlers} onClick={() => !press.wasLong() && onTap()} title={usual ? 'You usually have this around now' : undefined} style={{ WebkitTouchCallout: 'none', userSelect: 'none' }}>
+      {usual && <span className="fuel" style={{ display: 'flex' }}><Icon name="today" size={14} /></span>}
       {food.name.length > 22 ? `${food.name.slice(0, 21)}…` : food.name}
       <span className="mono fuel" style={{ fontSize: 11 }}>{energy(food.kcal, unit)}</span>
     </button>

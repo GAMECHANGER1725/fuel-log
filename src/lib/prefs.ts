@@ -23,9 +23,10 @@ export const CARDS = [
   ['qsnap', 'Snap meal'],
   ['qnum', 'Numbers'],
   ['qagain', 'Meal again'],
+  ['qusual', 'Usually now'],
 ] as const;
 /** Quick log's action buttons, which can be hidden one by one. */
-export const QUICK_ACTIONS = ['qscan', 'qsnap', 'qnum', 'qagain'] as const;
+export const QUICK_ACTIONS = ['qscan', 'qsnap', 'qnum', 'qagain', 'qusual'] as const;
 export type Card = (typeof CARDS)[number][0];
 
 const IDS: readonly string[] = CARDS.map(([id]) => id);

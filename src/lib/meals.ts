@@ -143,6 +143,37 @@ export function weekBalance(days: Record<string, DayLog>, start: string, today: 
   return { kcal, days: n, left, perDay: kcal < 0 ? Math.min(cap, Math.round(-kcal / left / 10) * 10) : 0 };
 }
 
+/**
+ * Foods you often log around this time of day: logged within `window` hours of `hour` on at least `min` of the last
+ * `lookback` days (today not counted), and not already logged today within that window. Each comes back as its most
+ * recent entry (name, serving, numbers, amount). Most days first.
+ */
+export function usualNow(days: Record<string, DayLog>, today: string, hour: number, lookback = 14, window = 1.5, min = 2, max = 3): Entry[] {
+  const near = (e: Entry) => {
+    const d = new Date(e.at);
+    const h = d.getHours() + d.getMinutes() / 60;
+    return Math.abs(h - hour) <= window;
+  };
+  const seen = new Map<string, { n: number; last: Entry }>();
+  for (let i = 1; i <= lookback; i++) {
+    const names = new Set<string>();
+    for (const e of days[addDays(today, -i)]?.entries ?? []) {
+      const k = e.name.trim().toLowerCase();
+      if (!near(e) || names.has(k)) continue;
+      names.add(k);
+      const s = seen.get(k);
+      if (s) s.n++;
+      else seen.set(k, { n: 1, last: e }); // newest day comes first
+    }
+  }
+  const done = new Set((days[today]?.entries ?? []).filter(near).map((e) => e.name.trim().toLowerCase()));
+  return [...seen.entries()]
+    .filter(([k, s]) => s.n >= min && !done.has(k))
+    .sort((a, b) => b[1].n - a[1].n || b[1].last.at - a[1].last.at)
+    .slice(0, max)
+    .map(([, s]) => s.last);
+}
+
 export interface MealGroup {
   /** Same foods and amounts give the same key. */
   key: string;
