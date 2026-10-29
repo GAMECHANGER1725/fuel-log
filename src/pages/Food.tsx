@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useStore } from '../lib/store';
 import { todayKey } from '../lib/dates';
 import { BROWSE, FOODS, browseFoods, foodMacros, searchFoods, type Browse } from '../lib/foods';
@@ -22,6 +22,17 @@ export default function FoodPage() {
   const date = params.get('d') ?? today;
   const [q, setQ] = useState('');
   const [browse, setBrowse] = useState<Browse | null>(null);
+  // "/" jumps to the search box on a keyboard.
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/' || (e.target as HTMLElement).closest('input, textarea, select, [role=dialog]')) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
   const [tidy, setTidy] = useState<'fav' | 'recent' | null>(null); // which list shows remove buttons
   const [editingFav, setEditingFav] = useState<Food | null>(null);
   const [picked, setPicked] = useState<Picked | null>(null);
@@ -116,7 +127,7 @@ export default function FoodPage() {
       <div className="page">
         <label className="search">
           <span className="mut"><Icon name="search" size={20} /></span>
-          <input aria-label="Search foods" placeholder="Search foods or products" value={q} onChange={(e) => setQ(e.target.value)} enterKeyHint="search" />
+          <input ref={searchRef} aria-label="Search foods" placeholder="Search foods or products" value={q} onChange={(e) => setQ(e.target.value)} enterKeyHint="search" />
           {q && <button className="btn icon sm" style={{ border: 0, width: 32 }} aria-label="Clear search" onClick={() => setQ('')}><Icon name="close" size={18} /></button>}
         </label>
 

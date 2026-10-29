@@ -46,6 +46,16 @@ export default function Today() {
   const setDate = (k: string) => (window.location.hash = k === today ? '/today' : `/today?d=${k}`);
   // Swipe right for the day before, left for the day after (not past today).
   const swipe = useSwipe(() => !isToday && setDate(addDays(date, 1)), () => setDate(addDays(date, -1)));
+  // On a keyboard, ← and → do the same (not while typing or with a sheet open).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || (e.target as HTMLElement).closest('input, textarea, select, [role=dialog]')) return;
+      if (e.key === 'ArrowLeft') setDate(addDays(date, -1));
+      else if (e.key === 'ArrowRight' && !isToday) setDate(addDays(date, 1));
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [date, isToday, today]);
   const now = new Date(useNow());
   const weekday = now.getDay() >= 1 && now.getDay() <= 5;
   const atSchool = isToday && weekday && now.getHours() >= 8 && now.getHours() < 15;
@@ -365,6 +375,7 @@ export default function Today() {
                 <span className="mono pro">Protein</span>
                 <span><span className="num" style={{ fontSize: 24 }}>{fmt(t.protein)}</span><span className="mut small"> / {T.protein} g</span></span>
                 <span className="mut small">{pLeft > 0 ? `${fmt(pLeft)} g to go` : 'Target hit'}</span>
+                <span className="mono dim">{(t.protein / s.profile.weightKg).toFixed(1)} g/kg of {(T.protein / s.profile.weightKg).toFixed(1)}</span>
               </div>
             </div>
           </div>
