@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useStore } from '../lib/store';
+import { todayKey } from '../lib/dates';
 import { BROWSE, FOODS, browseFoods, foodMacros, searchFoods, type Browse } from '../lib/foods';
 import { searchProducts } from '../lib/off';
 import { energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
@@ -11,7 +12,7 @@ import AiSheet from '../components/AiSheet';
 import type { AiMode } from '../lib/ai';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
-import { mealGroups, type MealGroup } from '../lib/meals';
+import { lastQty, mealGroups, type MealGroup } from '../lib/meals';
 
 type Picked = { food: Food; source: Source };
 
@@ -67,8 +68,9 @@ export default function FoodPage() {
   // + logs one serving straight away; tapping the name opens the sheet for amount and time.
   const quickAdd = (food: Food, source: Source) => {
     const f = withEdit(food, s.recipeEdits);
-    const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: foodMacros(f), qty: 1, source, foodId: f.id }], [f]);
-    toastAdded(`Added ${f.name}`, XP.meal + (source === 'scan' ? XP.scan : 0), date, ids);
+    const qty = lastQty(s.days, today, f.name, f.serving);
+    const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: foodMacros(f), qty, source, foodId: f.id }], [f]);
+    toastAdded(`Added ${qty !== 1 ? `${qty}× ` : ''}${f.name}`, XP.meal + (source === 'scan' ? XP.scan : 0), date, ids);
   };
   const row = (f: Food, source: Source, remove?: () => void, onOpen?: () => void) => (
     <div key={`${source}-${f.id}`} className="item">
@@ -219,7 +221,8 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
   const food = withEdit(picked.food, s.recipeEdits);
   const byGrams = !!food.per100;
   const [useGrams, setUseGrams] = useState(false);
-  const [qty, setQty] = useState(1);
+  // Starts at the amount you had last time.
+  const [qty, setQty] = useState(() => lastQty(s.days, todayKey(), food.name, food.serving));
   const [grams, setGrams] = useState(food.servingGrams ?? 100);
   const m = useGrams && food.per100 ? forGrams(food.per100, grams) : scale(foodMacros(food), qty);
   const fav = s.favourites.some((f) => f.name.toLowerCase() === food.name.toLowerCase());

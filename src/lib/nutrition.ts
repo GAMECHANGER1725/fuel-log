@@ -43,6 +43,11 @@ export function energy(kcal: number, unit: 'kcal' | 'kJ'): string {
 
 export const fmt = (n: number) => Math.round(n).toLocaleString('en-AU');
 
+/** Which daily targets a change just pushed past (was under, now at or over). */
+export function targetsCrossed(before: Macros, after: Macros, target: Macros): { kcal: boolean; protein: boolean } {
+  return { kcal: before.kcal < target.kcal && after.kcal >= target.kcal, protein: before.protein < target.protein && after.protein >= target.protein };
+}
+
 /** Share of energy from protein, carbs and fat (4/4/9 kcal per g), as whole percents; null with nothing eaten. */
 export function energySplit(m: Macros): { protein: number; carbs: number; fat: number } | null {
   const p = m.protein * 4;

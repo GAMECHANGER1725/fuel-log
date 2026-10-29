@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
-import { SECTION_LABEL, daySummary, logSections } from '../lib/meals';
+import { SECTION_LABEL, daySummary, lastQty, logSections } from '../lib/meals';
 
 const CHECKS: [string, string][] = [
   ['veg', 'Fruit or veg'],
@@ -438,15 +438,16 @@ function QuickLog({ date }: { date: string }) {
   if (!foods.length) return null;
   return (
     <section className="stack" style={{ gap: 6 }}>
-      <span className="mono mut">Quick log · tap to add one serving</span>
+      <span className="mono mut">Quick log · tap to add your usual amount</span>
       <div className="quick">
         {foods.map((f) => (
           <button
             key={f.id + f.name}
             className="chip"
             onClick={() => {
-              const ids = addEntries(date, [{ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty: 1, source: f.barcode ? 'off' : 'db', foodId: f.id }], [f]);
-              toastAdded(`Added ${f.name}`, XP.meal, date, ids);
+              const qty = lastQty(useStore.getState().days, date, f.name, f.serving);
+              const ids = addEntries(date, [{ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty, source: f.barcode ? 'off' : 'db', foodId: f.id }], [f]);
+              toastAdded(`Added ${qty !== 1 ? `${qty}× ` : ''}${f.name}`, XP.meal, date, ids);
             }}
           >
             {f.name.length > 22 ? `${f.name.slice(0, 21)}…` : f.name}
