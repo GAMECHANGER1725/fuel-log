@@ -5,7 +5,7 @@ import { KJ, dayTargets, dayTotals, energy, energySplit, entryMacros, fmt, paceG
 import { FOCUS_LABEL, FOODS, MOMENT_LABEL, gapFocus, gapSuggestions, momentOf, remaining } from '../lib/foods';
 import { XP } from '../lib/game';
 import type { Entry, Food } from '../lib/types';
-import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, toastAdded, useEatenAt, useGame, useNow, useRoute, useSwipe, useToday } from '../components/ui';
+import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, toastAdded, useEatenAt, useGame, useLongPress, useNow, useRoute, useSwipe, useToday } from '../components/ui';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
@@ -576,7 +576,7 @@ function QuickLog({ date }: { date: string }) {
   const again = date === today ? lastSection(days, today, momentOf(hour)) : null;
   return (
     <section className="stack" style={{ gap: 6 }}>
-      <span className="mono mut">Quick log{foods.length ? ' · tap a food to add your usual amount' : ''}</span>
+      <span className="mono mut">Quick log{foods.length ? ' · tap a food for your usual amount, hold to choose' : ''}</span>
       <div className="quick">
         <a className="chip" href={link('scan')}><Icon name="barcode" size={16} /> Scan</a>
         <a className="chip" href={link('photo')}><Icon name="camera" size={16} /> Snap meal</a>
@@ -596,21 +596,31 @@ function QuickLog({ date }: { date: string }) {
           </button>
         )}
         {foods.map((f) => (
-          <button
+          <QuickChip
             key={f.id + f.name}
-            className="chip"
-            onClick={() => {
+            food={f}
+            unit={unit}
+            onTap={() => {
               const qty = lastQty(useStore.getState().days, date, f.name, f.serving);
               const ids = addEntries(date, [{ name: f.name, serving: f.serving, base: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat }, qty, source: f.barcode ? 'off' : 'db', foodId: f.id }], [f]);
               toastAdded(`Added ${qty !== 1 ? `${qty}× ` : ''}${f.name}`, XP.meal, date, ids);
             }}
-          >
-            {f.name.length > 22 ? `${f.name.slice(0, 21)}…` : f.name}
-            <span className="mono fuel" style={{ fontSize: 11 }}>{energy(f.kcal, unit)}</span>
-          </button>
+            onHold={() => go(`food?add=${encodeURIComponent(f.name)}${date === today ? '' : `&d=${date}`}`)}
+          />
         ))}
       </div>
     </section>
+  );
+}
+
+/** A Quick log food: tap adds your usual amount, press and hold opens its sheet to choose. */
+function QuickChip({ food, unit, onTap, onHold }: { food: Food; unit: 'kcal' | 'kJ'; onTap: () => void; onHold: () => void }) {
+  const press = useLongPress(onHold);
+  return (
+    <button className="chip" {...press.handlers} onClick={() => !press.wasLong() && onTap()} style={{ WebkitTouchCallout: 'none', userSelect: 'none' }}>
+      {food.name.length > 22 ? `${food.name.slice(0, 21)}…` : food.name}
+      <span className="mono fuel" style={{ fontSize: 11 }}>{energy(food.kcal, unit)}</span>
+    </button>
   );
 }
 
