@@ -11,7 +11,7 @@ import { Bar, toast, useGame, useRoute, Icon } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { EAT_GAPS, FOOD_HOURS, WATER_GAPS, hourLabel, pauseToday, pausedToday, reminderTimes, remindersOn, remindersSupported, setReminderTimes, setReminders, setWrap, wrapOn } from '../lib/reminders';
 import { TOKEN_URL, connect, disconnect, syncNow, useSync } from '../lib/sync';
-import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, PROGRESS_CARDS, QUICK_COUNTS, STARTS, WEIGH_EVERY, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
+import { ACCENTS, BOOSTS, BOTTLES, CARDS, MAX_TAGS, PROGRESS_CARDS, QUICK_COUNTS, STARTS, WEEK_GOALS, WEIGH_EVERY, ORDER_LABEL, QUICK_ACTIONS, SIZES, usePrefs, type Card } from '../lib/prefs';
 import { NOTE_TAGS } from '../lib/meals';
 import WhatsNew from '../components/WhatsNew';
 
@@ -386,6 +386,8 @@ function TodayForm() {
       <BottlePicker />
       <span className="mono mut">Training day adds (this device)</span>
       <BoostPicker />
+      <span className="mono mut">Weekly goal (this device)</span>
+      <WeekGoalPicker />
       <span className="mono mut">Training days (this device)</span>
       <TrainDaysPicker />
       <span className="mono mut">Weigh-in reminder (this device)</span>
@@ -546,6 +548,18 @@ function BoostPicker() {
 }
 
 /** Weekdays whose target gets the training-day boost by itself. */
+function WeekGoalPicker() {
+  const { weekGoal, setWeekGoal } = usePrefs();
+  return (
+    <>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 6 }} role="group" aria-label="Weekly goal">
+        {WEEK_GOALS.map((n) => <button key={n} className="chip" aria-pressed={weekGoal === n} onClick={() => setWeekGoal(n)}>{n ? `${n} days` : 'Off'}</button>)}
+      </div>
+      <span className="small mut">Days a week to hit both energy and protein. This week on Today tracks it.</span>
+    </>
+  );
+}
+
 function TrainDaysPicker() {
   const { trainDays, setTrainDays } = usePrefs();
   const days: [number, string][] = [[1, 'Mon'], [2, 'Tue'], [3, 'Wed'], [4, 'Thu'], [5, 'Fri'], [6, 'Sat'], [0, 'Sun']];

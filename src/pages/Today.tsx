@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
-import { SECTION_LABEL, combineAsFood, hasTag, toggleTag, daySummary, drinkMl, waterWeek, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals, topFoods, usualNow, weekBalance } from '../lib/meals';
+import { SECTION_LABEL, combineAsFood, hasTag, toggleTag, daySummary, drinkMl, waterWeek, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals, topFoods, usualNow, weekBalance, weekStats } from '../lib/meals';
 
 export default function Today() {
   const today = useToday();
@@ -757,6 +757,8 @@ function WeekStrip({ date, today, onPick }: { date: string; today: string; onPic
   // Only for the current week: where the past days leave you, and what catches up.
   const bal = start === weekStart(today) ? weekBalance(days, start, today, T.kcal) : null;
   const near = bal && Math.abs(bal.kcal) < 100 * bal.days;
+  const weekGoal = usePrefs((p) => p.weekGoal);
+  const hitWeek = weekGoal ? weekStats(days, start, today, T).hit : 0;
   const bar = (frac: number, color: string) => <i style={{ height: Math.max(3, Math.min(1, frac) * H), background: color }} />;
   return (
     <section className="card tight">
@@ -784,6 +786,15 @@ function WeekStrip({ date, today, onPick }: { date: string; today: string; onPic
           );
         })}
       </div>
+      {weekGoal > 0 && (
+        <div className="stack" style={{ gap: 4, marginTop: 8 }}>
+          <div className="between">
+            <span className="small"><span className="mut">Goal:</span> {Math.min(hitWeek, weekGoal)} of {weekGoal} days on both targets</span>
+            {hitWeek >= weekGoal && <span className="mono fuel">Done ✓</span>}
+          </div>
+          <Bar value={hitWeek} max={weekGoal} color="var(--fuel)" />
+        </div>
+      )}
       {bal && (
         <p className="small" style={{ margin: '8px 0 0' }}>
           <span className="mut">Week so far: </span>

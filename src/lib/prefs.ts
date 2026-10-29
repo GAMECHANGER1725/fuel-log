@@ -106,6 +106,9 @@ export const PROGRESS_CARDS = [
 export type ProgressCard = (typeof PROGRESS_CARDS)[number][0];
 const PROGRESS_IDS = PROGRESS_CARDS.map(([id]) => id);
 
+/** Days a week on both targets to aim for (0 = no weekly goal). */
+export const WEEK_GOALS = [0, 4, 5, 6, 7];
+
 /** How many of your foods Quick log shows. */
 export const QUICK_COUNTS = [6, 10, 16];
 
@@ -219,6 +222,8 @@ interface Prefs {
   /** Quick log: how many foods, and whether the chips wrap onto lines instead of scrolling sideways. */
   /** Progress cards hidden on this device. */
   /** Level-ups as the full-screen moment, or just a toast. */
+  weekGoal: number;
+  setWeekGoal: (n: number) => void;
   quietLevelUp: boolean;
   setQuietLevelUp: (q: boolean) => void;
   progressHidden: ProgressCard[];
@@ -277,6 +282,8 @@ export const usePrefs = create<Prefs>()(
       bottleMl: 500,
       badge: 'off',
       weighEvery: 7,
+      weekGoal: 0,
+      setWeekGoal: (weekGoal) => set({ weekGoal }),
       quietLevelUp: false,
       setQuietLevelUp: (quietLevelUp) => set({ quietLevelUp }),
       progressHidden: [],
@@ -320,9 +327,9 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'fuel-log-prefs',
-      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches, weighEvery: s.weighEvery, start: s.start, shopping: s.shopping, trainDays: s.trainDays, lastAutoBoost: s.lastAutoBoost, quickCount: s.quickCount, quickWrap: s.quickWrap, progressHidden: s.progressHidden, quietLevelUp: s.quietLevelUp, progressOrder: s.progressOrder }),
+      partialize: (s) => ({ hidden: s.hidden, accent: s.accent, size: s.size, newsSeen: s.newsSeen, order: s.order, ring: s.ring, boostKcal: s.boostKcal, noSuggest: s.noSuggest, bottleMl: s.bottleMl, foodSort: s.foodSort, badge: s.badge, tags: s.tags, searches: s.searches, weighEvery: s.weighEvery, start: s.start, shopping: s.shopping, trainDays: s.trainDays, lastAutoBoost: s.lastAutoBoost, quickCount: s.quickCount, quickWrap: s.quickWrap, progressHidden: s.progressHidden, quietLevelUp: s.quietLevelUp, progressOrder: s.progressOrder, weekGoal: s.weekGoal }),
       merge: (p, cur) => {
-        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown; weighEvery?: unknown; start?: unknown; shopping?: unknown; trainDays?: unknown; lastAutoBoost?: unknown; quickCount?: unknown; quickWrap?: unknown; progressHidden?: unknown; quietLevelUp?: unknown; progressOrder?: unknown };
+        const saved = (p ?? {}) as { hidden?: unknown; accent?: unknown; size?: unknown; newsSeen?: unknown; order?: unknown; ring?: unknown; boostKcal?: unknown; noSuggest?: unknown; bottleMl?: unknown; foodSort?: unknown; badge?: unknown; tags?: unknown; searches?: unknown; weighEvery?: unknown; start?: unknown; shopping?: unknown; trainDays?: unknown; lastAutoBoost?: unknown; quickCount?: unknown; quickWrap?: unknown; progressHidden?: unknown; quietLevelUp?: unknown; progressOrder?: unknown; weekGoal?: unknown };
         return {
           ...cur,
           hidden: cleanHidden(saved.hidden),
@@ -339,6 +346,7 @@ export const usePrefs = create<Prefs>()(
           quickCount: QUICK_COUNTS.includes(saved.quickCount as number) ? (saved.quickCount as number) : 10,
           quickWrap: saved.quickWrap === true,
           quietLevelUp: saved.quietLevelUp === true,
+          weekGoal: WEEK_GOALS.includes(saved.weekGoal as number) ? (saved.weekGoal as number) : 0,
           progressOrder: cleanOrderOf(saved.progressOrder, PROGRESS_IDS),
           progressHidden: Array.isArray(saved.progressHidden) ? PROGRESS_CARDS.map(([id]) => id).filter((id) => (saved.progressHidden as unknown[]).includes(id)) : [],
           lastAutoBoost: typeof saved.lastAutoBoost === 'string' ? saved.lastAutoBoost.slice(0, 10) : '',
