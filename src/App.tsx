@@ -16,7 +16,7 @@ import { startSync, useSync } from './lib/sync';
 import { autoDue, checkIn, useCoach } from './lib/coach';
 import { startReminders } from './lib/reminders';
 import { autoBoostDue, usePrefs } from './lib/prefs';
-import { dateOf } from './lib/dates';
+import { atOn, dateOf } from './lib/dates';
 import { badgeCount, dayTargets, dayTotals, energy, targetsCrossed } from './lib/nutrition';
 
 export default function App() {
@@ -79,14 +79,16 @@ export default function App() {
 
   // Training days chosen in Profile get the boost by themselves, once a day (turning it off again sticks).
   const trainDays = usePrefs((p) => p.trainDays);
+  // With sync on, it waits for the first sync and skips a day already changed on any device (it may have been turned off).
   useEffect(() => {
-    if (!unlocked) return;
+    if (!unlocked || !synced) return;
     const p = usePrefs.getState();
     const s = useStore.getState();
-    if (!autoBoostDue(today, dateOf(today).getDay(), trainDays, p.lastAutoBoost, !!s.days[today]?.boost)) return;
+    const changed = !!sync.conn && (s.days[today]?.m ?? 0) >= atOn(today, '00:00');
+    if (!autoBoostDue(today, dateOf(today).getDay(), trainDays, p.lastAutoBoost, !!s.days[today]?.boost, changed)) return;
     s.setBoost(today, p.boostKcal);
     p.setLastAutoBoost(today);
-  }, [unlocked, today, trainDays]);
+  }, [unlocked, synced, today, trainDays]);
 
   // What's left today on the home-screen icon, where the phone supports app badges (installed PWA).
   // ponytail: set only while the app runs, so after midnight it shows yesterday's number until it's opened.

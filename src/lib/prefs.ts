@@ -180,9 +180,13 @@ export const cleanShopping = (v: unknown): ShopItem[] =>
         .slice(-60)
     : [];
 
-/** Whether to switch on today's training-day boost by itself: a chosen weekday (0 = Sunday), not already done today, no boost yet. */
-export const autoBoostDue = (today: string, weekday: number, trainDays: number[], lastAuto: string, hasBoost: boolean): boolean =>
-  trainDays.includes(weekday) && lastAuto !== today && !hasBoost;
+/**
+ * Whether to switch on today's training-day boost by itself: a chosen weekday (0 = Sunday), not already done today on
+ * this device, no boost yet. `changedToday` (the day's water/checks/boost changed today, on any device) stops it, so
+ * with sync on, a boost turned off on the phone isn't switched back on when the laptop opens later.
+ */
+export const autoBoostDue = (today: string, weekday: number, trainDays: number[], lastAuto: string, hasBoost: boolean, changedToday = false): boolean =>
+  trainDays.includes(weekday) && lastAuto !== today && !hasBoost && !changedToday;
 
 export const cleanSort = (v: unknown): FoodSort => FOOD_SORTS.find(([id]) => id === v)?.[0] ?? 'match';
 

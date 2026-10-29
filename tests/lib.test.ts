@@ -648,6 +648,7 @@ describe('auto training day', () => {
     expect(autoBoostDue('2026-10-28', 3, [1, 3, 5], '2026-10-28', false)).toBe(false); // done today, then turned off
     expect(autoBoostDue('2026-10-28', 3, [1, 3, 5], '', true)).toBe(false); // already boosted
     expect(autoBoostDue('2026-10-29', 4, [1, 3, 5], '', false)).toBe(false); // not a training day
+    expect(autoBoostDue('2026-10-28', 3, [1, 3, 5], '', false, true)).toBe(false); // changed today on another device
   });
 });
 
