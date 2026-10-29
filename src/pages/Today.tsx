@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
-import { SECTION_LABEL, combineAsFood, hasTag, toggleTag, daySummary, drinkMl, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals, topFoods, usualNow, weekBalance } from '../lib/meals';
+import { SECTION_LABEL, combineAsFood, hasTag, toggleTag, daySummary, drinkMl, waterWeek, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals, topFoods, usualNow, weekBalance } from '../lib/meals';
 
 export default function Today() {
   const today = useToday();
@@ -408,6 +408,14 @@ export default function Today() {
           ))}
         </div>
         {drinkMl(day.entries) >= 100 && <p className="small mut" style={{ margin: '8px 0 0' }}>Plus about {(drinkMl(day.entries) / 1000).toFixed(1)} L from drinks you logged (milk, lassi, juice).</p>}
+        {(() => {
+          const wk = waterWeek(s.days, date, waterGoal);
+          return wk && (
+            <p className="mono dim" style={{ margin: '8px 0 0' }}>
+              Last 7 days: {wk.avgL.toFixed(1)} L a day, goal hit on {wk.hit} of {wk.tracked}
+            </p>
+          );
+        })()}
       </section>
     ),
     quality: (

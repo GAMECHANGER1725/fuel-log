@@ -174,6 +174,16 @@ export function usualNow(days: Record<string, DayLog>, today: string, hour: numb
     .map(([, s]) => s.last);
 }
 
+/**
+ * Water over the `n` days before today: average litres on days with any water logged, and days the goal (in 250 ml
+ * glasses) was hit. null with fewer than 2 such days, since a gap in logging isn't a dry day.
+ */
+export function waterWeek(days: Record<string, DayLog>, today: string, goal: number, n = 7): { avgL: number; hit: number; tracked: number } | null {
+  const glasses = Array.from({ length: n }, (_, i) => days[addDays(today, -1 - i)]?.water ?? 0).filter((g) => g > 0);
+  if (glasses.length < 2) return null;
+  return { avgL: (glasses.reduce((a, b) => a + b, 0) * 0.25) / glasses.length, hit: glasses.filter((g) => g >= goal).length, tracked: glasses.length };
+}
+
 export interface MealGroup {
   /** Same foods and amounts give the same key. */
   key: string;

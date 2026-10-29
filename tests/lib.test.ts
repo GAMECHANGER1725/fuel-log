@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanTags, pushSearch, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, rangeStats, usualNow, foodHistory, hasTag, searchLog, weekBalance, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
+import { daySummary, rangeStats, usualNow, waterWeek, foodHistory, hasTag, searchLog, weekBalance, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -608,6 +608,16 @@ describe('custom tags', () => {
     expect(cleanTags([' Gym ', 'gym', 'a,b', '', 3, 'x'.repeat(40)])).toEqual(['Gym', 'a b', 'x'.repeat(24)]);
     expect(cleanTags(Array.from({ length: 20 }, (_, i) => `t${i}`))).toHaveLength(12);
     expect(cleanTags([])).toEqual([]);
+  });
+});
+
+describe('water week', () => {
+  it('averages the tracked days before today', () => {
+    const today = '2026-10-29';
+    const w = (g: number): DayLog => ({ ...day([]), water: g });
+    const days = { '2026-10-28': w(8), '2026-10-27': w(4), '2026-10-25': w(12), [today]: w(20), '2026-10-20': w(10) };
+    expect(waterWeek(days, today, 8)).toEqual({ avgL: 2, hit: 2, tracked: 3 });
+    expect(waterWeek({ '2026-10-28': w(8) }, today, 8)).toBeNull();
   });
 });
 
