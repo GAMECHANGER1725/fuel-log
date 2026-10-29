@@ -40,6 +40,21 @@ export function foodHistory(days: Record<string, DayLog>, today: string, name: s
   return { days: count, last };
 }
 
+/** One-tap tags for the day note. */
+export const NOTE_TAGS = ['Gym', 'Rest day', 'Eating out', 'Busy day', 'Sick', 'Felt full', 'Low appetite'];
+
+const noteParts = (note: string) => note.split(',').map((x) => x.trim()).filter(Boolean);
+
+/** Whether a note already has a tag as one of its comma-separated parts. */
+export const hasTag = (note: string, tag: string) => noteParts(note).some((x) => x.toLowerCase() === tag.toLowerCase());
+
+/** Add a tag to the end of a note, or take it out if it's there. Other text is kept. */
+export function toggleTag(note: string, tag: string): string {
+  const parts = noteParts(note);
+  const out = hasTag(note, tag) ? parts.filter((x) => x.toLowerCase() !== tag.toLowerCase()) : [...parts, tag];
+  return out.join(', ');
+}
+
 export interface MealGroup {
   /** Same foods and amounts give the same key. */
   key: string;

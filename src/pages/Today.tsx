@@ -9,7 +9,7 @@ import { Bar, Icon, MacroGrid, Rings, SERVING_PRESETS, Sheet, Stepper, TimeField
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
 import { usePrefs, type Card, type OrderCard } from '../lib/prefs';
-import { SECTION_LABEL, combineAsFood, daySummary, drinkMl, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals } from '../lib/meals';
+import { NOTE_TAGS, SECTION_LABEL, combineAsFood, hasTag, toggleTag, daySummary, drinkMl, eatenByTime, lastQty, lastSection, logSections, mealProteinGoal, proteinMeals } from '../lib/meals';
 
 export default function Today() {
   const today = useToday();
@@ -598,10 +598,18 @@ function DayNote({ date, note }: { date: string; note: string }) {
       </section>
     );
   return (
-    <button className="card tight" style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', color: 'var(--ink)', border: 0 }} onClick={() => setEditing(true)}>
-      <span className="mut"><Icon name="pencil" size={18} /></span>
-      <span className="grow" style={note ? undefined : { color: 'var(--mut)' }}>{note || 'Add a note for the day'}</span>
-    </button>
+    <section className="card tight stack" style={{ gap: 6 }}>
+      <button className="item-btn" style={{ flexDirection: 'row', alignItems: 'center', gap: 12, width: '100%', minHeight: 44 }} onClick={() => setEditing(true)}>
+        <span className="mut"><Icon name="pencil" size={18} /></span>
+        <span className="grow" style={note ? undefined : { color: 'var(--mut)' }}>{note || 'Add a note for the day'}</span>
+      </button>
+      {/* One tap adds or removes a tag, no typing. */}
+      <div className="quick" role="group" aria-label="Tag the day">
+        {NOTE_TAGS.map((tag) => (
+          <button key={tag} className="chip" aria-pressed={hasTag(note, tag)} onClick={() => setNote(date, toggleTag(note, tag).slice(0, 200))}>{tag}</button>
+        ))}
+      </div>
+    </section>
   );
 }
 

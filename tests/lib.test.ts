@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, foodHistory, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
+import { daySummary, foodHistory, hasTag, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -581,6 +581,16 @@ describe('usual amount and targets crossed', () => {
     const T = { kcal: 3000, protein: 115, carbs: 0, fat: 0 };
     expect(targetsCrossed({ kcal: 2900, protein: 100, carbs: 0, fat: 0 }, { kcal: 3100, protein: 110, carbs: 0, fat: 0 }, T)).toEqual({ kcal: true, protein: false });
     expect(targetsCrossed({ kcal: 3100, protein: 120, carbs: 0, fat: 0 }, { kcal: 3300, protein: 130, carbs: 0, fat: 0 }, T)).toEqual({ kcal: false, protein: false });
+  });
+});
+
+describe('note tags', () => {
+  it('adds and removes a tag, keeping the rest of the note', () => {
+    expect(toggleTag('', 'Gym')).toBe('Gym');
+    expect(toggleTag('felt great', 'Gym')).toBe('felt great, Gym');
+    expect(toggleTag('felt great, gym ', 'Gym')).toBe('felt great');
+    expect(hasTag('Rest day, tired', 'rest day')).toBe(true);
+    expect(hasTag('Gymnastics', 'Gym')).toBe(false);
   });
 });
 

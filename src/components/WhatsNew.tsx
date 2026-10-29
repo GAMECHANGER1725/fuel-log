@@ -2,9 +2,10 @@ import { Sheet } from './ui';
 import { usePrefs } from '../lib/prefs';
 
 /** Bump when there is something new to show; the sheet opens once per device for each id. */
-export const NEWS_ID = '2026-10-29f';
+export const NEWS_ID = '2026-10-29g';
 
 const NEWS: [title: string, body: string, href?: string][] = [
+  ['Tag the day', 'Tap Gym, Rest day, Eating out and more under the day note to add them without typing. Tap again to take one off.'],
   ['Badge on the app icon', 'Show protein or energy still to eat on the home-screen icon. Turn it on in Profile, under Reminders.', '#/profile?open=display'],
   ['By weekday', 'Progress shows your average energy and protein for each day of the week, so a day you usually fall short stands out.', '#/progress'],
   ['Speak instead of typing', 'Tap the mic in Add food’s search, or Speak it under Describe it, and say what you ate.', '#/food'],
