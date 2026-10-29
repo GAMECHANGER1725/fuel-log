@@ -155,3 +155,45 @@ export function records(days: Record<string, DayLog>): Records {
   }
   return out;
 }
+
+export interface Insight {
+  tone: 'good' | 'tip';
+  text: string;
+}
+
+/**
+ * A few plain observations from the last 7 days before today (no AI): how often targets were hit,
+ * the average gap to the energy target, the lightest main meal, missed days and late eating.
+ * `fmtKcal` formats energy in the user's unit.
+ */
+export function insights(days: Record<string, DayLog>, today: string, target: { kcal: number; protein: number }, fmtKcal: (k: number) => string): Insight[] {
+  const keys = Array.from({ length: 7 }, (_, i) => addDays(today, -1 - i));
+  const logged = keys.filter((k) => days[k]?.entries.length);
+  if (logged.length < 2) return [];
+  const out: Insight[] = [];
+  const totals = logged.map((k) => ({ k, t: sumEntries(days[k].entries), kcalTarget: target.kcal + (days[k].boost ?? 0) }));
+  const hitK = totals.filter((x) => x.t.kcal >= x.kcalTarget).length;
+  const hitP = totals.filter((x) => x.t.protein >= target.protein).length;
+  const n = totals.length;
+  if (hitK === n && hitP === n) out.push({ tone: 'good', text: `You hit both targets on all ${n} days you logged. Keep it going.` });
+  else {
+    if (hitP < n / 2) out.push({ tone: 'tip', text: `Protein was hit on ${hitP} of ${n} days. A protein snack (yoghurt, eggs, paneer, a milk) between meals closes it.` });
+    const gap = totals.reduce((a, x) => a + (x.kcalTarget - x.t.kcal), 0) / n;
+    if (gap > 150) out.push({ tone: 'tip', text: `You're averaging ${fmtKcal(gap)} under your energy target. One extra snack a day covers that.` });
+    else if (gap < -300) out.push({ tone: 'tip', text: `You're averaging ${fmtKcal(-gap)} over your energy target. That's fine on a bulk if your weight trend is on track.` });
+    else out.push({ tone: 'good', text: `Energy is close to target on average (hit on ${hitK} of ${n} days).` });
+  }
+  // Lightest main meal, averaged over logged days.
+  const mains = (['breakfast', 'lunch', 'dinner'] as const).map((m) => ({
+    m,
+    kcal: logged.reduce((a, k) => a + logSections(days[k].entries).filter((s) => s.moment === m).reduce((b, s) => b + s.kcal, 0), 0) / n,
+  }));
+  const light = mains.reduce((a, b) => (b.kcal < a.kcal ? b : a));
+  if (light.kcal < target.kcal * 0.15) out.push({ tone: 'tip', text: `${SECTION_LABEL[light.m]} averages ${fmtKcal(light.kcal)}, your lightest meal. It's the easiest place to add more.` });
+  const missed = 7 - logged.length;
+  if (missed >= 2) out.push({ tone: 'tip', text: `${missed} of the last 7 days have nothing logged. Quick log on Today makes it a tap.` });
+  const late = logged.reduce((a, k) => a + days[k].entries.filter((e) => new Date(e.at).getHours() >= 21).reduce((b, e) => b + sumEntries([e]).kcal, 0), 0);
+  const all = totals.reduce((a, x) => a + x.t.kcal, 0);
+  if (all > 0 && late / all > 0.3) out.push({ tone: 'tip', text: `About ${Math.round((late / all) * 100)}% of your energy comes after 9 pm. Moving some earlier can help sleep.` });
+  return out.slice(0, 4);
+}

@@ -5,6 +5,7 @@ import { friendlyError, hasAi } from '../lib/ai';
 import { dayTotals, energy, fmt } from '../lib/nutrition';
 import { fmtDate } from '../lib/dates';
 import { XP } from '../lib/game';
+import { insights } from '../lib/meals';
 import { Icon, go, toast, useToday } from '../components/ui';
 
 const STATUS: Record<Review['status'], [string, string]> = {
@@ -26,6 +27,7 @@ export default function Coach() {
         </div>
       </header>
       <div className="page">
+        <FromLog />
         {!hasKey ? (
           <section className="card stack">
             <h2 className="h2">Set up your coach</h2>
@@ -41,6 +43,30 @@ export default function Coach() {
         )}
       </div>
     </>
+  );
+}
+
+/** Rule-based notes from the last week's log; shown with or without an AI key. */
+function FromLog() {
+  const days = useStore((s) => s.days);
+  const T = useStore((s) => s.settings.targets);
+  const unit = useStore((s) => s.settings.unit);
+  const today = useToday();
+  const list = insights(days, today, T, (k) => `${energy(k, unit)} ${unit}`);
+  if (!list.length) return null;
+  return (
+    <section className="card stack" style={{ gap: 10 }}>
+      <div className="between">
+        <h2 className="h2">From your last week</h2>
+        <span className="mono dim">No AI needed</span>
+      </div>
+      {list.map((x) => (
+        <div key={x.text} className="row" style={{ alignItems: 'flex-start', gap: 10 }}>
+          <span className={x.tone === 'good' ? 'pro' : 'fuel'} style={{ flex: 'none', marginTop: 2 }}><Icon name={x.tone === 'good' ? 'check' : 'bolt'} size={16} stroke={2.4} /></span>
+          <span className="small">{x.text}</span>
+        </div>
+      ))}
+    </section>
   );
 }
 
