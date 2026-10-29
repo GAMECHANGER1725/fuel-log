@@ -33,6 +33,8 @@ interface Actions {
   addWeighIn: (date: string, kg: number) => void;
   removeWeighIn: (date: string) => void;
   toggleFavourite: (f: Food) => void;
+  /** Change a favourite's name, serving or numbers (synced with the favourites block). */
+  updateFavourite: (id: string, patch: Partial<Food>) => void;
   /** Drop a food from Recent (per device, so no sync stamp). */
   removeRecent: (name: string) => void;
   /** Save your version of a recipe, or null to go back to the original. */
@@ -106,6 +108,7 @@ export const useStore = create<AppData & Actions>()(
               mod: Date.now(),
             };
           }),
+        updateFavourite: (id, patch) => set((s) => ({ favourites: s.favourites.map((f) => (f.id === id ? { ...f, ...patch } : f)), mod: Date.now() })),
         removeRecent: (name) => set((s) => ({ recents: s.recents.filter((r) => r.name.toLowerCase() !== name.toLowerCase()) })),
         setRecipeEdit: (name, r) =>
           set((s) => {
