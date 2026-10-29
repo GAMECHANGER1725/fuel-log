@@ -6,7 +6,7 @@ import { chartWindow, goalProgress, projectedDate, trendLine, weeklyNudge, weekl
 
 import { XP } from '../lib/game';
 import { useCoach } from '../lib/coach';
-import { records, topFoods, weekdayAverages, weekStats, weekSummary } from '../lib/meals';
+import { NOTE_TAGS, records, tagStats, topFoods, weekdayAverages, weekStats, weekSummary } from '../lib/meals';
 import { hasAi } from '../lib/ai';
 import { Bar, Icon, Sheet, toast, useGame, useRoute, useToday } from '../components/ui';
 
@@ -193,6 +193,28 @@ export default function Progress() {
                   <span className="grow">{d.note}</span>
                   <span className="mono mut" style={{ flex: 'none' }}>{energy(dayTotals(d).kcal, unit)}</span>
                 </a>
+              ))}
+            </section>
+          );
+        })()}
+
+        {(() => {
+          const stats = tagStats(s.days, today, NOTE_TAGS);
+          if (!stats.length) return null;
+          const diff = (v: number, show: string) => (Math.abs(v) < 0.5 ? '' : ` (${v > 0 ? '+' : '−'}${show})`);
+          return (
+            <section className="card">
+              <h2 className="h2" style={{ marginBottom: 2 }}>Tagged days</h2>
+              <p className="small mut" style={{ margin: '0 0 6px' }}>Average on days with each tag, against your other logged days (last 8 weeks).</p>
+              {stats.map((x) => (
+                <div key={x.tag} className="item" style={{ padding: '8px 0', gap: 8 }}>
+                  <span className="grow">{x.tag} <span className="mono dim">{x.n} days</span></span>
+                  <span className="mono mut" style={{ textAlign: 'right' }}>
+                    {energy(x.kcal, unit)} {unit}{diff(x.kcal - x.otherKcal, energy(Math.abs(x.kcal - x.otherKcal), unit))}
+                    <br />
+                    {fmt(x.protein)} g{diff(x.protein - x.otherProtein, `${fmt(Math.abs(x.protein - x.otherProtein))} g`)}
+                  </span>
+                </div>
               ))}
             </section>
           );

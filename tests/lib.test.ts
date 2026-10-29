@@ -12,7 +12,7 @@ import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
 import { ORDER, cleanAccent, cleanHidden, cleanOrder, cleanSize, cleanSort, moveIn, toggleIn } from '../src/lib/prefs';
-import { daySummary, foodHistory, hasTag, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
+import { daySummary, foodHistory, hasTag, tagStats, toggleTag, weekdayAverages, insights, lastQty, logSections, mealGroups, records, weekStats, weekSummary, combineAsFood, drinkMl, eatenByTime, lastSection, mealProteinGoal, proteinMeals, topFoods } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -591,6 +591,22 @@ describe('note tags', () => {
     expect(toggleTag('felt great, gym ', 'Gym')).toBe('felt great');
     expect(hasTag('Rest day, tired', 'rest day')).toBe(true);
     expect(hasTag('Gymnastics', 'Gym')).toBe(false);
+  });
+});
+
+describe('tag stats', () => {
+  it('compares tagged days with the rest', () => {
+    const today = '2026-10-29';
+    const d = (kcal: number, protein: number, note?: string): DayLog => ({ ...day([entry(kcal, protein)]), note });
+    const days: Record<string, DayLog> = {
+      '2026-10-28': d(3200, 140, 'Gym'),
+      '2026-10-27': d(3000, 120, 'felt ok, gym'),
+      '2026-10-26': d(2400, 90),
+      '2026-10-25': d(2600, 100, 'Eating out'),
+      [today]: d(9000, 900, 'Gym'),
+    };
+    expect(tagStats(days, today, ['Gym', 'Eating out', 'Sick'])).toEqual([{ tag: 'Gym', n: 2, kcal: 3100, protein: 130, otherKcal: 2500, otherProtein: 95 }]);
+    expect(tagStats(days, today, ['Eating out'], 56, 1)[0].n).toBe(1);
   });
 });
 

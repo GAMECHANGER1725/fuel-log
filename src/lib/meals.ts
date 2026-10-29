@@ -55,6 +55,37 @@ export function toggleTag(note: string, tag: string): string {
   return out.join(', ');
 }
 
+export interface TagStat {
+  tag: string;
+  /** Logged days with the tag, and their average energy and protein. */
+  n: number;
+  kcal: number;
+  protein: number;
+  /** The same averages over logged days without it. */
+  otherKcal: number;
+  otherProtein: number;
+}
+
+/**
+ * For each note tag used on at least `min` logged days in the last `lookback` days (before today), average energy and
+ * protein on those days next to the other logged days. Most-used first.
+ */
+export function tagStats(days: Record<string, DayLog>, today: string, tags: string[], lookback = 56, min = 2): TagStat[] {
+  const logged = Array.from({ length: lookback }, (_, i) => addDays(today, -1 - i))
+    .filter((k) => days[k]?.entries.length)
+    .map((k) => ({ note: days[k].note ?? '', t: sumEntries(days[k].entries) }));
+  const avg = (xs: typeof logged, m: 'kcal' | 'protein') => (xs.length ? xs.reduce((a, x) => a + x.t[m], 0) / xs.length : 0);
+  return tags
+    .map((tag) => {
+      const on = logged.filter((x) => hasTag(x.note, tag));
+      const off = logged.filter((x) => !hasTag(x.note, tag));
+      return { tag, n: on.length, kcal: avg(on, 'kcal'), protein: avg(on, 'protein'), otherKcal: avg(off, 'kcal'), otherProtein: avg(off, 'protein'), others: off.length };
+    })
+    .filter((x) => x.n >= min && x.others > 0)
+    .sort((a, b) => b.n - a.n)
+    .map(({ others: _o, ...x }) => x);
+}
+
 export interface MealGroup {
   /** Same foods and amounts give the same key. */
   key: string;
