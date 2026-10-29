@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type TouchEvent } from 'react';
 import { create } from 'zustand';
 import { useStore, dataOf } from '../lib/store';
 import { computeGame } from '../lib/game';
@@ -174,21 +174,33 @@ export function MacroGrid({ kcal, protein, carbs, fat, unit }: { kcal: number; p
 
 // ----- Toast ---------------------------------------------------------------------
 
-export const useToast = create<{ msg: string | null; xp: number; n: number; show: (msg: string, xp?: number) => void }>((set) => ({
+/** A button on a toast, e.g. Undo. */
+export interface ToastAction {
+  label: string;
+  run: () => void;
+}
+
+export const useToast = create<{ msg: string | null; xp: number; n: number; action?: ToastAction; show: (msg: string, xp?: number, action?: ToastAction) => void }>((set) => ({
   msg: null,
   xp: 0,
   n: 0,
-  show: (msg, xp = 0) => set((s) => ({ msg, xp, n: s.n + 1 })),
+  show: (msg, xp = 0, action) => set((s) => ({ msg, xp, action, n: s.n + 1 })),
 }));
-export const toast = (msg: string, xp = 0) => useToast.getState().show(msg, xp);
+export const toast = (msg: string, xp = 0, action?: ToastAction) => useToast.getState().show(msg, xp, action);
+/** Toast for food just logged, with Undo that takes it back off the log. */
+export const toastAdded = (msg: string, xp: number, date: string, ids: string[]) => {
+  navigator.vibrate?.(12); // a light tap where supported (Android); iOS ignores it
+  toast(msg, xp, { label: 'Undo', run: () => ids.forEach((id) => useStore.getState().removeEntry(date, id)) });
+};
 
 export function Toast() {
-  const { msg, xp, n } = useToast();
+  const { msg, xp, n, action } = useToast();
   const [shown, setShown] = useState(false);
   useEffect(() => {
     if (!msg) return;
     setShown(true);
-    const t = setTimeout(() => setShown(false), 2400);
+    // Longer when there's something to tap.
+    const t = setTimeout(() => setShown(false), action ? 5000 : 2400);
     return () => clearTimeout(t);
   }, [msg, n]);
   if (!shown || !msg) return null;
@@ -196,6 +208,17 @@ export function Toast() {
     <div className="toast" role="status" aria-live="polite" key={n}>
       <span>{msg}</span>
       {xp > 0 && <span className="xp">+{xp} XP</span>}
+      {action && (
+        <button
+          className="toast-act"
+          onClick={() => {
+            action.run();
+            setShown(false);
+          }}
+        >
+          {action.label}
+        </button>
+      )}
     </div>
   );
 }
@@ -210,6 +233,39 @@ export function useToday(): string {
     return () => clearInterval(t);
   }, []);
   return k;
+}
+
+/** Touch handlers for a quick horizontal swipe (mostly sideways, at least 70 px, under 600 ms). */
+export function useSwipe(onLeft: () => void, onRight: () => void) {
+  const start = useRef<{ x: number; y: number; t: number } | null>(null);
+  return {
+    onTouchStart: (e: TouchEvent) => {
+      const t = e.touches[0];
+      // Leave sideways gestures in inputs alone.
+      start.current = e.touches.length === 1 && !(e.target as HTMLElement).closest('input, textarea, select') ? { x: t.clientX, y: t.clientY, t: Date.now() } : null;
+    },
+    onTouchEnd: (e: TouchEvent) => {
+      const s = start.current;
+      start.current = null;
+      if (!s) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - s.x;
+      const dy = t.clientY - s.y;
+      if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6 || Date.now() - s.t > 600) return;
+      if (dx < 0) onLeft();
+      else onRight();
+    },
+  };
+}
+
+/** The current time, refreshed each minute, for "x min ago" text. */
+export function useNow(): number {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
 }
 
 export function useGame() {

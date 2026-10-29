@@ -99,7 +99,7 @@ export default function Progress() {
         <section className="card">
           <div className="between" style={{ marginBottom: 12 }}>
             <h2 className="h2">Days hit</h2>
-            <span className="mono mut">{hitBoth} of {elapsed.length}</span>
+            <span className="mono mut">{hitBoth} of {elapsed.length} · tap a day</span>
           </div>
           <div className="heat" role="img" aria-label={`Hit both targets on ${hitBoth} of the last ${elapsed.length} days`}>
             {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
@@ -108,7 +108,8 @@ export default function Progress() {
             {cells.map((k) => {
               const st = g.byDate.get(k);
               const cls = k > today ? 'future' : k === today ? 'today' : k < firstDay ? 'pre' : st?.hitKcal && st.hitProtein ? 'both' : st?.hitKcal || st?.hitProtein ? 'one' : '';
-              return <i key={k} className={cls} title={k} />;
+              // Past and today's cells open that day's log.
+              return k > today || k < firstDay ? <i key={k} className={cls} /> : <a key={k} className={cls} href={k === today ? '#/today' : `#/today?d=${k}`} aria-label={`Open ${fmtDate(k, { weekday: 'long', day: 'numeric', month: 'long' })}`} />;
             })}
           </div>
           <div className="row" style={{ gap: 14, marginTop: 12, flexWrap: 'wrap' }}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayTotals, energy, forGrams } from '../src/lib/nutrition';
+import { dayTotals, energy, forGrams, paceGap, sinceLast } from '../src/lib/nutrition';
 import { foodDue, waterDue } from '../src/lib/reminders';
 import { FOODS, gapFocus, gapSuggestions, mealsLeft, momentOf, searchFoods, timeFit } from '../src/lib/foods';
 import { RECIPES, recipeFor, recipeMacros } from '../src/lib/recipes';
@@ -11,6 +11,8 @@ import { parseProduct } from '../src/lib/off';
 import { errorFromResponse, extractText, parseReply } from '../src/lib/ai';
 import type { AppData, DayLog, Entry } from '../src/lib/types';
 import { checkPasscode, hashCode } from '../src/lib/auth';
+import { cleanAccent, cleanHidden, toggleIn } from '../src/lib/prefs';
+import { daySummary, logSections, mealGroups } from '../src/lib/meals';
 
 const entry = (kcal: number, protein: number, extra: Partial<Entry> = {}): Entry => ({
   id: Math.random().toString(36),
@@ -346,5 +348,95 @@ describe('reminders', () => {
     expect(foodDue(at(17), '2026-10-09')).toBe(false);
     expect(foodDue(at(17), '2026-10-08')).toBe(true);
     expect(foodDue(at(20), '')).toBe(false);
+  });
+});
+
+describe('prefs', () => {
+  it('keeps only known Today cards, once each', () => {
+    expect(cleanHidden(['water', 'nope', 'water', 3, 'tips'])).toEqual(['water', 'tips']);
+    expect(cleanHidden('water')).toEqual([]);
+    expect(cleanHidden(undefined)).toEqual([]);
+  });
+  it('toggles a card in and out', () => {
+    expect(toggleIn([], 'gap')).toEqual(['gap']);
+    expect(toggleIn(['gap', 'water'], 'gap')).toEqual(['water']);
+  });
+});
+
+describe('since last meal', () => {
+  const at = (ms: number) => ({ at: ms }) as Entry;
+  const now = 10 * 3_600_000;
+  it('counts from the latest entry before now', () => {
+    expect(sinceLast([at(now - 200 * 60_000), at(now - 80 * 60_000)], now)).toBe('1 h 20 min');
+    expect(sinceLast([at(now - 120 * 60_000)], now)).toBe('2 h');
+    expect(sinceLast([at(now - 25 * 60_000)], now)).toBe('25 min');
+    expect(sinceLast([at(now - 10_000)], now)).toBe('just now');
+  });
+  it('ignores entries timed later than now, and an empty log', () => {
+    expect(sinceLast([at(now - 60 * 60_000), at(now + 60 * 60_000)], now)).toBe('1 h');
+    expect(sinceLast([at(now + 60_000)], now)).toBeNull();
+    expect(sinceLast([], now)).toBeNull();
+  });
+});
+
+describe('usual meals', () => {
+  const t = '2026-10-29';
+  const e = (name: string, at: number, qty = 1): Entry => ({ id: name + at, name, serving: '', base: { kcal: 100, protein: 5, carbs: 0, fat: 0 }, qty, source: 'db', at });
+  const day = (entries: Entry[]): DayLog => ({ entries, water: 0, checks: {} });
+  const h = (k: string, hh: number, mm = 0) => atOn(k, `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`);
+  const y = addDays(t, -1);
+  const days = {
+    [t]: day([e('Toast', h(t, 7)), e('Milk', h(t, 7, 5)), e('Apple', h(t, 13))]),
+    [y]: day([e('milk', h(y, 7, 30)), e('Toast', h(y, 7, 40)), e('Dal', h(y, 19)), e('Rice', h(y, 19, 2), 2)]),
+  };
+  it('groups foods logged close together and counts repeats regardless of order or case', () => {
+    const g = mealGroups(days, t);
+    expect(g.map((x) => x.count)).toEqual([2, 1]);
+    expect(g[0].items.map((x) => x.name)).toEqual(['Toast', 'Milk']); // the latest time it was eaten
+    expect(g[1].kcal).toBe(300);
+  });
+  it('skips single foods and days outside the lookback', () => {
+    expect(mealGroups({ [t]: day([e('Apple', h(t, 13))]) }, t)).toEqual([]);
+    expect(mealGroups(days, addDays(t, 20))).toEqual([]);
+  });
+});
+
+describe('log sections', () => {
+  const k = '2026-10-29';
+  const e = (name: string, hhmm: string): Entry => ({ id: name, name, serving: '', base: { kcal: 200, protein: 10, carbs: 0, fat: 0 }, qty: 1, source: 'db', at: atOn(k, hhmm) });
+  it('splits the day by part of day with subtotals, in time order', () => {
+    const s = logSections([e('Dal', '19:30'), e('Toast', '07:10'), e('Milk', '07:15'), e('Roti', '13:00')]);
+    expect(s.map((x) => x.moment)).toEqual(['breakfast', 'lunch', 'dinner']);
+    expect(s[0].entries.map((x) => x.name)).toEqual(['Toast', 'Milk']);
+    expect([s[0].kcal, s[0].protein]).toEqual([400, 20]);
+  });
+});
+
+describe('accent', () => {
+  it('falls back to ember for anything unknown', () => {
+    expect(cleanAccent('grape')).toBe('grape');
+    expect(cleanAccent('neon')).toBe('ember');
+    expect(cleanAccent(undefined)).toBe('ember');
+  });
+});
+
+describe('pace', () => {
+  it('compares what you ate with an even spread from 7 am to 9 pm', () => {
+    expect(paceGap(1400, 2800, 14)).toBe(0); // halfway through the window
+    expect(paceGap(1000, 2800, 14)).toBe(-400);
+    expect(paceGap(2000, 2800, 14)).toBe(600);
+  });
+  it('says nothing early in the morning or late at night', () => {
+    expect(paceGap(0, 2800, 8)).toBeNull();
+    expect(paceGap(0, 2800, 21.5)).toBeNull();
+  });
+});
+
+describe('day summary', () => {
+  it('lists totals then each part of the day', () => {
+    const k = '2026-10-29';
+    const e = (name: string, hhmm: string, qty = 1): Entry => ({ id: name, name, serving: '', base: { kcal: 300, protein: 10, carbs: 0, fat: 0 }, qty, source: 'db', at: atOn(k, hhmm) });
+    const text = daySummary('Thursday', [e('Toast', '07:00', 2), e('Dal', '19:00')], { kcal: 3000, protein: 115 }, 'kcal', hhmmOf);
+    expect(text).toBe(['Thursday: 900 kcal of 3,000 kcal, 30 g of 115 g protein', '', 'Breakfast (600 kcal, 20 g)', '• 07:00 2× Toast', '', 'Dinner (300 kcal, 10 g)', '• 19:00 Dal'].join('\n'));
   });
 });

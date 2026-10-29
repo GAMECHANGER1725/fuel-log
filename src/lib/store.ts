@@ -19,16 +19,22 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 export type NewEntry = Omit<Entry, 'id' | 'at'>;
 
 interface Actions {
-  /** `at` = when it was eaten (epoch ms), now if left out. */
-  addEntries: (date: string, items: NewEntry[], foods?: Food[], at?: number) => void;
+  /** `at` = when it was eaten (epoch ms), now if left out. Returns the new entry ids (for undo). */
+  addEntries: (date: string, items: NewEntry[], foods?: Food[], at?: number) => string[];
   updateEntry: (date: string, id: string, patch: Partial<Entry>) => void;
   removeEntry: (date: string, id: string) => void;
+  /** Put a removed entry back (undo). It gets a new id, since the old one stays in `tomb`. */
+  restoreEntry: (date: string, e: Entry) => void;
+  /** Move an entry to another day (and time). Like delete + add, so sync sees the change on both days. */
+  moveEntry: (from: string, to: string, e: Entry) => void;
   copyDay: (from: string, to: string) => number;
   setWater: (date: string, glasses: number) => void;
   toggleCheck: (date: string, key: string) => void;
   addWeighIn: (date: string, kg: number) => void;
   removeWeighIn: (date: string) => void;
   toggleFavourite: (f: Food) => void;
+  /** Drop a food from Recent (per device, so no sync stamp). */
+  removeRecent: (name: string) => void;
   /** Save your version of a recipe, or null to go back to the original. */
   setRecipeEdit: (name: string, r: Recipe | null) => void;
   setSettings: (patch: Partial<Settings>) => void;
@@ -55,17 +61,24 @@ export const useStore = create<AppData & Actions>()(
           const now = Date.now();
           // A picked time can be later than now, so stamp the edit time too: sync compares `upd ?? at`.
           const stamp = at == null ? {} : { upd: now };
-          editDay(date, (d) => ({ ...d, entries: [...d.entries, ...items.map((e, i) => ({ ...e, id: uid(), at: (at ?? now) + i, ...stamp }))] }));
+          const added = items.map((e, i) => ({ ...e, id: uid(), at: (at ?? now) + i, ...stamp }));
+          editDay(date, (d) => ({ ...d, entries: [...d.entries, ...added] }));
           if (foods.length)
             set((s) => {
               const names = new Set(foods.map((f) => f.name.toLowerCase()));
               return { recents: [...foods, ...s.recents.filter((r) => !names.has(r.name.toLowerCase()))].slice(0, 20) };
             });
+          return added.map((e) => e.id);
         },
         updateEntry: (date, id, patch) => editDay(date, (d) => ({ ...d, entries: d.entries.map((e) => (e.id === id ? { ...e, ...patch, upd: Date.now() } : e)) })),
         removeEntry: (date, id) => {
           editDay(date, (d) => ({ ...d, entries: d.entries.filter((e) => e.id !== id) }));
           set((s) => ({ tomb: { ...s.tomb, [id]: Date.now() } }));
+        },
+        restoreEntry: (date, e) => editDay(date, (d) => ({ ...d, entries: [...d.entries, { ...e, id: uid(), upd: Date.now() }] })),
+        moveEntry: (from, to, e) => {
+          get().removeEntry(from, e.id);
+          get().restoreEntry(to, e);
         },
         copyDay: (from, to) => {
           const src = get().days[from]?.entries ?? [];
@@ -93,6 +106,7 @@ export const useStore = create<AppData & Actions>()(
               mod: Date.now(),
             };
           }),
+        removeRecent: (name) => set((s) => ({ recents: s.recents.filter((r) => r.name.toLowerCase() !== name.toLowerCase()) })),
         setRecipeEdit: (name, r) =>
           set((s) => {
             const { [name.toLowerCase()]: _old, ...rest } = s.recipeEdits;

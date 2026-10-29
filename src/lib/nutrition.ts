@@ -43,5 +43,29 @@ export function energy(kcal: number, unit: 'kcal' | 'kJ'): string {
 
 export const fmt = (n: number) => Math.round(n).toLocaleString('en-AU');
 
+/** Eating window for pace: the day's target spread evenly from 7 am to 9 pm. */
+const PACE_FROM = 7;
+const PACE_TO = 21;
+
+/**
+ * How far ahead (+) or behind (−) of pace you are, in kcal, at `hour` (e.g. 13.5). Null outside
+ * 9 am to 9 pm, when the comparison means little.
+ * ponytail: a straight line; it doesn't know you eat a big dinner. Good enough as a nudge.
+ */
+export function paceGap(eaten: number, target: number, hour: number): number | null {
+  if (hour < 9 || hour >= PACE_TO) return null;
+  return eaten - (target * (hour - PACE_FROM)) / (PACE_TO - PACE_FROM);
+}
+
+/** "3 h 20 min" since the latest entry eaten before `now`, or null if none. */
+export function sinceLast(entries: Entry[], now: number): string | null {
+  const last = Math.max(-Infinity, ...entries.map((e) => e.at).filter((at) => at <= now));
+  if (!Number.isFinite(last)) return null;
+  const m = Math.floor((now - last) / 60_000);
+  if (m < 1) return 'just now';
+  const h = Math.floor(m / 60);
+  return h ? `${h} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`;
+}
+
 /** Time an entry was logged, e.g. "7:20 am". */
 export const timeOf = (ms: number) => new Date(ms).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });

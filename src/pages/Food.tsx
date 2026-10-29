@@ -2,15 +2,16 @@ import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useStore } from '../lib/store';
 import { FOODS, foodMacros, searchFoods } from '../lib/foods';
 import { searchProducts } from '../lib/off';
-import { energy, forGrams, scale, KJ } from '../lib/nutrition';
+import { energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
 import type { Food, Source } from '../lib/types';
-import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, useEatenAt, useRoute, useToday } from '../components/ui';
+import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, toastAdded, useEatenAt, useRoute, useToday } from '../components/ui';
 import Scanner from '../components/Scanner';
 import AiSheet from '../components/AiSheet';
 import type { AiMode } from '../lib/ai';
 import RecipeView from '../components/RecipeView';
 import { recipeFor, withEdit } from '../lib/recipes';
+import { mealGroups, type MealGroup } from '../lib/meals';
 
 type Picked = { food: Food; source: Source };
 
@@ -19,8 +20,10 @@ export default function FoodPage() {
   const { params } = useRoute();
   const date = params.get('d') ?? today;
   const [q, setQ] = useState('');
+  const [tidy, setTidy] = useState<'fav' | 'recent' | null>(null); // which list shows remove buttons
   const [picked, setPicked] = useState<Picked | null>(null);
-  const [sheet, setSheet] = useState<'scan' | 'manual' | AiMode | null>(null);
+  // #/food?open=scan comes from the app-icon shortcut.
+  const [sheet, setSheet] = useState<'scan' | 'manual' | AiMode | null>(params.get('open') === 'scan' ? 'scan' : null);
   const [off, setOff] = useState<{ q: string; foods: Food[]; loading: boolean; failed: boolean }>({ q: '', foods: [], loading: false, failed: false });
   const s = useStore();
   const unit = s.settings.unit;
@@ -47,14 +50,37 @@ export default function FoodPage() {
     };
   }, [q]);
 
+  const usual = useMemo(() => mealGroups(s.days, today), [s.days, today]);
+  const logMeal = (g: MealGroup) => {
+    const ids = s.addEntries(date, g.items.map(({ name, serving, base, qty, source, foodId }) => ({ name, serving, base, qty, source, foodId })));
+    toastAdded(`Added ${g.items.length} items`, Math.min(g.items.length, XP.mealCap) * XP.meal, date, ids);
+    back();
+  };
+
   const back = () => go(date === today ? 'today' : `today?d=${date}`);
-  const row = (f: Food, source: Source) => (
+  // + logs one serving straight away; tapping the name opens the sheet for amount and time.
+  const quickAdd = (food: Food, source: Source) => {
+    const f = withEdit(food, s.recipeEdits);
+    const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: foodMacros(f), qty: 1, source, foodId: f.id }], [f]);
+    toastAdded(`Added ${f.name}`, XP.meal + (source === 'scan' ? XP.scan : 0), date, ids);
+  };
+  const row = (f: Food, source: Source, remove?: () => void) => (
     <div key={`${source}-${f.id}`} className="item">
       <button className="item-btn" onClick={() => setPicked({ food: f, source })}>
         <span>{f.name}</span>
         <span className="mono mut">{f.serving} · {energy(f.kcal, unit)} {unit} · {f.protein} g P{recipeFor(f, s.recipeEdits) ? ' · recipe' : ''}</span>
       </button>
-      <button className="btn icon" aria-label={`Add ${f.name}`} onClick={() => setPicked({ food: f, source })}>+</button>
+      {remove ? (
+        <button className="btn icon danger" aria-label={`Remove ${f.name} from this list`} onClick={remove}><Icon name="close" size={18} /></button>
+      ) : (
+        <button className="btn icon" aria-label={`Add one ${f.name} now`} onClick={() => quickAdd(f, source)}>+</button>
+      )}
+    </div>
+  );
+  const listHead = (title: string, list: 'fav' | 'recent') => (
+    <div className="between" style={{ marginBottom: 6, alignItems: 'center' }}>
+      <h2 className="h2">{title}</h2>
+      <button className="btn sm" aria-pressed={tidy === list} onClick={() => setTidy(tidy === list ? null : list)}>{tidy === list ? 'Done' : 'Edit'}</button>
     </div>
   );
 
@@ -110,15 +136,32 @@ export default function FoodPage() {
           </section>
         ) : (
           <>
+            {usual.length > 0 && (
+              <section>
+                <div className="between" style={{ marginBottom: 6 }}>
+                  <h2 className="h2">Usual meals</h2>
+                  <span className="mono mut">Foods you log together</span>
+                </div>
+                {usual.map((g) => (
+                  <div key={g.key} className="item">
+                    <button className="item-btn" onClick={() => logMeal(g)}>
+                      <span>{g.items.map((e) => (e.qty !== 1 ? `${e.qty}× ${e.name}` : e.name)).join(' + ')}</span>
+                      <span className="mono mut">{energy(g.kcal, unit)} {unit} · {fmt(g.protein)} g P{g.count > 1 ? ` · ${g.count}× in 2 weeks` : ''}</span>
+                    </button>
+                    <button className="btn icon" aria-label={`Log ${g.items.map((e) => e.name).join(', ')}`} onClick={() => logMeal(g)}>+</button>
+                  </div>
+                ))}
+              </section>
+            )}
             {s.favourites.length > 0 && (
               <section>
-                <h2 className="h2" style={{ marginBottom: 6 }}>Favourites</h2>
-                {s.favourites.map((f) => row(f, f.barcode ? 'off' : 'db'))}
+                {listHead('Favourites', 'fav')}
+                {s.favourites.map((f) => row(f, f.barcode ? 'off' : 'db', tidy === 'fav' ? () => { s.toggleFavourite(f); toast(`Removed ${f.name} from favourites`, 0, { label: 'Undo', run: () => useStore.getState().toggleFavourite(f) }); } : undefined))}
               </section>
             )}
             <section>
-              <h2 className="h2" style={{ marginBottom: 6 }}>Recent</h2>
-              {s.recents.length ? s.recents.slice(0, 12).map((f) => row(f, f.barcode ? 'off' : 'db')) : <p className="empty">Foods you log show up here for one-tap adding.</p>}
+              {s.recents.length ? listHead('Recent', 'recent') : <h2 className="h2" style={{ marginBottom: 6 }}>Recent</h2>}
+              {s.recents.length ? s.recents.slice(0, 12).map((f) => row(f, f.barcode ? 'off' : 'db', tidy === 'recent' ? () => s.removeRecent(f.name) : undefined)) : <p className="empty">Foods you log show up here for one-tap adding.</p>}
             </section>
           </>
         )}
@@ -161,8 +204,8 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
       useGrams && food.per100
         ? { name: food.name, serving: `${grams} g`, base: m, qty: 1 }
         : { name: food.name, serving: food.serving, base: foodMacros(food), qty };
-    s.addEntries(date, [{ ...entry, source, foodId: food.id }], [food], when.at);
-    toast(`Added ${food.name}`, xp);
+    const ids = s.addEntries(date, [{ ...entry, source, foodId: food.id }], [food], when.at);
+    toastAdded(`Added ${food.name}`, xp, date, ids);
     onClose();
   };
 
@@ -213,23 +256,23 @@ function ManualSheet({ date, onClose }: { date: string; onClose: () => void }) {
   const [f, setF] = useState({ name: '', serving: '', energy: '', protein: '', carbs: '', fat: '', fav: false });
   const n = (v: string) => Math.max(0, parseFloat(v) || 0);
   const kcal = unit === 'kJ' ? n(f.energy) / KJ : n(f.energy);
-  const ok = f.name.trim() && kcal > 0;
+  const ok = kcal > 0;
   const when = useEatenAt(date);
   const set = (k: keyof typeof f) => (e: ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: k === 'fav' ? e.target.checked : e.target.value });
 
   const save = () => {
     const base = { kcal: Math.round(kcal), protein: n(f.protein), carbs: n(f.carbs), fat: n(f.fat) };
-    const food: Food = { id: `fav-${Date.now().toString(36)}`, name: f.name.trim().slice(0, 60), serving: f.serving.trim() || '1 serve', ...base };
-    s.addEntries(date, [{ name: food.name, serving: food.serving, base, qty: 1, source: 'custom' }], [food], when.at);
+    const food: Food = { id: `fav-${Date.now().toString(36)}`, name: f.name.trim().slice(0, 60) || 'Quick add', serving: f.serving.trim() || '1 serve', ...base };
+    const ids = s.addEntries(date, [{ name: food.name, serving: food.serving, base, qty: 1, source: 'custom' }], [food], when.at);
     if (f.fav) s.toggleFavourite(food);
-    toast(`Added ${food.name}`, XP.meal);
+    toastAdded(`Added ${food.name}`, XP.meal, date, ids);
     onClose();
   };
 
   return (
     <Sheet onClose={onClose} label="Enter food">
       <h2 className="h2" style={{ fontSize: 26 }}>Enter it yourself</h2>
-      <label className="field"><span>Food</span><input className="input" value={f.name} onChange={set('name')} placeholder="Mum's paneer paratha" maxLength={60} /></label>
+      <label className="field"><span>Food (optional)</span><input className="input" value={f.name} onChange={set('name')} placeholder="Mum's paneer paratha" maxLength={60} /></label>
       <label className="field"><span>Serving</span><input className="input" value={f.serving} onChange={set('serving')} placeholder="1 paratha" maxLength={40} /></label>
       <div className="grid2">
         <label className="field"><span>Energy ({unit})</span><input className="input" inputMode="decimal" type="number" min="0" value={f.energy} onChange={set('energy')} /></label>

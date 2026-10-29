@@ -188,6 +188,7 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .check { width: 24px; height: 24px; border-radius: 999px; flex: none; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 2px var(--line2); }
 .check.on { background: var(--fuel); color: var(--on-fuel); box-shadow: none; }
 .toast .xp { color: var(--fuel); font-size: 13px; }
+.toast-act { border: 0; background: none; color: var(--fuel); font: inherit; font-weight: 800; padding: 6px 2px 6px 8px; margin: -6px -6px -6px 0; min-height: 36px; cursor: pointer; }
 
 /* Bottom nav: icons only, ember tint on the current tab, round + in the middle. */
 .nav a[aria-current='page'] { background: var(--fuel-soft); color: var(--fuel); }
@@ -210,11 +211,11 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 
 /* Heatmap */
 .heat { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
-.heat > i { aspect-ratio: 1; border-radius: 10px; background: var(--track); }
-.heat > i.both { background: var(--fuel); }
-.heat > i.one { background: var(--fuel-dim); }
-.heat > i.today { background: transparent; box-shadow: inset 0 0 0 2px var(--fuel); }
-.heat > i.pre { background: transparent; }
+.heat > i, .heat > a { aspect-ratio: 1; border-radius: 10px; background: var(--track); }
+.heat > .both { background: var(--fuel); }
+.heat > .one { background: var(--fuel-dim); }
+.heat > .today { background: transparent; box-shadow: inset 0 0 0 2px var(--fuel); }
+.heat > .pre { background: transparent; }
 .heat > i.future { background: transparent; box-shadow: inset 0 0 0 1.5px var(--line2); }
 
 .photo { width: 100%; max-height: 240px; object-fit: cover; border-radius: 18px; display: block; }
@@ -228,3 +229,34 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Tap the date on Today to jump to any day: a native date input laid invisibly over the label. */
+.date-pick { position: relative; cursor: pointer; }
+.date-pick input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; border: 0; padding: 0; cursor: pointer; }
+.date-pick input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+
+/* Accent colours (Profile > Display, per device). Ember is the default above. Light shades need the
+   extra attribute selector to outrank the plain dark rule. Dim and soft tints are mixed from the ground. */
+:root[data-accent] { --fuel-dim: color-mix(in srgb, var(--fuel) 38%, var(--bg)); --fuel-soft: color-mix(in srgb, var(--fuel) 12%, var(--bg)); }
+:root[data-accent='rose'] { --fuel: #ff7aa8; }
+:root[data-accent='grape'] { --fuel: #c29bff; }
+:root[data-accent='leaf'] { --fuel: #8fdc6e; }
+:root[data-accent='gold'] { --fuel: #f5c542; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark'])[data-accent='rose'] { --fuel: #c2185b; }
+  :root:not([data-theme='dark'])[data-accent='grape'] { --fuel: #7a3fd1; }
+  :root:not([data-theme='dark'])[data-accent='leaf'] { --fuel: #3d7f1f; }
+  :root:not([data-theme='dark'])[data-accent='gold'] { --fuel: #8a6400; }
+}
+:root[data-theme='light'][data-accent='rose'] { --fuel: #c2185b; }
+:root[data-theme='light'][data-accent='grape'] { --fuel: #7a3fd1; }
+:root[data-theme='light'][data-accent='leaf'] { --fuel: #3d7f1f; }
+:root[data-theme='light'][data-accent='gold'] { --fuel: #8a6400; }
+
+/* This-week strip on Today */
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.week-day { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 0; border: 0; border-radius: 14px; background: none; color: var(--mut); min-height: 48px; }
+.week-day[aria-current='date'] { background: var(--s2); color: var(--ink); }
+.week-day:disabled { opacity: 0.35; }
+.week-bars { display: flex; align-items: flex-end; gap: 3px; }
+.week-bars > i { width: 8px; border-radius: 4px; transition: height 0.4s ease; }
