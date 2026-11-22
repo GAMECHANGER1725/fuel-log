@@ -90,6 +90,37 @@ export function Sheet({ onClose, children, label }: { onClose: () => void; child
   );
 }
 
+/**
+ * Calls `save(value)` shortly after `value` stops changing, and once more when the component goes away (so
+ * closing a sheet mid-edit still keeps the draft). The returned `stop()` cancels both: call it after the thing
+ * was logged, before clearing the draft.
+ */
+export function useAutosave<T>(value: T, save: (v: T) => void, delay = 500): () => void {
+  const latest = useRef(value);
+  const saver = useRef(save);
+  const state = useRef({ dirty: false, stopped: false });
+  latest.current = value;
+  saver.current = save;
+  useEffect(() => {
+    if (state.current.stopped) return;
+    state.current.dirty = true;
+    const t = setTimeout(() => {
+      state.current.dirty = false;
+      saver.current(latest.current);
+    }, delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  useEffect(
+    () => () => {
+      if (state.current.dirty && !state.current.stopped) saver.current(latest.current);
+    },
+    [],
+  );
+  return () => {
+    state.current.stopped = true;
+  };
+}
+
 /** Quick serving sizes shown under a servings Stepper. */
 /** The "when did you eat it" time for a log sheet: starts at the current time, as epoch ms on `date`. */
 export function useEatenAt(date: string, initial = Date.now()) {

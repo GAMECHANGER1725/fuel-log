@@ -3,7 +3,8 @@ import { useStore } from '../lib/store';
 import { analyse, fileToJpeg, hasAi, friendlyError, MAX_PHOTOS, type AiItem, type AiMode, type AiResult } from '../lib/ai';
 import { sumEntries, energy } from '../lib/nutrition';
 import { XP } from '../lib/game';
-import { go, Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, useEatenAt } from './ui';
+import { go, Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, toast, useAutosave, useEatenAt } from './ui';
+import { imgUrl, useDraft } from '../lib/draft';
 
 type Row = AiItem & { qty: number; removed: boolean };
 
@@ -18,12 +19,14 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
   const c = COPY[mode];
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
-  const [imgs, setImgs] = useState<{ base64: string; mimeType: string; url: string }[]>([]);
-  const [text, setText] = useState(initialText);
+  // Whatever was typed or attached last time this sheet was closed unfinished comes back (see lib/draft.ts).
+  const saved = useRef(useDraft.getState().ai[mode]).current;
+  const [imgs, setImgs] = useState<{ base64: string; mimeType: string; url: string }[]>(() => (saved?.imgs ?? []).map((im) => ({ ...im, url: imgUrl(im) })));
+  const [text, setText] = useState(initialText.trim() ? initialText : saved?.text ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState<AiResult | null>(null);
-  const [rows, setRows] = useState<Row[]>([]);
+  const [result, setResult] = useState<AiResult | null>(saved?.result ?? null);
+  const [rows, setRows] = useState<Row[]>(saved?.rows ?? []);
   const [sizing, setSizing] = useState<number | null>(null); // row whose serving picker is open
 
   const noKey = !hasAi(s.settings);
@@ -57,6 +60,10 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
   const total = sumEntries(entries.map((e) => ({ ...e, id: '', at: 0 })));
   const xp = Math.min(entries.length, XP.mealCap) * XP.meal + (entries.length ? XP.scan : 0);
   const patch = (i: number, p: Partial<Row>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...p } : r)));
+
+  const stopSave = useAutosave({ text, imgs, result, rows }, (v) =>
+    useDraft.getState().setAi(mode, { text: v.text, imgs: v.imgs.map(({ base64, mimeType }) => ({ base64, mimeType })), result: v.result, rows: v.rows }),
+  );
 
   if (noKey)
     return (
@@ -208,6 +215,9 @@ export default function AiSheet({ mode, date, initialText = '', onClose }: { mod
               disabled={!entries.length}
               onClick={() => {
                 s.addEntries(date, entries.map((e) => ({ ...e, serving: e.serving === '__new' ? '' : e.serving })), [], when.at);
+                stopSave();
+                useDraft.getState().setAi(mode, null);
+                useDraft.getState().setQ('');
                 toast(`Logged ${entries.length} item${entries.length === 1 ? '' : 's'}`, xp);
                 onClose();
               }}

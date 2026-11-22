@@ -6,7 +6,8 @@ import { searchProducts } from '../lib/off';
 import { coverage, dayTargets, dayTotals, energy, fmt, forGrams, scale, KJ } from '../lib/nutrition';
 import { XP } from '../lib/game';
 import type { Food, Macros, Source } from '../lib/types';
-import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, toastAdded, useEatenAt, useRoute, useToday } from '../components/ui';
+import { Icon, MacroGrid, SERVING_PRESETS, Sheet, Stepper, TimeField, go, toast, toastAdded, useAutosave, useEatenAt, useRoute, useToday } from '../components/ui';
+import { hasSheetDraft, useDraft, type ManualDraft } from '../lib/draft';
 import Scanner from '../components/Scanner';
 import AiSheet from '../components/AiSheet';
 import { hasAi, type AiMode } from '../lib/ai';
@@ -21,7 +22,14 @@ export default function FoodPage() {
   const today = useToday();
   const { params } = useRoute();
   const date = params.get('d') ?? today;
-  const [q, setQ] = useState('');
+  // The search text is kept as a draft (lib/draft.ts) so it is still here when you come back to this page.
+  const [q, setQ0] = useState(() => useDraft.getState().q);
+  const setQ = (v: string) => {
+    setQ0(v);
+    useDraft.getState().setQ(v);
+  };
+  const draft = useDraft();
+  const [resumed, setResumed] = useState(false); // the open sheet was started from the draft card, not from the search text
   const [browse, setBrowse] = useState<Browse | null>(null);
   const sort = usePrefs((p) => p.foodSort);
   const setSort = usePrefs((p) => p.setFoodSort);
@@ -53,6 +61,7 @@ export default function FoodPage() {
   const fromLink = useRef(!!opened || !!picked);
   const closeSheet = () => {
     setSheet(null);
+    setResumed(false);
     if (fromLink.current) back();
   };
   const [off, setOff] = useState<{ q: string; foods: Food[]; loading: boolean; failed: boolean }>({ q: '', foods: [], loading: false, failed: false });
@@ -91,6 +100,7 @@ export default function FoodPage() {
   const usual = useMemo(() => mealGroups(s.days, today), [s.days, today]);
   const logMeal = (g: MealGroup) => {
     const ids = s.addEntries(date, g.items.map(({ name, serving, base, qty, source, foodId }) => ({ name, serving, base, qty, source, foodId })));
+    useDraft.getState().setQ('');
     toastAdded(`Added ${g.items.length} items`, Math.min(g.items.length, XP.mealCap) * XP.meal, date, ids);
     back();
   };
@@ -101,6 +111,7 @@ export default function FoodPage() {
     const f = withEdit(food, s.recipeEdits);
     const qty = lastQty(s.days, today, f.name, f.serving);
     const ids = s.addEntries(date, [{ name: f.name, serving: f.serving, base: foodMacros(f), qty, source, foodId: f.id }], [f]);
+    useDraft.getState().setQ('');
     toastAdded(`Added ${qty !== 1 ? `${qty}× ` : ''}${f.name}`, XP.meal + (source === 'scan' ? XP.scan : 0), date, ids);
   };
   const row = (f: Food, source: Source, remove?: () => void, onOpen?: () => void, move?: { up: boolean; down: boolean }) => (
@@ -158,6 +169,21 @@ export default function FoodPage() {
       </header>
 
       <div className="page">
+        {hasSheetDraft(draft) && !sheet && !picked && (
+          <section className="card tight stack" style={{ gap: 8 }} aria-label="Unfinished drafts">
+            <span className="mono mut">Unfinished · saved on this phone</span>
+            {draftRows(draft).map((d) => (
+              <div key={d.id} className="row" style={{ gap: 8 }}>
+                <div className="grow stack" style={{ gap: 2, minWidth: 0 }}>
+                  <span style={{ fontWeight: 600 }}>{d.title}</span>
+                  <span className="mono mut" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.detail}</span>
+                </div>
+                <button className="btn sm primary" onClick={() => { setResumed(true); setSheet(d.sheet); }}>Resume</button>
+                <button className="btn icon sm" aria-label={`Discard ${d.title} draft`} onClick={() => (d.sheet === 'manual' ? draft.setManual(null) : draft.setAi(d.sheet, null))}><Icon name="close" size={18} /></button>
+              </div>
+            ))}
+          </section>
+        )}
         <label className="search">
           <span className="mut"><Icon name="search" size={20} /></span>
           <input ref={searchRef} aria-label="Search foods" placeholder="Search foods or products" value={q} onChange={(e) => setQ(e.target.value)} enterKeyHint="search" />
@@ -267,7 +293,7 @@ export default function FoodPage() {
           }}
         />
       )}
-      {sheet === 'manual' && <ManualSheet date={date} initialName={q.trim()} onClose={closeSheet} />}
+      {sheet === 'manual' && <ManualSheet date={date} initialName={resumed ? '' : q.trim()} onClose={closeSheet} />}
       {sheet === 'scan' && (
         <Scanner
           onClose={closeSheet}
@@ -280,9 +306,23 @@ export default function FoodPage() {
           known={[...s.favourites, ...s.recents]}
         />
       )}
-      {(sheet === 'photo' || sheet === 'label' || sheet === 'text') && <AiSheet mode={sheet} date={date} initialText={sheet === 'text' ? q : ''} onClose={closeSheet} />}
+      {(sheet === 'photo' || sheet === 'label' || sheet === 'text') && <AiSheet key={sheet} mode={sheet} date={date} initialText={sheet === 'text' && !resumed ? q : ''} onClose={closeSheet} />}
     </>
   );
+}
+
+/** The unfinished sheets to list on the page, in the order they sit on it. */
+function draftRows(d: ReturnType<typeof useDraft.getState>): { id: string; sheet: 'manual' | AiMode; title: string; detail: string }[] {
+  const out: { id: string; sheet: 'manual' | AiMode; title: string; detail: string }[] = [];
+  const ai: [AiMode, string][] = [['photo', 'Snap meal'], ['label', 'Read label'], ['text', 'Describe it']];
+  for (const [mode, title] of ai) {
+    const a = d.ai[mode];
+    if (!a) continue;
+    const bits = [a.imgs.length ? `${a.imgs.length} photo${a.imgs.length === 1 ? '' : 's'}` : '', a.result ? `${a.rows.filter((r) => !r.removed).length} foods found` : '', a.text.trim()].filter(Boolean);
+    out.push({ id: mode, sheet: mode, title, detail: bits.join(' · ') });
+  }
+  if (d.manual) out.push({ id: 'manual', sheet: 'manual', title: 'Enter numbers yourself', detail: [d.manual.name.trim(), d.manual.energy ? `energy ${d.manual.energy}` : ''].filter(Boolean).join(' · ') || 'Numbers typed' });
+  return out;
 }
 
 function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onClose: () => void }) {
@@ -307,6 +347,7 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
         ? { name: food.name, serving: `${grams} g`, base: m, qty: 1 }
         : { name: food.name, serving: food.serving, base: foodMacros(food), qty };
     const ids = s.addEntries(date, [{ ...entry, source, foodId: food.id }], [food], when.at);
+    useDraft.getState().setQ('');
     toastAdded(`Added ${food.name}`, xp, date, ids);
     onClose();
   };
@@ -356,7 +397,17 @@ function AddSheet({ date, picked, onClose }: { date: string; picked: Picked; onC
 function ManualSheet({ date, initialName = '', onClose }: { date: string; initialName?: string; onClose: () => void }) {
   const s = useStore();
   const unit = s.settings.unit;
-  const [f, setF] = useState({ name: initialName.slice(0, 60), serving: '', energy: '', protein: '', carbs: '', fat: '', fav: false });
+  // Numbers typed last time this sheet was closed unfinished come back (see lib/draft.ts).
+  const [f, setF] = useState<ManualDraft>(() => {
+    const saved = useDraft.getState().manual;
+    return saved ? { ...saved, name: saved.name || initialName.slice(0, 60) } : { name: initialName.slice(0, 60), serving: '', energy: '', protein: '', carbs: '', fat: '', fav: false };
+  });
+  const stopSave = useAutosave(f, (v) => useDraft.getState().setManual(v));
+  const finish = () => {
+    stopSave();
+    useDraft.getState().setManual(null);
+    useDraft.getState().setQ('');
+  };
   const n = (v: string) => Math.max(0, parseFloat(v) || 0);
   const kcal = unit === 'kJ' ? n(f.energy) / KJ : n(f.energy);
   const ok = kcal > 0;
@@ -376,6 +427,7 @@ function ManualSheet({ date, initialName = '', onClose }: { date: string; initia
     const food = build();
     if (!s.favourites.some((x) => x.name.toLowerCase() === food.name.toLowerCase())) s.toggleFavourite(food);
     toast(`Saved ${food.name} to favourites`);
+    finish();
     onClose();
   };
   const save = () => {
@@ -384,6 +436,7 @@ function ManualSheet({ date, initialName = '', onClose }: { date: string; initia
     const ids = s.addEntries(date, [{ name: food.name, serving: food.serving, base, qty: 1, source: 'custom' }], [food], when.at);
     if (f.fav) s.toggleFavourite(food);
     toastAdded(`Added ${food.name}`, XP.meal, date, ids);
+    finish();
     onClose();
   };
 
